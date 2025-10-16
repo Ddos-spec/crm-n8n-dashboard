@@ -1,8 +1,9 @@
 import axios from 'axios';
 import { getToken, removeToken } from './auth.js';
+import { getRestApiBaseUrl } from './env.js';
 
 const api = axios.create({
-  baseURL: import.meta.env.VITE_API_URL ? `${import.meta.env.VITE_API_URL}/api` : 'http://localhost:3001/api'
+  baseURL: getRestApiBaseUrl()
 });
 
 api.interceptors.request.use((config) => {

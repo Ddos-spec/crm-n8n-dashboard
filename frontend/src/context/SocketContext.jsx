@@ -2,6 +2,7 @@ import { createContext, useContext, useEffect, useMemo, useState } from 'react';
 import { io } from 'socket.io-client';
 import { getToken } from '../utils/auth.js';
 import { useAuthContext } from './AuthContext.jsx';
+import { getSocketUrl } from '../utils/env.js';
 
 const SocketContext = createContext();
 
@@ -22,7 +23,7 @@ export const SocketProvider = ({ children }) => {
       return undefined;
     }
 
-    const instance = io(import.meta.env.VITE_API_URL || 'http://localhost:3001', {
+    const instance = io(getSocketUrl(), {
       autoConnect: false,
       transports: ['websocket'],
       auth: { token }
