@@ -58,10 +58,19 @@ docker compose up --build
 Layanan backend tersedia pada port 3001 dan frontend pada port 3000.
 
 ## Deploy di EasyPanel
-1. Buat dua aplikasi Docker (backend & frontend) menggunakan Dockerfile masing-masing.
-2. Set environment variable sesuai `.env.example` backend pada layanan backend.
-3. Set `VITE_API_URL` pada layanan frontend menuju URL publik backend.
-4. Pastikan firewall membuka port 3000 (frontend) dan 3001 (backend).
+Gunakan langkah berikut untuk meluncurkan frontend di EasyPanel agar terhubung dengan backend yang sudah berjalan:
+
+1. Masuk ke proyek EasyPanel Anda lalu buat layanan baru bertipe **App** dengan nama `crm-frontend`.
+2. Hubungkan repositori GitHub `https://github.com/Ddos-spec/crm-n8n-dashboard` dan set *build path* ke folder `frontend/`.
+3. Pilih metode build **Dockerfile** dan pastikan container diekspos pada port internal 80 (default Nginx image).
+4. Tambahkan environment variable berikut agar frontend membaca URL runtime yang benar:
+   - `REACT_APP_API_URL=https://projek-n8n-crm-backend.qk6yxt.easypanel.host`
+   - `REACT_APP_SOCKET_URL=https://projek-n8n-crm-backend.qk6yxt.easypanel.host`
+   - `NODE_ENV=production`
+5. Setelah build & deploy selesai, EasyPanel akan memberikan URL publik (misal `https://projek-n8n-crm-frontend.qk6yxt.easypanel.host`).
+6. Verifikasi login (`admin/admin123`), data dashboard, dan koneksi real-time melalui Socket.IO.
+
+> **Catatan:** Frontend mendukung injeksi konfigurasi runtime melalui `public/env-config.js`. Jika URL backend berubah, cukup perbarui environment variable di EasyPanel dan restart layanan tanpa rebuild image.
 
 ## Peningkatan Database
 Jalankan skrip pada folder `database/` terhadap database terkait:
