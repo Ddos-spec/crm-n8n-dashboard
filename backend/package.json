@@ -6,7 +6,8 @@
   "scripts": {
     "start": "node server.js",
     "dev": "nodemon server.js",
-    "lint": "eslint ."
+    "lint": "eslint .",
+    "ensure-admin": "node scripts/ensureAdminUser.js"
   },
   "dependencies": {
     "axios": "^1.6.8",

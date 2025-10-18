@@ -89,3 +89,17 @@ ALTER TABLE customers
     ADD COLUMN IF NOT EXISTS tags TEXT,
     ADD COLUMN IF NOT EXISTS notes TEXT,
     ADD COLUMN IF NOT EXISTS campaign_id INTEGER REFERENCES marketing_campaigns(id);
+
+INSERT INTO dashboard_users (email, password_hash, full_name, role)
+VALUES (
+    'admin@crm.local',
+    '$2a$10$5LNX6z5OcD9MudgdiV48DekO7eeas6k8A/2c1tutbFShXKG4BVhYG',
+    'Administrator',
+    'admin'
+)
+ON CONFLICT (email) DO UPDATE
+SET
+    password_hash = EXCLUDED.password_hash,
+    full_name = EXCLUDED.full_name,
+    role = EXCLUDED.role,
+    updated_at = NOW();
