@@ -7,7 +7,7 @@ if (envResult.error) {
 }
 
 const FALLBACK_CONNECTIONS = {
-  DATABASE_URL: 'postgres://postgres:postgres@localhost:5432/cswa_v2',
+  DATABASE_URL: 'postgres://postgres:postgres@localhost:5432/crm',
   MARKETER_DATABASE_URL: 'postgres://postgres:postgres@localhost:5432/marketerv2'
 };
 
