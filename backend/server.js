@@ -14,17 +14,45 @@ dotenv.config();
 const app = express();
 const server = http.createServer(app);
 
-const allowedOrigins = process.env.CORS_ORIGIN
+const DEFAULT_ALLOWED_ORIGINS = [
+  'https://projek-n8n-crm-frontend.qk6yxt.easypanel.host',
+  'http://localhost:3000'
+];
+
+const configuredOrigins = process.env.CORS_ORIGIN
   ? process.env.CORS_ORIGIN.split(',').map((origin) => origin.trim())
-  : '*';
+  : DEFAULT_ALLOWED_ORIGINS;
+
+const allowAllOrigins = Array.isArray(configuredOrigins)
+  ? configuredOrigins.includes('*')
+  : configuredOrigins === '*';
+
+const resolveCorsOrigin = (origin, callback) => {
+  if (allowAllOrigins) {
+    return callback(null, true);
+  }
+
+  if (!origin) {
+    return callback(null, true);
+  }
+
+  if (configuredOrigins.includes(origin)) {
+    return callback(null, true);
+  }
+
+  return callback(null, false);
+};
+
+const corsOptions = {
+  origin: allowAllOrigins ? true : resolveCorsOrigin,
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept', 'Origin']
+};
 
 app.use(helmet());
-app.use(
-  cors({
-    origin: allowedOrigins === '*' ? true : allowedOrigins,
-    credentials: true
-  })
-);
+app.use(cors(corsOptions));
+app.options('*', cors(corsOptions));
 app.use(express.json({ limit: '2mb' }));
 app.use(express.urlencoded({ extended: true }));
 app.use(morgan('combined'));
@@ -35,8 +63,9 @@ app.use(errorHandler);
 
 const io = new Server(server, {
   cors: {
-    origin: allowedOrigins === '*' ? true : allowedOrigins,
-    methods: ['GET', 'POST']
+    origin: allowAllOrigins ? true : configuredOrigins,
+    methods: ['GET', 'POST'],
+    credentials: true
   }
 });
 
