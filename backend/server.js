@@ -19,40 +19,76 @@ const DEFAULT_ALLOWED_ORIGINS = [
   'http://localhost:3000'
 ];
 
+const normalizeOrigin = (origin) => {
+  if (!origin) {
+    return origin;
+  }
+
+  try {
+    const { origin: parsedOrigin } = new URL(origin);
+    return parsedOrigin;
+  } catch (_error) {
+    return origin.replace(/\/$/, '');
+  }
+};
+
 const configuredOrigins = process.env.CORS_ORIGIN
-  ? process.env.CORS_ORIGIN.split(',').map((origin) => origin.trim())
+  ? process.env.CORS_ORIGIN.split(',').map((origin) => origin.trim()).filter(Boolean)
   : DEFAULT_ALLOWED_ORIGINS;
 
-const allowAllOrigins = Array.isArray(configuredOrigins)
-  ? configuredOrigins.includes('*')
-  : configuredOrigins === '*';
+const allowedOrigins = new Set(configuredOrigins.map(normalizeOrigin));
 
-const resolveCorsOrigin = (origin, callback) => {
-  if (allowAllOrigins) {
-    return callback(null, true);
-  }
-
+const isOriginAllowed = (origin) => {
   if (!origin) {
-    return callback(null, true);
+    return true;
   }
 
-  if (configuredOrigins.includes(origin)) {
-    return callback(null, true);
+  if (allowedOrigins.has('*')) {
+    return true;
   }
 
-  return callback(null, false);
+  return allowedOrigins.has(normalizeOrigin(origin));
 };
 
 const corsOptions = {
-  origin: allowAllOrigins ? true : resolveCorsOrigin,
+  origin: (origin, callback) => {
+    if (isOriginAllowed(origin)) {
+      return callback(null, origin || true);
+    }
+    return callback(null, false);
+  },
   credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept', 'Origin']
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
+  optionsSuccessStatus: 204
 };
+
+const socketCorsOrigin = allowedOrigins.has('*')
+  ? true
+  : Array.from(allowedOrigins);
 
 app.use(helmet());
 app.use(cors(corsOptions));
 app.options('*', cors(corsOptions));
+
+app.use((req, res, next) => {
+  const requestOrigin = req.headers.origin;
+
+  if (isOriginAllowed(requestOrigin) && requestOrigin) {
+    res.header('Access-Control-Allow-Origin', requestOrigin);
+    res.header('Vary', 'Origin');
+  }
+
+  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+  res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  res.header('Access-Control-Allow-Credentials', 'true');
+
+  if (req.method === 'OPTIONS') {
+    return res.sendStatus(204);
+  }
+
+  return next();
+});
 app.use(express.json({ limit: '2mb' }));
 app.use(express.urlencoded({ extended: true }));
 app.use(morgan('combined'));
@@ -63,7 +99,7 @@ app.use(errorHandler);
 
 const io = new Server(server, {
   cors: {
-    origin: allowAllOrigins ? true : configuredOrigins,
+    origin: socketCorsOrigin,
     methods: ['GET', 'POST'],
     credentials: true
   }
