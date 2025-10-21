@@ -74,6 +74,40 @@ const CONFIG = {
         escalationThreshold: 0.8
     },
 
+    // UI Configuration
+    ui: {
+        chartPalette: {
+            pie: ['#2563eb', '#38bdf8', '#f97316', '#10b981'],
+            line: '#2563eb',
+            bar: ['#2563eb', '#1d4ed8', '#22d3ee', '#10b981'],
+            funnel: ['#94a3b8', '#2563eb', '#f97316', '#10b981']
+        },
+        classificationPills: {
+            AI_AGENT: 'bg-sky-50 text-sky-600 border-sky-100',
+            ESCALATE_PRICE: 'bg-amber-50 text-amber-600 border-amber-100',
+            ESCALATE_URGENT: 'bg-rose-50 text-rose-600 border-rose-100',
+            BUYING_READY: 'bg-emerald-50 text-emerald-600 border-emerald-100'
+        },
+        activityBadges: {
+            escalation: {
+                iconBg: 'bg-rose-500/10 text-rose-600',
+                badge: 'bg-rose-100 text-rose-600'
+            },
+            lead_contact: {
+                iconBg: 'bg-sky-500/10 text-sky-600',
+                badge: 'bg-sky-100 text-sky-600'
+            },
+            conversion: {
+                iconBg: 'bg-emerald-500/10 text-emerald-600',
+                badge: 'bg-emerald-100 text-emerald-600'
+            },
+            default: {
+                iconBg: 'bg-slate-500/10 text-slate-600',
+                badge: 'bg-slate-100 text-slate-600'
+            }
+        }
+    },
+
     // Notification Configuration
     notifications: {
         adminPhone: '085771518231',
