@@ -20,8 +20,9 @@ class CRMDashboard {
     setupEventListeners() {
         // Tab navigation
         document.querySelectorAll('.tab-button').forEach(button => {
-            button.addEventListener('click', (e) => {
-                this.switchTab(e.target.dataset.tab);
+            button.addEventListener('click', (event) => {
+                const targetButton = event.currentTarget;
+                this.switchTab(targetButton.dataset.tab, targetButton);
             });
         });
 
@@ -59,37 +60,67 @@ class CRMDashboard {
         }
 
         // Refresh button
-        const refreshButton = document.querySelector('button:has(.fa-sync-alt)');
+        const refreshButton = document.getElementById('refresh-data');
         if (refreshButton) {
             refreshButton.addEventListener('click', () => this.refreshAllData());
         }
+
+        requestAnimationFrame(() => {
+            const defaultTab = document.querySelector('.tab-button[data-tab="overview"]');
+            if (defaultTab) {
+                defaultTab.classList.remove('text-slate-500');
+                defaultTab.classList.add('text-slate-900', 'font-semibold');
+                defaultTab.setAttribute('aria-selected', 'true');
+                this.updateTabIndicator(defaultTab);
+            }
+        });
     }
 
-    switchTab(tabName) {
-        // Update tab buttons
-        document.querySelectorAll('.tab-button').forEach(button => {
-            button.classList.remove('active', 'border-blue-500', 'text-blue-600');
-            button.classList.add('border-transparent', 'text-gray-500');
+    switchTab(tabName, triggerButton = null) {
+        const tabButtons = document.querySelectorAll('.tab-button');
+        tabButtons.forEach(button => {
+            button.classList.remove('text-slate-900', 'font-semibold');
+            button.classList.add('text-slate-500');
+            button.setAttribute('aria-selected', 'false');
         });
-        
-        const activeTab = document.querySelector(`[data-tab="${tabName}"]`);
-        if (activeTab) {
-            activeTab.classList.remove('border-transparent', 'text-gray-500');
-            activeTab.classList.add('active', 'border-blue-500', 'text-blue-600');
+
+        const activeButton = triggerButton || document.querySelector(`.tab-button[data-tab="${tabName}"]`);
+        if (activeButton) {
+            activeButton.classList.remove('text-slate-500');
+            activeButton.classList.add('text-slate-900', 'font-semibold');
+            activeButton.setAttribute('aria-selected', 'true');
         }
 
-        // Update tab content
         document.querySelectorAll('.tab-content').forEach(content => {
             content.classList.add('hidden');
         });
-        
+
         const targetContent = document.getElementById(`${tabName}-tab`);
         if (targetContent) {
             targetContent.classList.remove('hidden');
         }
 
-        this.currentTab = tabName;
-        this.loadTabData(tabName);
+        this.updateTabIndicator(activeButton);
+
+        if (this.currentTab !== tabName) {
+            this.currentTab = tabName;
+            this.loadTabData(tabName);
+        }
+    }
+
+    updateTabIndicator(activeButton) {
+        const indicator = document.getElementById('tab-indicator');
+        const tablist = document.getElementById('tablist');
+
+        if (!indicator || !tablist || !activeButton) {
+            return;
+        }
+
+        const { offsetWidth, offsetHeight, offsetLeft, offsetTop } = activeButton;
+        indicator.style.width = `${offsetWidth}px`;
+        indicator.style.height = `${offsetHeight}px`;
+        indicator.style.transform = `translate(${offsetLeft}px, ${offsetTop}px)`;
+        indicator.style.opacity = 1;
     }
 
     async loadInitialData() {
@@ -415,45 +446,88 @@ class CRMDashboard {
         const container = document.getElementById('chat-monitor');
         if (!container) return;
 
-        container.innerHTML = chats.map(chat => `
-            <div class="flex items-start space-x-3 p-3 rounded-lg ${chat.type === 'in' ? 'bg-blue-50' : 'bg-gray-50'}">
-                <div class="flex-shrink-0">
-                    <div class="w-8 h-8 rounded-full ${chat.type === 'in' ? 'bg-blue-500' : 'bg-gray-500'} flex items-center justify-center">
-                        <i class="fas ${chat.type === 'in' ? 'fa-user' : 'fa-robot'} text-white text-sm"></i>
+        if (!chats || chats.length === 0) {
+            container.innerHTML = `
+                <div class="flex flex-col items-center justify-center rounded-2xl border border-dashed border-slate-200 bg-white/60 py-10 text-center text-slate-400">
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.6" stroke="currentColor" class="h-10 w-10">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M7.5 8.25h9m-9 3h5.25M21 12a9 9 0 1 0-18 0 9 9 0 0 0 18 0Zm-5.25 5.25 4.5 4.5" />
+                    </svg>
+                    <p class="mt-4 text-sm font-medium">Belum ada chat terbaru</p>
+                </div>
+            `;
+            return;
+        }
+
+        container.innerHTML = chats.map(chat => {
+            const isInbound = chat.type === 'in';
+            const avatarTone = this.getChatAvatarTone(chat.type);
+            const pillClasses = this.getClassificationPillClasses(chat.classification);
+            const classificationLabel = this.formatClassificationLabel(chat.classification);
+            const bubbleClasses = isInbound
+                ? 'bg-white/80 border border-sky-100 text-slate-700'
+                : 'bg-gradient-to-r from-sky-500 to-blue-500 text-white shadow-lg shadow-sky-500/30';
+            const alignment = isInbound ? 'flex-row' : 'flex-row-reverse';
+            const metaAlignment = isInbound ? 'justify-start text-slate-400' : 'justify-end text-white/80';
+
+            return `
+                <div class="group flex ${alignment} items-start gap-3">
+                    <div class="icon-ring flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-2xl ${avatarTone.background} ${avatarTone.text}">
+                        ${this.getChatIcon(chat.type)}
+                    </div>
+                    <div class="max-w-full flex-1 space-y-2 sm:max-w-md">
+                        <div class="chat-bubble rounded-3xl px-4 py-3 ${bubbleClasses}">
+                            <div class="flex items-center justify-between gap-3">
+                                <p class="text-sm font-semibold ${isInbound ? 'text-slate-800' : 'text-white'}">${chat.customerName}</p>
+                                <span class="text-xs ${isInbound ? 'text-slate-400' : 'text-white/80'}">${this.formatTime(chat.timestamp)}</span>
+                            </div>
+                            <p class="mt-2 text-sm ${isInbound ? 'text-slate-600' : 'text-white/90'}">${chat.message}</p>
+                        </div>
+                        <div class="flex items-center gap-2 ${metaAlignment}">
+                            <span class="${pillClasses}">${classificationLabel}</span>
+                            <span class="text-xs ${isInbound ? 'text-slate-400' : 'text-white/70'}">${chat.phone}</span>
+                        </div>
                     </div>
                 </div>
-                <div class="flex-1 min-w-0">
-                    <div class="flex items-center justify-between">
-                        <p class="text-sm font-medium text-gray-900">${chat.customerName}</p>
-                        <span class="text-xs text-gray-500">${this.formatTime(chat.timestamp)}</span>
-                    </div>
-                    <p class="text-sm text-gray-700 mt-1">${chat.message}</p>
-                    <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800 mt-2">
-                        ${chat.classification}
-                    </span>
-                </div>
-            </div>
-        `).join('');
+            `;
+        }).join('');
     }
 
     renderRecentActivities(activities) {
         const container = document.getElementById('recent-activities');
         if (!container) return;
 
-        container.innerHTML = activities.map(activity => `
-            <div class="flex items-center space-x-3 p-3 hover:bg-gray-50 rounded-lg">
-                <div class="flex-shrink-0">
-                    <div class="w-8 h-8 rounded-full ${this.getActivityColor(activity.type)} flex items-center justify-center">
-                        <i class="fas ${this.getActivityIcon(activity.type)} text-white text-sm"></i>
+        if (!activities || activities.length === 0) {
+            container.innerHTML = `
+                <div class="flex flex-col items-center justify-center rounded-2xl border border-dashed border-slate-200 bg-white/60 py-10 text-center text-slate-400">
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.6" stroke="currentColor" class="h-10 w-10">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6h6m4.5 0a10.5 10.5 0 1 1-21 0 10.5 10.5 0 0 1 21 0Z" />
+                    </svg>
+                    <p class="mt-4 text-sm font-medium">Belum ada aktivitas terbaru</p>
+                </div>
+            `;
+            return;
+        }
+
+        container.innerHTML = activities.map(activity => {
+            const style = this.getActivityStyle(activity.type);
+            return `
+                <div class="activity-item flex items-start gap-4 rounded-2xl px-4 py-3">
+                    <div class="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-xl ${style.iconBg}">
+                        ${style.icon}
+                    </div>
+                    <div class="flex-1 space-y-1">
+                        <div class="flex items-center justify-between gap-3">
+                            <p class="text-sm font-semibold text-slate-800">${activity.description}</p>
+                            <span class="text-xs text-slate-400">${this.formatTime(activity.timestamp)}</span>
+                        </div>
+                        ${activity.customer ? `<p class="text-xs text-slate-500">Customer: <span class="font-medium text-slate-700">${activity.customer}</span></p>` : ''}
+                        <span class="inline-flex w-fit items-center gap-2 rounded-full px-3 py-1 text-xs font-medium ${style.badge}">
+                            ${style.badgeIcon}${style.label}
+                        </span>
                     </div>
                 </div>
-                <div class="flex-1 min-w-0">
-                    <p class="text-sm font-medium text-gray-900">${activity.description}</p>
-                    ${activity.customer ? `<p class="text-sm text-gray-500">Customer: ${activity.customer}</p>` : ''}
-                    <p class="text-xs text-gray-400">${this.formatTime(activity.timestamp)}</p>
-                </div>
-            </div>
-        `).join('');
+            `;
+        }).join('');
     }
 
     renderCustomerList() {
@@ -668,23 +742,39 @@ class CRMDashboard {
             'BUYING_READY': 15
         };
 
+        const palette = CONFIG?.ui?.chartPalette || {};
         const classificationTrace = {
             values: Object.values(classificationData),
             labels: Object.keys(classificationData),
             type: 'pie',
-            hole: 0.4,
+            hole: 0.45,
             marker: {
-                colors: ['#3B82F6', '#EF4444', '#F59E0B', '#10B981']
-            }
+                colors: palette.pie || ['#2563eb', '#38bdf8', '#f97316', '#10b981'],
+                line: { color: '#ffffff', width: 2 }
+            },
+            hoverinfo: 'label+percent',
+            textinfo: 'value'
         };
 
         const classificationLayout = {
-            margin: { t: 0, b: 0, l: 0, r: 0 },
+            margin: { t: 10, b: 10, l: 10, r: 10 },
             showlegend: true,
-            legend: { orientation: 'h', x: 0, y: -0.1 }
+            legend: {
+                orientation: 'h',
+                x: 0.5,
+                y: -0.2,
+                xanchor: 'center',
+                font: { family: 'Inter, sans-serif', color: '#475569' }
+            },
+            paper_bgcolor: 'rgba(0,0,0,0)',
+            plot_bgcolor: 'rgba(0,0,0,0)',
+            font: { family: 'Inter, sans-serif', color: '#0f172a' }
         };
 
-        Plotly.newPlot('classification-chart', [classificationTrace], classificationLayout, {responsive: true});
+        Plotly.newPlot('classification-chart', [classificationTrace], classificationLayout, {
+            responsive: true,
+            displayModeBar: false
+        });
 
         // Interaction Chart
         const interactionData = data ? data.interactions : [
@@ -700,50 +790,97 @@ class CRMDashboard {
             y: interactionData.map(d => d.count),
             type: 'scatter',
             mode: 'lines+markers',
-            line: { color: '#3B82F6', width: 3 },
-            marker: { color: '#3B82F6', size: 8 }
+            line: { color: palette.line || '#2563eb', width: 3, shape: 'spline' },
+            marker: {
+                color: palette.line || '#2563eb',
+                size: 8,
+                line: { color: '#ffffff', width: 2 }
+            },
+            hovertemplate: '%{y} interaksi<extra>%{x}</extra>'
         };
 
         const interactionLayout = {
-            margin: { t: 20, b: 40, l: 40, r: 20 },
-            xaxis: { title: 'Tanggal' },
-            yaxis: { title: 'Jumlah Interaksi' },
+            margin: { t: 20, b: 40, l: 50, r: 20 },
+            xaxis: {
+                title: '',
+                showgrid: true,
+                gridcolor: 'rgba(148, 163, 184, 0.25)',
+                tickfont: { color: '#64748b' }
+            },
+            yaxis: {
+                title: '',
+                showgrid: true,
+                gridcolor: 'rgba(148, 163, 184, 0.25)',
+                zeroline: false,
+                tickfont: { color: '#64748b' }
+            },
+            hovermode: 'x unified',
+            paper_bgcolor: 'rgba(0,0,0,0)',
+            plot_bgcolor: 'rgba(0,0,0,0)',
             showlegend: false
         };
 
-        Plotly.newPlot('interaction-chart', [interactionTrace], interactionLayout, {responsive: true});
+        Plotly.newPlot('interaction-chart', [interactionTrace], interactionLayout, {
+            responsive: true,
+            displayModeBar: false
+        });
 
         // AI Performance Chart
         const aiPerformanceTrace = {
             x: ['AI_AGENT', 'ESCALATE_PRICE', 'ESCALATE_URGENT', 'BUYING_READY'],
             y: [92, 87, 94, 89],
             type: 'bar',
-            marker: { color: ['#3B82F6', '#EF4444', '#F59E0B', '#10B981'] }
+            marker: {
+                color: palette.bar || ['#2563eb', '#38bdf8', '#f97316', '#10b981'],
+                line: { color: '#ffffff', width: 1.5 }
+            }
         };
 
         const aiPerformanceLayout = {
-            margin: { t: 20, b: 60, l: 40, r: 20 },
-            xaxis: { title: 'Klasifikasi' },
-            yaxis: { title: 'Akurasi (%)' },
-            showlegend: false
+            margin: { t: 20, b: 60, l: 50, r: 20 },
+            xaxis: {
+                title: '',
+                tickfont: { color: '#475569' },
+                showgrid: false
+            },
+            yaxis: {
+                title: 'Akurasi (%)',
+                gridcolor: 'rgba(148, 163, 184, 0.25)',
+                tickfont: { color: '#475569' }
+            },
+            paper_bgcolor: 'rgba(0,0,0,0)',
+            plot_bgcolor: 'rgba(0,0,0,0)',
+            showlegend: false,
+            font: { family: 'Inter, sans-serif', color: '#0f172a' }
         };
 
-        Plotly.newPlot('ai-performance-chart', [aiPerformanceTrace], aiPerformanceLayout, {responsive: true});
+        Plotly.newPlot('ai-performance-chart', [aiPerformanceTrace], aiPerformanceLayout, {
+            responsive: true,
+            displayModeBar: false
+        });
 
         // Marketing Conversion Chart
         const conversionTrace = {
             x: ['Sent', 'Delivered', 'Responded', 'Converted'],
             y: [156, 142, 23, 8],
             type: 'funnel',
-            marker: { color: ['#6B7280', '#3B82F6', '#F59E0B', '#10B981'] }
+            marker: {
+                color: palette.funnel || ['#94a3b8', '#2563eb', '#f97316', '#10b981']
+            }
         };
 
         const conversionLayout = {
             margin: { t: 20, b: 40, l: 40, r: 20 },
+            paper_bgcolor: 'rgba(0,0,0,0)',
+            plot_bgcolor: 'rgba(0,0,0,0)',
+            font: { family: 'Inter, sans-serif', color: '#0f172a' },
             showlegend: false
         };
 
-        Plotly.newPlot('marketing-conversion-chart', [conversionTrace], conversionLayout, {responsive: true});
+        Plotly.newPlot('marketing-conversion-chart', [conversionTrace], conversionLayout, {
+            responsive: true,
+            displayModeBar: false
+        });
     }
 
     renderAnalyticsStats(data) {
@@ -771,22 +908,98 @@ class CRMDashboard {
         return date.toLocaleDateString('id-ID');
     }
 
-    getActivityColor(type) {
-        switch (type) {
-            case 'escalation': return 'bg-red-500';
-            case 'lead_contact': return 'bg-blue-500';
-            case 'conversion': return 'bg-green-500';
-            default: return 'bg-gray-500';
-        }
+    getChatAvatarTone(type) {
+        const tones = {
+            in: { background: 'bg-sky-500/10', text: 'text-sky-600' },
+            out: { background: 'bg-indigo-500/10', text: 'text-indigo-600' }
+        };
+
+        return tones[type] || tones.in;
     }
 
-    getActivityIcon(type) {
-        switch (type) {
-            case 'escalation': return 'fa-exclamation-triangle';
-            case 'lead_contact': return 'fa-paper-plane';
-            case 'conversion': return 'fa-handshake';
-            default: return 'fa-info-circle';
+    getChatIcon(type) {
+        if (type === 'out') {
+            return `
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor" class="h-5 w-5">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M12 19.5v-15m0 0L7.5 9M12 4.5 16.5 9" />
+                </svg>
+            `;
         }
+
+        return `
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor" class="h-5 w-5">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 6a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0ZM4.501 20.118a7.5 7.5 0 0 1 14.998 0A17.933 17.933 0 0 1 12 21.75c-2.749 0-5.362-.608-7.499-1.632Z" />
+            </svg>
+        `;
+    }
+
+    getClassificationPillClasses(classification) {
+        const normalized = classification ? classification.toUpperCase() : '';
+        const palette = CONFIG?.ui?.classificationPills || {};
+        const colorClass = palette[normalized] || 'bg-slate-100 text-slate-600 border border-slate-200';
+
+        return `inline-flex items-center rounded-full px-3 py-1 text-xs font-medium border ${colorClass}`;
+    }
+
+    formatClassificationLabel(value) {
+        if (!value) return 'Tidak diketahui';
+        return value
+            .toLowerCase()
+            .split('_')
+            .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+            .join(' ');
+    }
+
+    getActivityStyle(type) {
+        const badgeConfig = CONFIG?.ui?.activityBadges || {};
+        const styles = badgeConfig[type] || badgeConfig.default || {
+            iconBg: 'bg-slate-500/10 text-slate-600',
+            badge: 'bg-slate-100 text-slate-600'
+        };
+
+        const iconMap = {
+            escalation: `
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor" class="h-5 w-5">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z" />
+                </svg>
+            `,
+            lead_contact: `
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor" class="h-5 w-5">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M21.75 6.75 11.25 12l10.5 5.25m0-10.5L11.25 12 2.25 6.75m19.5 10.5L11.25 12 2.25 17.25m19.5-10.5-10.5 5.25-10.5-5.25" />
+                </svg>
+            `,
+            conversion: `
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor" class="h-5 w-5">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M8.25 7.5h-1.5A2.25 2.25 0 0 0 4.5 9.75v8.25A2.25 2.25 0 0 0 6.75 20.25h10.5A2.25 2.25 0 0 0 19.5 18V9.75a2.25 2.25 0 0 0-2.25-2.25h-1.5m-7.5 0V5.25a3 3 0 0 1 3-3h1.5a3 3 0 0 1 3 3V7.5m-7.5 0h7.5" />
+                </svg>
+            `,
+            default: `
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor" class="h-5 w-5">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M11.25 11.25a.75.75 0 0 1 .75-.75h.008a.75.75 0 0 1 .75.75v.008a.75.75 0 0 1-.75.75h-.008a.75.75 0 0 1-.75-.75V11.25Zm.75 2.25h.008v3h-.008v-3ZM21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
+                </svg>
+            `
+        };
+
+        const labelMap = {
+            escalation: 'Escalation',
+            lead_contact: 'Kontak Lead',
+            conversion: 'Konversi',
+            default: 'Aktivitas'
+        };
+
+        const badgeIcon = `
+            <span class="flex h-5 w-5 items-center justify-center rounded-full bg-white/50 text-current">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 8 8" class="h-2 w-2 fill-current"><circle cx="4" cy="4" r="4" /></svg>
+            </span>
+        `;
+
+        return {
+            iconBg: styles.iconBg,
+            badge: styles.badge,
+            icon: iconMap[type] || iconMap.default,
+            badgeIcon,
+            label: labelMap[type] || labelMap.default
+        };
     }
 
     getStatusColor(status) {
