@@ -1,0 +1,447 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CRM Dashboard - Tepat Laser</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/js/all.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/plotly.js/3.0.3/plotly.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        .gradient-bg { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); }
+        .card-shadow { box-shadow: 0 10px 25px rgba(0,0,0,0.1); }
+        .hover-lift { transition: transform 0.2s ease; }
+        .hover-lift:hover { transform: translateY(-2px); }
+        .status-indicator { width: 8px; height: 8px; border-radius: 50%; }
+        .status-online { background-color: #10b981; }
+        .status-offline { background-color: #ef4444; }
+        .status-busy { background-color: #f59e0b; }
+        .chat-bubble { max-width: 70%; }
+        .chat-bubble.ai { background-color: #f3f4f6; }
+        .chat-bubble.customer { background-color: #3b82f6; color: white; }
+    </style>
+</head>
+<body class="bg-gray-50">
+    <!-- Navigation -->
+    <nav class="bg-white shadow-sm border-b">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between items-center h-16">
+                <div class="flex items-center">
+                    <div class="flex-shrink-0">
+                        <h1 class="text-2xl font-bold text-gray-900">🔥 Tepat Laser CRM</h1>
+                    </div>
+                </div>
+                <div class="flex items-center space-x-4">
+                    <div class="flex items-center space-x-2">
+                        <div class="status-indicator status-online"></div>
+                        <span class="text-sm text-gray-600">Sistem Aktif</span>
+                    </div>
+                    <button class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors">
+                        <i class="fas fa-sync-alt mr-2"></i>Refresh Data
+                    </button>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <!-- Quick Stats -->
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+            <div class="bg-white rounded-xl p-6 card-shadow hover-lift">
+                <div class="flex items-center">
+                    <div class="p-3 rounded-full bg-blue-100">
+                        <i class="fas fa-users text-blue-600 text-xl"></i>
+                    </div>
+                    <div class="ml-4">
+                        <p class="text-sm font-medium text-gray-600">Total Pelanggan</p>
+                        <p class="text-2xl font-bold text-gray-900" id="total-customers">0</p>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="bg-white rounded-xl p-6 card-shadow hover-lift">
+                <div class="flex items-center">
+                    <div class="p-3 rounded-full bg-green-100">
+                        <i class="fas fa-handshake text-green-600 text-xl"></i>
+                    </div>
+                    <div class="ml-4">
+                        <p class="text-sm font-medium text-gray-600">Leads Marketing</p>
+                        <p class="text-2xl font-bold text-gray-900" id="total-leads">0</p>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="bg-white rounded-xl p-6 card-shadow hover-lift">
+                <div class="flex items-center">
+                    <div class="p-3 rounded-full bg-yellow-100">
+                        <i class="fas fa-exclamation-triangle text-yellow-600 text-xl"></i>
+                    </div>
+                    <div class="ml-4">
+                        <p class="text-sm font-medium text-gray-600">Escalations</p>
+                        <p class="text-2xl font-bold text-gray-900" id="total-escalations">0</p>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="bg-white rounded-xl p-6 card-shadow hover-lift">
+                <div class="flex items-center">
+                    <div class="p-3 rounded-full bg-purple-100">
+                        <i class="fas fa-chart-line text-purple-600 text-xl"></i>
+                    </div>
+                    <div class="ml-4">
+                        <p class="text-sm font-medium text-gray-600">Response Rate</p>
+                        <p class="text-2xl font-bold text-gray-900" id="response-rate">0%</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tab Navigation -->
+        <div class="mb-6">
+            <div class="border-b border-gray-200">
+                <nav class="-mb-px flex space-x-8">
+                    <button class="tab-button active py-2 px-1 border-b-2 border-blue-500 font-medium text-sm text-blue-600" data-tab="overview">
+                        <i class="fas fa-tachometer-alt mr-2"></i>Overview
+                    </button>
+                    <button class="tab-button py-2 px-1 border-b-2 border-transparent font-medium text-sm text-gray-500 hover:text-gray-700" data-tab="customers">
+                        <i class="fas fa-headset mr-2"></i>Customer Service
+                    </button>
+                    <button class="tab-button py-2 px-1 border-b-2 border-transparent font-medium text-sm text-gray-500 hover:text-gray-700" data-tab="marketing">
+                        <i class="fas fa-bullhorn mr-2"></i>Marketing
+                    </button>
+                    <button class="tab-button py-2 px-1 border-b-2 border-transparent font-medium text-sm text-gray-500 hover:text-gray-700" data-tab="analytics">
+                        <i class="fas fa-chart-bar mr-2"></i>Analitik
+                    </button>
+                </nav>
+            </div>
+        </div>
+
+        <!-- Overview Tab -->
+        <div id="overview-tab" class="tab-content">
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <!-- Real-time Chat Monitor -->
+                <div class="bg-white rounded-xl p-6 card-shadow">
+                    <h3 class="text-lg font-semibold text-gray-900 mb-4">
+                        <i class="fas fa-comments text-blue-600 mr-2"></i>Monitor Chat Real-time
+                    </h3>
+                    <div class="space-y-4" id="chat-monitor">
+                        <div class="text-center text-gray-500 py-8">
+                            <i class="fas fa-circle-notch fa-spin text-4xl mb-4"></i>
+                            <p>Memuat data chat...</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Recent Activities -->
+                <div class="bg-white rounded-xl p-6 card-shadow">
+                    <h3 class="text-lg font-semibold text-gray-900 mb-4">
+                        <i class="fas fa-history text-green-600 mr-2"></i>Aktivitas Terbaru
+                    </h3>
+                    <div class="space-y-3" id="recent-activities">
+                        <div class="text-center text-gray-500 py-8">
+                            <i class="fas fa-clock text-4xl mb-4"></i>
+                            <p>Memuat aktivitas...</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Analytics Charts -->
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
+                <div class="bg-white rounded-xl p-6 card-shadow">
+                    <h3 class="text-lg font-semibold text-gray-900 mb-4">
+                        <i class="fas fa-chart-pie text-purple-600 mr-2"></i>Klasifikasi Pesan
+                    </h3>
+                    <div id="classification-chart" style="height: 300px;"></div>
+                </div>
+                
+                <div class="bg-white rounded-xl p-6 card-shadow">
+                    <h3 class="text-lg font-semibold text-gray-900 mb-4">
+                        <i class="fas fa-chart-line text-orange-600 mr-2"></i>Tren Interaksi
+                    </h3>
+                    <div id="interaction-chart" style="height: 300px;"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Customer Service Tab -->
+        <div id="customers-tab" class="tab-content hidden">
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <!-- Customer List -->
+                <div class="lg:col-span-2">
+                    <div class="bg-white rounded-xl p-6 card-shadow">
+                        <div class="flex justify-between items-center mb-4">
+                            <h3 class="text-lg font-semibold text-gray-900">
+                                <i class="fas fa-users text-blue-600 mr-2"></i>Daftar Pelanggan
+                            </h3>
+                            <div class="flex space-x-2">
+                                <input type="text" id="customer-search" placeholder="Cari pelanggan..." 
+                                       class="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                <select id="customer-filter" class="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                    <option value="">Semua Status</option>
+                                    <option value="active">Aktif</option>
+                                    <option value="cooldown">Cooldown</option>
+                                    <option value="escalated">Escalated</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="space-y-3" id="customer-list">
+                            <div class="text-center text-gray-500 py-8">
+                                <i class="fas fa-users text-4xl mb-4"></i>
+                                <p>Memuat daftar pelanggan...</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Customer Details -->
+                <div class="bg-white rounded-xl p-6 card-shadow">
+                    <h3 class="text-lg font-semibold text-gray-900 mb-4">
+                        <i class="fas fa-user text-green-600 mr-2"></i>Detail Pelanggan
+                    </h3>
+                    <div id="customer-details">
+                        <div class="text-center text-gray-500 py-8">
+                            <i class="fas fa-user-circle text-4xl mb-4"></i>
+                            <p>Pilih pelanggan untuk melihat detail</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Escalations Section -->
+            <div class="mt-6 bg-white rounded-xl p-6 card-shadow">
+                <h3 class="text-lg font-semibold text-gray-900 mb-4">
+                    <i class="fas fa-exclamation-triangle text-red-600 mr-2"></i>Daftar Escalations
+                </h3>
+                <div class="overflow-x-auto">
+                    <table class="min-w-full divide-y divide-gray-200">
+                        <thead class="bg-gray-50">
+                            <tr>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Customer</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Tipe</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Prioritas</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Waktu</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Aksi</th>
+                            </tr>
+                        </thead>
+                        <tbody id="escalations-table" class="bg-white divide-y divide-gray-200">
+                            <tr>
+                                <td colspan="6" class="px-6 py-8 text-center text-gray-500">
+                                    <i class="fas fa-exclamation-triangle text-4xl mb-4"></i>
+                                    <p>Memuat escalations...</p>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- Marketing Tab -->
+        <div id="marketing-tab" class="tab-content hidden">
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <!-- Lead Management -->
+                <div class="bg-white rounded-xl p-6 card-shadow">
+                    <h3 class="text-lg font-semibold text-gray-900 mb-4">
+                        <i class="fas fa-filter text-blue-600 mr-2"></i>Filter Leads
+                    </h3>
+                    <div class="space-y-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Segment Pasar</label>
+                            <select id="segment-filter" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                <option value="">Semua Segment</option>
+                                <option value="advertising_signage">Advertising & Signage</option>
+                                <option value="metal_fabrication">Metal Fabrication</option>
+                                <option value="furniture_manufacturing">Furniture Manufacturing</option>
+                                <option value="automotive_workshop">Automotive Workshop</option>
+                                <option value="interior_design">Interior Design</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Status Kontak</label>
+                            <select id="contact-status-filter" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                <option value="">Semua Status</option>
+                                <option value="new">Baru</option>
+                                <option value="contacted">Sudah Dikontak</option>
+                                <option value="invalid_whatsapp">WhatsApp Invalid</option>
+                                <option value="blocked">Terblokir</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Skor Lead</label>
+                            <select id="lead-score-filter" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                <option value="">Semua Skor</option>
+                                <option value="high">Tinggi (70+)</option>
+                                <option value="medium">Sedang (40-69)</option>
+                                <option value="low">Rendah (<40)</option>
+                            </select>
+                        </div>
+                        <button id="apply-filters" class="w-full bg-blue-600 text-white py-2 px-4 rounded-lg hover:bg-blue-700 transition-colors">
+                            <i class="fas fa-search mr-2"></i>Terapkan Filter
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Campaign Stats -->
+                <div class="bg-white rounded-xl p-6 card-shadow">
+                    <h3 class="text-lg font-semibold text-gray-900 mb-4">
+                        <i class="fas fa-chart-bar text-green-600 mr-2"></i>Statistik Campaign
+                    </h3>
+                    <div class="space-y-4" id="campaign-stats">
+                        <div class="text-center text-gray-500 py-8">
+                            <i class="fas fa-chart-bar text-4xl mb-4"></i>
+                            <p>Memuat statistik campaign...</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Leads Table -->
+            <div class="mt-6 bg-white rounded-xl p-6 card-shadow">
+                <div class="flex justify-between items-center mb-4">
+                    <h3 class="text-lg font-semibold text-gray-900">
+                        <i class="fas fa-address-book text-purple-600 mr-2"></i>Daftar Leads
+                    </h3>
+                    <div class="flex space-x-2">
+                        <button id="export-leads" class="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors">
+                            <i class="fas fa-download mr-2"></i>Export CSV
+                        </button>
+                        <button id="bulk-contact" class="bg-orange-600 text-white px-4 py-2 rounded-lg hover:bg-orange-700 transition-colors">
+                            <i class="fas fa-paper-plane mr-2"></i>Kontak Massal
+                        </button>
+                    </div>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="min-w-full divide-y divide-gray-200">
+                        <thead class="bg-gray-50">
+                            <tr>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                    <input type="checkbox" id="select-all-leads" class="rounded">
+                                </th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Nama Bisnis</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Telepon</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Segment</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase-tracker-wider">Skor</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Aksi</th>
+                            </tr>
+                        </thead>
+                        <tbody id="leads-table" class="bg-white divide-y divide-gray-200">
+                            <tr>
+                                <td colspan="7" class="px-6 py-8 text-center text-gray-500">
+                                    <i class="fas fa-address-book text-4xl mb-4"></i>
+                                    <p>Memuat leads...</p>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- Analytics Tab -->
+        <div id="analytics-tab" class="tab-content hidden">
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <div class="bg-white rounded-xl p-6 card-shadow">
+                    <h3 class="text-lg font-semibold text-gray-900 mb-4">
+                        <i class="fas fa-chart-pie text-blue-600 mr-2"></i>Performa AI Agent
+                    </h3>
+                    <div id="ai-performance-chart" style="height: 350px;"></div>
+                </div>
+                
+                <div class="bg-white rounded-xl p-6 card-shadow">
+                    <h3 class="text-lg font-semibold text-gray-900 mb-4">
+                        <i class="fas fa-chart-line text-green-600 mr-2"></i>Konversi Marketing
+                    </h3>
+                    <div id="marketing-conversion-chart" style="height: 350px;"></div>
+                </div>
+            </div>
+            
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mt-6">
+                <div class="bg-white rounded-xl p-6 card-shadow">
+                    <h3 class="text-lg font-semibold text-gray-900 mb-4">
+                        <i class="fas fa-clock text-purple-600 mr-2"></i>Waktu Respons
+                    </h3>
+                    <div class="space-y-3" id="response-time-stats">
+                        <div class="flex justify-between items-center">
+                            <span class="text-sm text-gray-600">Rata-rata</span>
+                            <span class="font-semibold text-blue-600" id="avg-response-time">-</span>
+                        </div>
+                        <div class="flex justify-between items-center">
+                            <span class="text-sm text-gray-600">Tercepat</span>
+                            <span class="font-semibold text-green-600" id="fastest-response-time">-</span>
+                        </div>
+                        <div class="flex justify-between items-center">
+                            <span class="text-sm text-gray-600">Terlambat</span>
+                            <span class="font-semibold text-red-600" id="slowest-response-time">-</span>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="bg-white rounded-xl p-6 card-shadow">
+                    <h3 class="text-lg font-semibold text-gray-900 mb-4">
+                        <i class="fas fa-target text-orange-600 mr-2"></i>Target vs Realisasi
+                    </h3>
+                    <div class="space-y-3" id="target-stats">
+                        <div class="flex justify-between items-center">
+                            <span class="text-sm text-gray-600">Target Harian</span>
+                            <span class="font-semibold">100 kontak</span>
+                        </div>
+                        <div class="flex justify-between items-center">
+                            <span class="text-sm text-gray-600">Terkontak Hari Ini</span>
+                            <span class="font-semibold text-blue-600" id="contacts-today">-</span>
+                        </div>
+                        <div class="flex justify-between items-center">
+                            <span class="text-sm text-gray-600">Persentase</span>
+                            <span class="font-semibold text-green-600" id="target-percentage">-</span>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="bg-white rounded-xl p-6 card-shadow">
+                    <h3 class="text-lg font-semibold text-gray-900 mb-4">
+                        <i class="fas fa-trophy text-yellow-600 mr-2"></i>Prestasi Tim
+                    </h3>
+                    <div class="space-y-3" id="team-achievements">
+                        <div class="flex justify-between items-center">
+                            <span class="text-sm text-gray-600">Lead Terbaik</span>
+                            <span class="font-semibold text-yellow-600">Advertising Signage</span>
+                        </div>
+                        <div class="flex justify-between items-center">
+                            <span class="text-sm text-gray-600">Response Rate Tertinggi</span>
+                            <span class="font-semibold text-green-600">85%</span>
+                        </div>
+                        <div class="flex justify-between items-center">
+                            <span class="text-sm text-gray-600">Conversion Rate</span>
+                            <span class="font-semibold text-blue-600">12.5%</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Footer -->
+    <footer class="bg-white border-t mt-12">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+            <div class="text-center text-gray-500">
+                <p>&copy; 2024 Tepat Laser CRM Dashboard. Dibuat dengan ❤️ untuk tim sales dan customer service.</p>
+            </div>
+        </div>
+    </footer>
+
+    <!-- Loading Overlay -->
+    <div id="loading-overlay" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 hidden">
+        <div class="bg-white rounded-lg p-8 text-center">
+            <i class="fas fa-spinner fa-spin text-4xl text-blue-600 mb-4"></i>
+            <p class="text-gray-700">Memuat data...</p>
+        </div>
+    </div>
+
+    <script src="dashboard.js"></script>
+</body>
+</html>
