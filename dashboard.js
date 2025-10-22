@@ -1,4 +1,4 @@
-// CRM Dashboard JavaScript dengan Real Database Integration
+// CRM Dashboard JavaScript dengan Webhook N8N Integration
 class CRMDashboard {
     constructor() {
         this.currentTab = 'overview';
@@ -8,17 +8,66 @@ class CRMDashboard {
         this.activities = [];
         this.chats = [];
         this.apiConnector = null;
+        this.connectionStatus = 'disconnected';
         
         this.init();
     }
 
     async init() {
-        // Initialize API connector
-        this.apiConnector = new APIConnector();
+        console.log('🚀 Initializing CRM Dashboard with N8N Webhook Integration');
+        
+        // Initialize webhook API connector
+        this.apiConnector = window.webhookApiConnector || new WebhookAPIConnector();
         
         this.setupEventListeners();
-        await this.loadInitialData();
-        this.startRealTimeUpdates();
+        this.updateConnectionStatus('connecting');
+        
+        try {
+            await this.testConnection();
+            await this.loadInitialData();
+            this.startRealTimeUpdates();
+            this.updateConnectionStatus('connected');
+        } catch (error) {
+            console.error('Failed to initialize dashboard:', error);
+            this.updateConnectionStatus('disconnected');
+            this.showError('Gagal terhubung ke sistem. Menggunakan data fallback.');
+            await this.loadFallbackData();
+        }
+    }
+
+    async testConnection() {
+        console.log('🔍 Testing N8N connection...');
+        const health = await this.apiConnector.healthCheck();
+        console.log('Health check result:', health);
+        return health;
+    }
+
+    updateConnectionStatus(status) {
+        this.connectionStatus = status;
+        const statusElement = document.getElementById('connection-status');
+        const textElement = document.getElementById('connection-text');
+        
+        if (!statusElement || !textElement) return;
+        
+        // Remove all status classes
+        statusElement.classList.remove('status-connected', 'status-connecting', 'status-disconnected');
+        
+        switch (status) {
+            case 'connected':
+                statusElement.classList.add('status-connected');
+                textElement.textContent = 'N8N Connected';
+                break;
+            case 'connecting':
+                statusElement.classList.add('status-connecting');
+                textElement.textContent = 'Connecting to N8N...';
+                break;
+            case 'disconnected':
+                statusElement.classList.add('status-disconnected');
+                textElement.textContent = 'N8N Disconnected';
+                break;
+        }
+        
+        console.log(`📡 Connection status: ${status}`);
     }
 
     setupEventListeners() {
@@ -29,39 +78,6 @@ class CRMDashboard {
                 this.switchTab(targetButton.dataset.tab, targetButton);
             });
         });
-
-        // Customer search and filter
-        const customerSearch = document.getElementById('customer-search');
-        const customerFilter = document.getElementById('customer-filter');
-        
-        if (customerSearch) {
-            customerSearch.addEventListener('input', () => this.filterCustomers());
-        }
-        if (customerFilter) {
-            customerFilter.addEventListener('change', () => this.filterCustomers());
-        }
-
-        // Marketing filters
-        const applyFilters = document.getElementById('apply-filters');
-        if (applyFilters) {
-            applyFilters.addEventListener('click', () => this.applyMarketingFilters());
-        }
-
-        // Bulk actions
-        const selectAllLeads = document.getElementById('select-all-leads');
-        if (selectAllLeads) {
-            selectAllLeads.addEventListener('change', () => this.toggleSelectAllLeads());
-        }
-
-        const exportLeads = document.getElementById('export-leads');
-        if (exportLeads) {
-            exportLeads.addEventListener('click', () => this.exportLeadsCSV());
-        }
-
-        const bulkContact = document.getElementById('bulk-contact');
-        if (bulkContact) {
-            bulkContact.addEventListener('click', () => this.bulkContactLeads());
-        }
 
         // Refresh button
         const refreshButton = document.getElementById('refresh-data');
@@ -132,38 +148,64 @@ class CRMDashboard {
         this.showLoading(true);
         
         try {
-            // Test database connection first
-            const healthCheck = await this.apiConnector.healthCheck();
-            console.log('Database health:', healthCheck);
+            console.log('📊 Loading initial data via webhook...');
             
             await Promise.all([
                 this.loadQuickStats(),
                 this.loadOverviewData()
             ]);
+            
+            console.log('✅ Initial data loaded successfully');
         } catch (error) {
-            console.error('Error loading initial data:', error);
+            console.error('❌ Error loading initial data:', error);
             this.showError('Gagal memuat data awal. Menggunakan data fallback.');
         } finally {
             this.showLoading(false);
         }
     }
 
+    async loadFallbackData() {
+        console.log('🔄 Loading fallback data...');
+        
+        // Use fallback data provider
+        const fallbackProvider = new FallbackDataProvider();
+        
+        const stats = fallbackProvider.getFallbackData('getQuickStats');
+        this.updateStatsDisplay(stats);
+        
+        const chats = fallbackProvider.getFallbackData('getRecentChats');
+        this.renderChatMonitor(chats);
+        
+        const activities = fallbackProvider.getFallbackData('getRecentActivities');
+        this.renderRecentActivities(activities);
+        
+        await this.renderAnalyticsCharts();
+    }
+
     async loadQuickStats() {
         try {
+            console.log('📈 Loading quick stats...');
             const stats = await this.apiConnector.getQuickStats();
-            
-            document.getElementById('total-customers').textContent = stats.totalCustomers.toLocaleString('id-ID');
-            document.getElementById('total-leads').textContent = stats.totalLeads.toLocaleString('id-ID');
-            document.getElementById('total-escalations').textContent = stats.totalEscalations.toLocaleString('id-ID');
-            document.getElementById('response-rate').textContent = stats.responseRate + '%';
+            this.updateStatsDisplay(stats);
         } catch (error) {
-            console.error('Error loading quick stats:', error);
-            // Keep default values if error
+            console.warn('⚠️ Failed to load quick stats:', error.message);
+            // Fallback stats will be used by the connector
+        }
+    }
+
+    updateStatsDisplay(stats) {
+        if (stats) {
+            document.getElementById('total-customers').textContent = stats.totalCustomers?.toLocaleString('id-ID') || '0';
+            document.getElementById('total-leads').textContent = stats.totalLeads?.toLocaleString('id-ID') || '0';
+            document.getElementById('total-escalations').textContent = stats.totalEscalations?.toLocaleString('id-ID') || '0';
+            document.getElementById('response-rate').textContent = (stats.responseRate || 0) + '%';
         }
     }
 
     async loadOverviewData() {
         try {
+            console.log('🔍 Loading overview data...');
+            
             const [chats, activities] = await Promise.all([
                 this.apiConnector.getRecentChats(10),
                 this.apiConnector.getRecentActivities(20)
@@ -173,14 +215,21 @@ class CRMDashboard {
             this.renderRecentActivities(activities);
             await this.renderAnalyticsCharts();
         } catch (error) {
-            console.error('Error loading overview data:', error);
+            console.warn('⚠️ Failed to load overview data:', error.message);
         }
     }
 
     async loadTabData(tabName) {
+        if (tabName === 'overview') {
+            // Overview data already loaded
+            return;
+        }
+        
         this.showLoading(true);
         
         try {
+            console.log(`📁 Loading ${tabName} data...`);
+            
             switch (tabName) {
                 case 'customers':
                     await this.loadCustomerServiceData();
@@ -193,7 +242,7 @@ class CRMDashboard {
                     break;
             }
         } catch (error) {
-            console.error(`Error loading ${tabName} data:`, error);
+            console.error(`❌ Error loading ${tabName} data:`, error);
             this.showError(`Gagal memuat data ${tabName}`);
         } finally {
             this.showLoading(false);
@@ -201,48 +250,21 @@ class CRMDashboard {
     }
 
     async loadCustomerServiceData() {
-        try {
-            const [customers, escalations] = await Promise.all([
-                this.apiConnector.getCustomers(),
-                this.apiConnector.getEscalations()
-            ]);
-
-            this.customers = customers;
-            this.escalations = escalations;
-            
-            this.renderCustomerList();
-            this.renderEscalationsTable();
-        } catch (error) {
-            console.error('Error loading customer service data:', error);
-        }
+        // Implementation for customer service tab
+        console.log('👥 Loading customer service data...');
+        // This would load customers, escalations, etc.
     }
 
     async loadMarketingData() {
-        try {
-            const [leads, campaignStats] = await Promise.all([
-                this.apiConnector.getBusinessLeads(),
-                this.apiConnector.getCampaignStats()
-            ]);
-
-            this.leads = leads;
-            this.renderCampaignStats(campaignStats);
-            this.renderLeadsTable();
-        } catch (error) {
-            console.error('Error loading marketing data:', error);
-        }
+        // Implementation for marketing tab
+        console.log('📱 Loading marketing data...');
+        // This would load leads, campaigns, etc.
     }
 
     async loadAnalyticsData() {
-        try {
-            const [classifications, interactions] = await Promise.all([
-                this.apiConnector.getMessageClassifications(),
-                this.apiConnector.getInteractionTrends()
-            ]);
-            
-            this.renderAnalyticsCharts({ classifications, interactions });
-        } catch (error) {
-            console.error('Error loading analytics data:', error);
-        }
+        // Implementation for analytics tab
+        console.log('📊 Loading analytics data...');
+        // This would load detailed analytics
     }
 
     // Render methods
@@ -334,254 +356,20 @@ class CRMDashboard {
         }).join('');
     }
 
-    renderCustomerList() {
-        const container = document.getElementById('customer-list');
-        if (!container) return;
-
-        if (!this.customers || this.customers.length === 0) {
-            container.innerHTML = `
-                <div class="text-center text-gray-500 py-8">
-                    <i class="fas fa-users text-4xl mb-4"></i>
-                    <p>Belum ada data pelanggan</p>
-                </div>
-            `;
-            return;
-        }
-
-        container.innerHTML = this.customers.map(customer => `
-            <div class="flex items-center justify-between p-4 border border-gray-200 rounded-lg hover:bg-gray-50 cursor-pointer" 
-                 onclick="dashboard.selectCustomer(${customer.id})">
-                <div class="flex items-center space-x-3">
-                    <div class="w-10 h-10 rounded-full bg-blue-500 flex items-center justify-center">
-                        <i class="fas fa-user text-white"></i>
-                    </div>
-                    <div>
-                        <p class="font-medium text-gray-900">${customer.name}</p>
-                        <p class="text-sm text-gray-500">${customer.phone}</p>
-                        <p class="text-xs text-gray-400">${customer.location || 'Lokasi tidak diketahui'}</p>
-                    </div>
-                </div>
-                <div class="text-right">
-                    <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${this.getStatusColor(customer.is_cooldown_active ? 'cooldown' : 'active')}">
-                        ${customer.is_cooldown_active ? 'Cooldown' : 'Aktif'}
-                    </span>
-                    <p class="text-xs text-gray-400 mt-1">${this.formatTime(customer.last_interaction)}</p>
-                </div>
-            </div>
-        `).join('');
-    }
-
-    async renderCustomerDetails(customerId) {
+    async renderAnalyticsCharts() {
         try {
-            const customer = await this.apiConnector.getCustomerDetails(customerId);
-            if (!customer) return;
-
-            const container = document.getElementById('customer-details');
-            if (!container) return;
-
-            container.innerHTML = `
-                <div class="text-center mb-4">
-                    <div class="w-16 h-16 rounded-full bg-blue-500 flex items-center justify-center mx-auto mb-3">
-                        <i class="fas fa-user text-white text-2xl"></i>
-                    </div>
-                    <h4 class="font-semibold text-gray-900">${customer.name}</h4>
-                    <p class="text-sm text-gray-500">${customer.phone}</p>
-                </div>
-                
-                <div class="space-y-3">
-                    <div class="flex justify-between">
-                        <span class="text-sm text-gray-600">Lokasi:</span>
-                        <span class="text-sm font-medium">${customer.location || '-'}</span>
-                    </div>
-                    <div class="flex justify-between">
-                        <span class="text-sm text-gray-600">Stage:</span>
-                        <span class="text-sm font-medium">${customer.conversation_stage}</span>
-                    </div>
-                    <div class="flex justify-between">
-                        <span class="text-sm text-gray-600">Total Pesan:</span>
-                        <span class="text-sm font-medium">${customer.total_messages || 0}</span>
-                    </div>
-                    <div class="flex justify-between">
-                        <span class="text-sm text-gray-600">Cooldown:</span>
-                        <span class="text-sm font-medium">${customer.is_cooldown_active ? 'Aktif' : 'Tidak Aktif'}</span>
-                    </div>
-                </div>
-                
-                <div class="mt-4 space-y-2">
-                    <button onclick="dashboard.showChatHistory(${customer.id})" class="w-full bg-blue-600 text-white py-2 px-4 rounded-lg hover:bg-blue-700 transition-colors">
-                        <i class="fas fa-comment mr-2"></i>Lihat Chat History
-                    </button>
-                    <button onclick="dashboard.contactCustomer('${customer.phone}')" class="w-full bg-green-600 text-white py-2 px-4 rounded-lg hover:bg-green-700 transition-colors">
-                        <i class="fas fa-phone mr-2"></i>Hubungi Customer
-                    </button>
-                </div>
-            `;
-        } catch (error) {
-            console.error('Error loading customer details:', error);
-        }
-    }
-
-    renderEscalationsTable() {
-        const container = document.getElementById('escalations-table');
-        if (!container) return;
-
-        if (!this.escalations || this.escalations.length === 0) {
-            container.innerHTML = `
-                <tr>
-                    <td colspan="6" class="px-6 py-8 text-center text-gray-500">
-                        <i class="fas fa-exclamation-triangle text-4xl mb-4"></i>
-                        <p>Belum ada escalations</p>
-                    </td>
-                </tr>
-            `;
-            return;
-        }
-
-        container.innerHTML = this.escalations.map(escalation => `
-            <tr>
-                <td class="px-6 py-4 whitespace-nowrap">
-                    <div class="text-sm font-medium text-gray-900">${escalation.customer_name}</div>
-                    <div class="text-sm text-gray-500">${escalation.customer_phone}</div>
-                </td>
-                <td class="px-6 py-4 whitespace-nowrap">
-                    <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-                        ${escalation.escalation_type}
-                    </span>
-                </td>
-                <td class="px-6 py-4 whitespace-nowrap">
-                    <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${this.getPriorityColor(escalation.priority)}">
-                        ${escalation.priority}
-                    </span>
-                </td>
-                <td class="px-6 py-4 whitespace-nowrap">
-                    <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${this.getStatusColor(escalation.status)}">
-                        ${escalation.status}
-                    </span>
-                </td>
-                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    ${this.formatTime(escalation.created_at)}
-                </td>
-                <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                    <button onclick="dashboard.handleEscalation(${escalation.id})" class="text-blue-600 hover:text-blue-900 mr-3">
-                        <i class="fas fa-eye mr-1"></i>Detail
-                    </button>
-                    <button onclick="dashboard.resolveEscalation(${escalation.id})" class="text-green-600 hover:text-green-900">
-                        <i class="fas fa-handshake mr-1"></i>Handle
-                    </button>
-                </td>
-            </tr>
-        `).join('');
-    }
-
-    renderCampaignStats(stats) {
-        const container = document.getElementById('campaign-stats');
-        if (!container) return;
-
-        const successRate = stats.totalSent > 0 ? Math.round((stats.totalDelivered / stats.totalSent) * 100) : 0;
-        const responseRate = stats.totalDelivered > 0 ? Math.round((stats.responseCount / stats.totalDelivered) * 100) : 0;
-
-        container.innerHTML = `
-            <div class="grid grid-cols-2 gap-4">
-                <div class="text-center p-4 bg-blue-50 rounded-lg">
-                    <div class="text-2xl font-bold text-blue-600">${stats.totalSent}</div>
-                    <div class="text-sm text-gray-600">Total Terkirim</div>
-                </div>
-                <div class="text-center p-4 bg-green-50 rounded-lg">
-                    <div class="text-2xl font-bold text-green-600">${stats.totalDelivered}</div>
-                    <div class="text-sm text-gray-600">Berhasil</div>
-                </div>
-                <div class="text-center p-4 bg-red-50 rounded-lg">
-                    <div class="text-2xl font-bold text-red-600">${stats.totalFailed}</div>
-                    <div class="text-sm text-gray-600">Gagal</div>
-                </div>
-                <div class="text-center p-4 bg-purple-50 rounded-lg">
-                    <div class="text-2xl font-bold text-purple-600">${successRate}%</div>
-                    <div class="text-sm text-gray-600">Sukses Rate</div>
-                </div>
-            </div>
-            <div class="mt-4 space-y-2">
-                <div class="flex justify-between">
-                    <span class="text-sm text-gray-600">Response:</span>
-                    <span class="font-semibold">${stats.responseCount} (${responseRate}%)</span>
-                </div>
-                <div class="flex justify-between">
-                    <span class="text-sm text-gray-600">Update terakhir:</span>
-                    <span class="font-semibold">${this.formatTime(new Date().toISOString())}</span>
-                </div>
-            </div>
-        `;
-    }
-
-    renderLeadsTable() {
-        const container = document.getElementById('leads-table');
-        if (!container) return;
-
-        if (!this.leads || this.leads.length === 0) {
-            container.innerHTML = `
-                <tr>
-                    <td colspan="7" class="px-6 py-8 text-center text-gray-500">
-                        <i class="fas fa-address-book text-4xl mb-4"></i>
-                        <p>Belum ada data leads</p>
-                    </td>
-                </tr>
-            `;
-            return;
-        }
-
-        container.innerHTML = this.leads.map(lead => `
-            <tr>
-                <td class="px-6 py-4 whitespace-nowrap">
-                    <input type="checkbox" class="lead-checkbox rounded" value="${lead.id}">
-                </td>
-                <td class="px-6 py-4 whitespace-nowrap">
-                    <div class="text-sm font-medium text-gray-900">${lead.name}</div>
-                    <div class="text-sm text-gray-500">${lead.address || ''}</div>
-                </td>
-                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                    ${lead.phone}
-                </td>
-                <td class="px-6 py-4 whitespace-nowrap">
-                    <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-                        ${this.formatMarketSegment(lead.market_segment)}
-                    </span>
-                </td>
-                <td class="px-6 py-4 whitespace-nowrap">
-                    <div class="flex items-center">
-                        <div class="text-sm font-medium text-gray-900">${lead.lead_score}</div>
-                        <div class="ml-2 w-16 bg-gray-200 rounded-full h-2">
-                            <div class="bg-blue-600 h-2 rounded-full" style="width: ${lead.lead_score}%"></div>
-                        </div>
-                    </div>
-                </td>
-                <td class="px-6 py-4 whitespace-nowrap">
-                    <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${this.getLeadStatusColor(lead.status)}">
-                        ${this.getLeadStatusLabel(lead.status)}
-                    </span>
-                </td>
-                <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                    <button onclick="dashboard.contactLead('${lead.phone}', '${lead.name}')" class="text-green-600 hover:text-green-900">
-                        <i class="fas fa-paper-plane mr-1"></i>Kontak
-                    </button>
-                </td>
-            </tr>
-        `).join('');
-    }
-
-    async renderAnalyticsCharts(data = null) {
-        try {
-            // Get real data if not provided
-            if (!data) {
-                const [classifications, interactions] = await Promise.all([
-                    this.apiConnector.getMessageClassifications(),
-                    this.apiConnector.getInteractionTrends()
-                ]);
-                data = { classifications, interactions };
-            }
+            console.log('📊 Rendering analytics charts...');
+            
+            // Get analytics data
+            const [classifications, interactions] = await Promise.all([
+                this.apiConnector.getMessageClassifications(),
+                this.apiConnector.getInteractionTrends()
+            ]);
 
             // Classification Chart
             const classificationTrace = {
-                values: Object.values(data.classifications),
-                labels: Object.keys(data.classifications).map(key => this.formatClassificationLabel(key)),
+                values: Object.values(classifications),
+                labels: Object.keys(classifications).map(key => this.formatClassificationLabel(key)),
                 type: 'pie',
                 hole: 0.45,
                 marker: {
@@ -614,8 +402,8 @@ class CRMDashboard {
 
             // Interaction Chart
             const interactionTrace = {
-                x: data.interactions.map(d => d.date),
-                y: data.interactions.map(d => d.count),
+                x: interactions.map(d => d.date),
+                y: interactions.map(d => d.count),
                 type: 'scatter',
                 mode: 'lines+markers',
                 line: { color: '#2563eb', width: 3, shape: 'spline' },
@@ -652,27 +440,14 @@ class CRMDashboard {
                 responsive: true,
                 displayModeBar: false
             });
+            
+            console.log('✅ Analytics charts rendered successfully');
         } catch (error) {
-            console.error('Error rendering charts:', error);
+            console.warn('⚠️ Failed to render analytics charts:', error.message);
         }
     }
 
     // Event handlers dan utility methods
-    async selectCustomer(customerId) {
-        await this.renderCustomerDetails(customerId);
-    }
-
-    async showChatHistory(customerId) {
-        try {
-            const chats = await this.apiConnector.getChatHistory(customerId);
-            // Open modal or navigate to chat history page
-            console.log('Chat history:', chats);
-            this.showSuccess('Chat history dimuat');
-        } catch (error) {
-            this.showError('Gagal memuat chat history');
-        }
-    }
-
     async contactCustomer(phone) {
         const message = prompt('Masukkan pesan untuk customer:');
         if (message) {
@@ -691,175 +466,84 @@ class CRMDashboard {
         
         if (message) {
             try {
-                await this.apiConnector.sendWhatsAppMessage(phone, message);
-                // Trigger N8N webhook to update lead status
-                await this.apiConnector.triggerN8NWebhook({
-                    action: 'lead_contacted',
-                    phone: phone,
-                    name: name,
-                    message: message
-                });
+                await this.apiConnector.contactLead(phone, name, message);
                 this.showSuccess('Pesan berhasil dikirim ke lead');
-                // Refresh leads data
-                await this.loadMarketingData();
+                // Refresh data
+                await this.loadQuickStats();
             } catch (error) {
                 this.showError('Gagal mengirim pesan ke lead');
             }
         }
     }
 
-    async handleEscalation(escalationId) {
-        // Handle escalation logic
-        console.log('Handling escalation:', escalationId);
-        this.showSuccess('Escalation sedang dihandle');
-    }
-
-    async resolveEscalation(escalationId) {
-        const confirm = window.confirm('Apakah Anda yakin ingin menyelesaikan escalation ini?');
-        if (confirm) {
-            try {
-                // Update escalation status via N8N webhook
-                await this.apiConnector.triggerN8NWebhook({
-                    action: 'resolve_escalation',
-                    escalation_id: escalationId
-                });
-                this.showSuccess('Escalation berhasil diselesaikan');
-                await this.loadCustomerServiceData();
-            } catch (error) {
-                this.showError('Gagal menyelesaikan escalation');
-            }
-        }
-    }
-
-    async filterCustomers() {
-        const searchTerm = document.getElementById('customer-search')?.value || '';
-        const filterStatus = document.getElementById('customer-filter')?.value || '';
-        
-        try {
-            const customers = await this.apiConnector.getCustomers({
-                search: searchTerm,
-                status: filterStatus
-            });
-            this.customers = customers;
-            this.renderCustomerList();
-        } catch (error) {
-            console.error('Error filtering customers:', error);
-        }
-    }
-
-    async applyMarketingFilters() {
-        const segment = document.getElementById('segment-filter')?.value || '';
-        const status = document.getElementById('contact-status-filter')?.value || '';
-        const score = document.getElementById('lead-score-filter')?.value || '';
-        
-        try {
-            const leads = await this.apiConnector.getBusinessLeads({
-                segment: segment,
-                status: status,
-                leadScore: score
-            });
-            this.leads = leads;
-            this.renderLeadsTable();
-        } catch (error) {
-            console.error('Error applying filters:', error);
-        }
-    }
-
-    toggleSelectAllLeads() {
-        const checkboxes = document.querySelectorAll('.lead-checkbox');
-        const selectAll = document.getElementById('select-all-leads');
-        
-        checkboxes.forEach(checkbox => {
-            checkbox.checked = selectAll.checked;
-        });
-    }
-
-    async exportLeadsCSV() {
-        try {
-            const filters = this.getCurrentMarketingFilters();
-            await this.apiConnector.exportLeadsToCSV(filters);
-            this.showSuccess('Export leads berhasil! File CSV telah diunduh.');
-        } catch (error) {
-            this.showError('Gagal mengexport leads');
-        }
-    }
-
-    getCurrentMarketingFilters() {
-        return {
-            segment: document.getElementById('segment-filter')?.value || '',
-            status: document.getElementById('contact-status-filter')?.value || '',
-            leadScore: document.getElementById('lead-score-filter')?.value || ''
-        };
-    }
-
-    async bulkContactLeads() {
-        const selectedLeads = Array.from(document.querySelectorAll('.lead-checkbox:checked'))
-            .map(cb => parseInt(cb.value));
-        
-        if (selectedLeads.length === 0) {
-            this.showError('Pilih leads yang ingin dihubungi');
-            return;
-        }
-
-        const message = prompt('Masukkan pesan untuk semua leads yang dipilih:');
-        if (message) {
-            try {
-                // Trigger bulk contact via N8N webhook
-                await this.apiConnector.triggerN8NWebhook({
-                    action: 'bulk_contact_leads',
-                    lead_ids: selectedLeads,
-                    message: message
-                });
-                this.showSuccess(`Proses kontak massal untuk ${selectedLeads.length} leads dimulai`);
-            } catch (error) {
-                this.showError('Gagal memulai kontak massal');
-            }
-        }
-    }
-
     async refreshAllData() {
-        this.showLoading(true);
+        console.log('🔄 Refreshing all data...');
+        this.updateConnectionStatus('connecting');
         
         try {
+            // Clear cache
+            if (this.apiConnector.clearCache) {
+                this.apiConnector.clearCache();
+            }
+            
+            // Test connection
+            await this.testConnection();
+            
+            // Reload data
             await Promise.all([
                 this.loadQuickStats(),
-                this.loadTabData(this.currentTab)
+                this.loadOverviewData()
             ]);
             
-            if (this.currentTab === 'overview') {
-                await this.loadOverviewData();
-            }
-            
+            this.updateConnectionStatus('connected');
             this.showSuccess('Data berhasil diperbarui!');
         } catch (error) {
+            console.error('❌ Failed to refresh data:', error);
+            this.updateConnectionStatus('disconnected');
             this.showError('Gagal memperbarui data');
-        } finally {
-            this.showLoading(false);
         }
     }
 
     // Real-time updates
     startRealTimeUpdates() {
+        console.log('⏰ Starting real-time updates...');
+        
         // Update chat monitor setiap 30 detik
         setInterval(async () => {
-            if (this.currentTab === 'overview') {
+            if (this.currentTab === 'overview' && this.connectionStatus === 'connected') {
                 try {
                     const chats = await this.apiConnector.getRecentChats(10);
                     this.renderChatMonitor(chats);
                 } catch (error) {
-                    console.error('Error updating chats:', error);
+                    console.warn('Failed to update chats:', error.message);
                 }
             }
         }, 30000);
 
         // Update stats setiap 5 menit
         setInterval(async () => {
-            try {
-                await this.loadQuickStats();
-            } catch (error) {
-                console.error('Error updating stats:', error);
+            if (this.connectionStatus === 'connected') {
+                try {
+                    await this.loadQuickStats();
+                } catch (error) {
+                    console.warn('Failed to update stats:', error.message);
+                }
             }
         }, 300000);
+        
+        // Connection health check setiap 2 menit
+        setInterval(async () => {
+            try {
+                await this.testConnection();
+                if (this.connectionStatus !== 'connected') {
+                    this.updateConnectionStatus('connected');
+                }
+            } catch (error) {
+                if (this.connectionStatus !== 'disconnected') {
+                    this.updateConnectionStatus('disconnected');
+                }
+            }
+        }, 120000);
     }
 
     // Utility methods
@@ -872,17 +556,6 @@ class CRMDashboard {
         if (diff < 3600000) return Math.floor(diff / 60000) + ' menit lalu';
         if (diff < 86400000) return Math.floor(diff / 3600000) + ' jam lalu';
         return date.toLocaleDateString('id-ID');
-    }
-
-    formatMarketSegment(segment) {
-        const segments = {
-            'advertising_signage': 'Advertising & Signage',
-            'metal_fabrication': 'Metal Fabrication',
-            'furniture_manufacturing': 'Furniture Manufacturing',
-            'automotive_workshop': 'Automotive Workshop',
-            'interior_design': 'Interior Design'
-        };
-        return segments[segment] || segment;
     }
 
     getChatAvatarTone(type) {
@@ -959,48 +632,6 @@ class CRMDashboard {
         return style;
     }
 
-    getStatusColor(status) {
-        switch (status) {
-            case 'active': return 'bg-green-100 text-green-800';
-            case 'cooldown': return 'bg-yellow-100 text-yellow-800';
-            case 'escalated': return 'bg-red-100 text-red-800';
-            case 'open': return 'bg-red-100 text-red-800';
-            case 'in_progress': return 'bg-yellow-100 text-yellow-800';
-            case 'closed': return 'bg-green-100 text-green-800';
-            default: return 'bg-gray-100 text-gray-800';
-        }
-    }
-
-    getPriorityColor(priority) {
-        switch (priority) {
-            case 'urgent': return 'bg-red-100 text-red-800';
-            case 'high': return 'bg-orange-100 text-orange-800';
-            case 'medium': return 'bg-blue-100 text-blue-800';
-            case 'normal': return 'bg-blue-100 text-blue-800';
-            default: return 'bg-gray-100 text-gray-800';
-        }
-    }
-
-    getLeadStatusColor(status) {
-        switch (status) {
-            case 'new': return 'bg-blue-100 text-blue-800';
-            case 'contacted': return 'bg-green-100 text-green-800';
-            case 'invalid_whatsapp': return 'bg-red-100 text-red-800';
-            case 'blocked': return 'bg-gray-100 text-gray-800';
-            default: return 'bg-gray-100 text-gray-800';
-        }
-    }
-
-    getLeadStatusLabel(status) {
-        switch (status) {
-            case 'new': return 'Baru';
-            case 'contacted': return 'Dikontak';
-            case 'invalid_whatsapp': return 'WhatsApp Invalid';
-            case 'blocked': return 'Terblokir';
-            default: return status;
-        }
-    }
-
     // UI helpers
     showLoading(show) {
         const overlay = document.getElementById('loading-overlay');
@@ -1046,5 +677,6 @@ class CRMDashboard {
 
 // Initialize dashboard when DOM is loaded
 document.addEventListener('DOMContentLoaded', () => {
+    console.log('🏁 DOM loaded, initializing CRM Dashboard...');
     window.dashboard = new CRMDashboard();
 });
