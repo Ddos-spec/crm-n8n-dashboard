@@ -1,0 +1,1224 @@
+{
+  "name": "CRM Dashboard Integration",
+  "nodes": [
+    {
+      "parameters": {
+        "path": "crm",
+        "responseMode": "respondToWebhook",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [200, 300],
+      "id": "webhook-crm-main",
+      "name": "CRM Webhook"
+    },
+    {
+      "parameters": {
+        "rules": {
+          "rules": [
+            {
+              "conditions": [
+                {
+                  "leftValue": "={{ $json.action }}",
+                  "rightValue": "get_quick_stats",
+                  "operator": {
+                    "type": "string",
+                    "operation": "equals"
+                  }
+                }
+              ]
+            },
+            {
+              "conditions": [
+                {
+                  "leftValue": "={{ $json.action }}",
+                  "rightValue": "get_customers",
+                  "operator": {
+                    "type": "string", 
+                    "operation": "equals"
+                  }
+                }
+              ]
+            },
+            {
+              "conditions": [
+                {
+                  "leftValue": "={{ $json.action }}",
+                  "rightValue": "get_leads",
+                  "operator": {
+                    "type": "string",
+                    "operation": "equals"
+                  }
+                }
+              ]
+            },
+            {
+              "conditions": [
+                {
+                  "leftValue": "={{ $json.action }}",
+                  "rightValue": "get_escalations",
+                  "operator": {
+                    "type": "string",
+                    "operation": "equals"
+                  }
+                }
+              ]
+            },
+            {
+              "conditions": [
+                {
+                  "leftValue": "={{ $json.action }}",
+                  "rightValue": "get_recent_chats",
+                  "operator": {
+                    "type": "string",
+                    "operation": "equals"
+                  }
+                }
+              ]
+            },
+            {
+              "conditions": [
+                {
+                  "leftValue": "={{ $json.action }}",
+                  "rightValue": "get_recent_activities",
+                  "operator": {
+                    "type": "string",
+                    "operation": "equals"
+                  }
+                }
+              ]
+            },
+            {
+              "conditions": [
+                {
+                  "leftValue": "={{ $json.action }}",
+                  "rightValue": "send_whatsapp_message",
+                  "operator": {
+                    "type": "string",
+                    "operation": "equals"
+                  }
+                }
+              ]
+            },
+            {
+              "conditions": [
+                {
+                  "leftValue": "={{ $json.action }}",
+                  "rightValue": "contact_lead",
+                  "operator": {
+                    "type": "string",
+                    "operation": "equals"
+                  }
+                }
+              ]
+            },
+            {
+              "conditions": [
+                {
+                  "leftValue": "={{ $json.action }}",
+                  "rightValue": "bulk_contact_leads",
+                  "operator": {
+                    "type": "string",
+                    "operation": "equals"
+                  }
+                }
+              ]
+            },
+            {
+              "conditions": [
+                {
+                  "leftValue": "={{ $json.action }}",
+                  "rightValue": "resolve_escalation",
+                  "operator": {
+                    "type": "string",
+                    "operation": "equals"
+                  }
+                }
+              ]
+            },
+            {
+              "conditions": [
+                {
+                  "leftValue": "={{ $json.action }}",
+                  "rightValue": "health_check",
+                  "operator": {
+                    "type": "string",
+                    "operation": "equals"
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3,
+      "position": [400, 300],
+      "id": "action-router",
+      "name": "Action Router"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT \n  (SELECT COUNT(*) FROM customers) as \"totalCustomers\",\n  (SELECT COUNT(*) FROM businesses WHERE has_phone = true) as \"totalLeads\",\n  (SELECT COUNT(*) FROM escalations WHERE status = 'open') as \"totalEscalations\",\n  COALESCE((\n    SELECT COUNT(CASE WHEN status = 'contacted' THEN 1 END) * 100.0 / \n    NULLIF(COUNT(CASE WHEN message_sent = true THEN 1 END), 0)\n    FROM businesses\n  ), 0) as \"responseRate\"",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.4,
+      "position": [600, 100],
+      "id": "get-quick-stats",
+      "name": "Get Quick Stats",
+      "credentials": {
+        "postgres": {
+          "id": "postgres-scrapdatan8n",
+          "name": "postgres_scrapdatan8n"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT \n  id, phone, name, location, conversation_stage, \n  last_interaction, is_cooldown_active, cooldown_until,\n  message_count, created_at, updated_at\nFROM customers \nWHERE 1=1\n  {{ $json.data.filters && $json.data.filters.search ? \n    \"AND (name ILIKE '%\" + $json.data.filters.search + \"%' OR phone ILIKE '%\" + $json.data.filters.search + \"%')\" : \"\" }}\n  {{ $json.data.filters && $json.data.filters.status ? \n    ($json.data.filters.status === 'active' ? \"AND is_cooldown_active = false\" :\n     $json.data.filters.status === 'cooldown' ? \"AND is_cooldown_active = true\" :\n     $json.data.filters.status === 'escalated' ? \"AND id IN (SELECT customer_id FROM escalations WHERE status = 'open')\" : \"\") : \"\" }}\nORDER BY last_interaction DESC\nLIMIT 100",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.4,
+      "position": [600, 200],
+      "id": "get-customers",
+      "name": "Get Customers",
+      "credentials": {
+        "postgres": {
+          "id": "postgres-scrapdatan8n",
+          "name": "postgres_scrapdatan8n"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT \n  id, name, phone, formatted_phone_number, address,\n  website, rating, business_status, market_segment,\n  status, lead_score, contact_attempts, last_contacted,\n  message_sent, has_phone, created_at\nFROM businesses\nWHERE has_phone = true\n  {{ $json.data.filters && $json.data.filters.segment ? \n    \"AND market_segment = '\" + $json.data.filters.segment + \"'\" : \"\" }}\n  {{ $json.data.filters && $json.data.filters.status ? \n    \"AND status = '\" + $json.data.filters.status + \"'\" : \"\" }}\n  {{ $json.data.filters && $json.data.filters.leadScore ? \n    ($json.data.filters.leadScore === 'high' ? \"AND lead_score >= 70\" :\n     $json.data.filters.leadScore === 'medium' ? \"AND lead_score >= 40 AND lead_score < 70\" :\n     $json.data.filters.leadScore === 'low' ? \"AND lead_score < 40\" : \"\") : \"\" }}\nORDER BY lead_score DESC, created_at DESC\nLIMIT 500",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.4,
+      "position": [600, 300],
+      "id": "get-leads",
+      "name": "Get Leads",
+      "credentials": {
+        "postgres": {
+          "id": "postgres-scrapdatan8n",
+          "name": "postgres_scrapdatan8n"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT \n  e.id, e.customer_id, e.escalation_type, e.priority,\n  e.status, e.reason, e.created_at, e.resolved_at,\n  c.name as customer_name, c.phone as customer_phone\nFROM escalations e\nLEFT JOIN customers c ON e.customer_id = c.id\nWHERE 1=1\n  {{ $json.data.filters && $json.data.filters.status ? \n    \"AND e.status = '\" + $json.data.filters.status + \"'\" : \"\" }}\n  {{ $json.data.filters && $json.data.filters.priority ? \n    \"AND e.priority = '\" + $json.data.filters.priority + \"'\" : \"\" }}\nORDER BY \n  CASE e.priority \n    WHEN 'urgent' THEN 1 \n    WHEN 'high' THEN 2 \n    WHEN 'medium' THEN 3 \n    ELSE 4 \n  END,\n  e.created_at DESC",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.4,
+      "position": [600, 400],
+      "id": "get-escalations",
+      "name": "Get Escalations",
+      "credentials": {
+        "postgres": {
+          "id": "postgres-scrapdatan8n",
+          "name": "postgres_scrapdatan8n"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT \n  ch.id, ch.customer_id, ch.message_type, ch.content,\n  ch.classification, ch.ai_confidence, ch.created_at,\n  c.name as customer_name, c.phone as customer_phone\nFROM chat_history ch\nLEFT JOIN customers c ON ch.customer_id = c.id\nORDER BY ch.created_at DESC\nLIMIT {{ $json.data.limit || 10 }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.4,
+      "position": [600, 500],
+      "id": "get-recent-chats",
+      "name": "Get Recent Chats",
+      "credentials": {
+        "postgres": {
+          "id": "postgres-scrapdatan8n",
+          "name": "postgres_scrapdatan8n"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "(SELECT \n  'escalation' as type,\n  'Escalation baru: ' || reason as description,\n  created_at as timestamp,\n  (SELECT name FROM customers WHERE id = customer_id) as customer\nFROM escalations \nWHERE created_at >= CURRENT_DATE - INTERVAL '24 hours'\nORDER BY created_at DESC\nLIMIT 10)\nUNION ALL\n(SELECT \n  'lead_contact' as type,\n  'Lead baru dikontak: ' || name as description,\n  last_contacted as timestamp,\n  name as customer\nFROM businesses \nWHERE last_contacted >= CURRENT_DATE - INTERVAL '24 hours'\nAND message_sent = true\nORDER BY last_contacted DESC\nLIMIT 10)\nORDER BY timestamp DESC\nLIMIT {{ $json.data.limit || 20 }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.4,
+      "position": [600, 600],
+      "id": "get-recent-activities",
+      "name": "Get Recent Activities",
+      "credentials": {
+        "postgres": {
+          "id": "postgres-scrapdatan8n",
+          "name": "postgres_scrapdatan8n"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "url": "=https://app.notif.my.id/api/v2/send-message?apikey=mm68fx5IvP2GIb2Wjq1760330685167&mtype={{ $json.data.type || 'text' }}&receiver={{ $json.data.phone }}&text={{ encodeURIComponent($json.data.message) }}",
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [600, 700],
+      "id": "send-whatsapp-message",
+      "name": "Send WhatsApp Message"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE businesses \nSET \n  status = 'contacted',\n  contact_attempts = contact_attempts + 1,\n  last_contacted = CURRENT_TIMESTAMP,\n  message_sent = true,\n  updated_at = CURRENT_TIMESTAMP\nWHERE phone = '{{ $json.data.phone }}'\nRETURNING id, name, phone, status",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.4,
+      "position": [800, 800],
+      "id": "update-lead-status",
+      "name": "Update Lead Status",
+      "credentials": {
+        "postgres": {
+          "id": "postgres-scrapdatan8n",
+          "name": "postgres_scrapdatan8n"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "url": "=https://app.notif.my.id/api/v2/send-message?apikey=mm68fx5IvP2GIb2Wjq1760330685167&mtype=text&receiver={{ $json.data.phone }}&text={{ encodeURIComponent($json.data.message) }}",
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [600, 800],
+      "id": "contact-lead-whatsapp",
+      "name": "Contact Lead WhatsApp"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT id, name, phone FROM businesses WHERE id = ANY(ARRAY[{{ $json.data.lead_ids.join(',') }}])",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.4,
+      "position": [600, 900],
+      "id": "get-bulk-leads",
+      "name": "Get Bulk Leads",
+      "credentials": {
+        "postgres": {
+          "id": "postgres-scrapdatan8n",
+          "name": "postgres_scrapdatan8n"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "batchSize": 1,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [800, 900],
+      "id": "split-leads-batch",
+      "name": "Split Leads Batch"
+    },
+    {
+      "parameters": {
+        "url": "=https://app.notif.my.id/api/v2/send-message?apikey=mm68fx5IvP2GIb2Wjq1760330685167&mtype=text&receiver={{ $json.phone }}&text={{ encodeURIComponent($node['CRM Webhook'].json.data.message) }}",
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1000, 900],
+      "id": "send-bulk-whatsapp",
+      "name": "Send Bulk WhatsApp"
+    },
+    {
+      "parameters": {
+        "amount": 5,
+        "unit": "seconds"
+      },
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1,
+      "position": [1200, 900],
+      "id": "wait-between-messages",
+      "name": "Wait Between Messages"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE escalations \nSET \n  status = 'resolved',\n  resolved_at = CURRENT_TIMESTAMP,\n  resolved_by = 'crm_dashboard'\nWHERE id = {{ $json.data.escalation_id }}\nRETURNING id, customer_id, escalation_type, status",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.4,
+      "position": [600, 1000],
+      "id": "resolve-escalation-db",
+      "name": "Resolve Escalation DB",
+      "credentials": {
+        "postgres": {
+          "id": "postgres-scrapdatan8n",
+          "name": "postgres_scrapdatan8n"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "values": {
+          "boolean": [
+            {
+              "name": "success",
+              "value": "=true"
+            }
+          ],
+          "object": [
+            {
+              "name": "data",
+              "value": "={{ $json }}"
+            }
+          ],
+          "string": [
+            {
+              "name": "request_id",
+              "value": "={{ $node['CRM Webhook'].json.request_id }}"
+            },
+            {
+              "name": "action",
+              "value": "={{ $node['CRM Webhook'].json.action }}"
+            },
+            {
+              "name": "timestamp",
+              "value": "={{ new Date().toISOString() }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.3,
+      "position": [800, 100],
+      "id": "format-stats-response",
+      "name": "Format Stats Response"
+    },
+    {
+      "parameters": {
+        "values": {
+          "boolean": [
+            {
+              "name": "success",
+              "value": "=true"
+            }
+          ],
+          "object": [
+            {
+              "name": "data",
+              "value": "={{ $json }}"
+            }
+          ],
+          "string": [
+            {
+              "name": "request_id",
+              "value": "={{ $node['CRM Webhook'].json.request_id }}"
+            },
+            {
+              "name": "action",
+              "value": "={{ $node['CRM Webhook'].json.action }}"
+            },
+            {
+              "name": "timestamp",
+              "value": "={{ new Date().toISOString() }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.3,
+      "position": [800, 200],
+      "id": "format-customers-response",
+      "name": "Format Customers Response"
+    },
+    {
+      "parameters": {
+        "values": {
+          "boolean": [
+            {
+              "name": "success",
+              "value": "=true"
+            }
+          ],
+          "object": [
+            {
+              "name": "data",
+              "value": "={{ $json }}"
+            }
+          ],
+          "string": [
+            {
+              "name": "request_id",
+              "value": "={{ $node['CRM Webhook'].json.request_id }}"
+            },
+            {
+              "name": "action",
+              "value": "={{ $node['CRM Webhook'].json.action }}"
+            },
+            {
+              "name": "timestamp",
+              "value": "={{ new Date().toISOString() }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.3,
+      "position": [800, 300],
+      "id": "format-leads-response",
+      "name": "Format Leads Response"
+    },
+    {
+      "parameters": {
+        "values": {
+          "boolean": [
+            {
+              "name": "success",
+              "value": "=true"
+            }
+          ],
+          "object": [
+            {
+              "name": "data",
+              "value": "={{ $json }}"
+            }
+          ],
+          "string": [
+            {
+              "name": "request_id",
+              "value": "={{ $node['CRM Webhook'].json.request_id }}"
+            },
+            {
+              "name": "action",
+              "value": "={{ $node['CRM Webhook'].json.action }}"
+            },
+            {
+              "name": "timestamp",
+              "value": "={{ new Date().toISOString() }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.3,
+      "position": [800, 400],
+      "id": "format-escalations-response",
+      "name": "Format Escalations Response"
+    },
+    {
+      "parameters": {
+        "values": {
+          "boolean": [
+            {
+              "name": "success",
+              "value": "=true"
+            }
+          ],
+          "object": [
+            {
+              "name": "data",
+              "value": "={{ $json }}"
+            }
+          ],
+          "string": [
+            {
+              "name": "request_id",
+              "value": "={{ $node['CRM Webhook'].json.request_id }}"
+            },
+            {
+              "name": "action",
+              "value": "={{ $node['CRM Webhook'].json.action }}"
+            },
+            {
+              "name": "timestamp",
+              "value": "={{ new Date().toISOString() }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.3,
+      "position": [800, 500],
+      "id": "format-chats-response",
+      "name": "Format Chats Response"
+    },
+    {
+      "parameters": {
+        "values": {
+          "boolean": [
+            {
+              "name": "success",
+              "value": "=true"
+            }
+          ],
+          "object": [
+            {
+              "name": "data",
+              "value": "={{ $json }}"
+            }
+          ],
+          "string": [
+            {
+              "name": "request_id",
+              "value": "={{ $node['CRM Webhook'].json.request_id }}"
+            },
+            {
+              "name": "action",
+              "value": "={{ $node['CRM Webhook'].json.action }}"
+            },
+            {
+              "name": "timestamp",
+              "value": "={{ new Date().toISOString() }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.3,
+      "position": [800, 600],
+      "id": "format-activities-response",
+      "name": "Format Activities Response"
+    },
+    {
+      "parameters": {
+        "values": {
+          "boolean": [
+            {
+              "name": "success",
+              "value": "=true"
+            }
+          ],
+          "object": [
+            {
+              "name": "data",
+              "value": "={{ {
+                message_id: $json.data ? $json.data.id || 'sent_' + Date.now() : 'sent_' + Date.now(),
+                status: $json.status === 200 ? 'sent' : 'failed',
+                phone: $node['CRM Webhook'].json.data.phone,
+                message: $node['CRM Webhook'].json.data.message
+              } }}"
+            }
+          ],
+          "string": [
+            {
+              "name": "request_id",
+              "value": "={{ $node['CRM Webhook'].json.request_id }}"
+            },
+            {
+              "name": "action",
+              "value": "=send_whatsapp_message"
+            },
+            {
+              "name": "timestamp",
+              "value": "={{ new Date().toISOString() }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.3,
+      "position": [800, 700],
+      "id": "format-whatsapp-response",
+      "name": "Format WhatsApp Response"
+    },
+    {
+      "parameters": {
+        "values": {
+          "boolean": [
+            {
+              "name": "success",
+              "value": "=true"
+            }
+          ],
+          "object": [
+            {
+              "name": "data",
+              "value": "={{ {
+                phone: $node['CRM Webhook'].json.data.phone,
+                name: $node['CRM Webhook'].json.data.name,
+                message: $node['CRM Webhook'].json.data.message,
+                whatsapp_response: $node['Contact Lead WhatsApp'].json,
+                database_update: $node['Update Lead Status'].json
+              } }}"
+            }
+          ],
+          "string": [
+            {
+              "name": "request_id",
+              "value": "={{ $node['CRM Webhook'].json.request_id }}"
+            },
+            {
+              "name": "action",
+              "value": "=contact_lead"
+            },
+            {
+              "name": "timestamp",
+              "value": "={{ new Date().toISOString() }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.3,
+      "position": [1000, 800],
+      "id": "format-contact-lead-response",
+      "name": "Format Contact Lead Response"
+    },
+    {
+      "parameters": {
+        "values": {
+          "boolean": [
+            {
+              "name": "success",
+              "value": "=true"
+            }
+          ],
+          "object": [
+            {
+              "name": "data",
+              "value": "={{ {
+                contacted_leads: $node['Split Leads Batch'].json.length,
+                message: $node['CRM Webhook'].json.data.message,
+                status: 'bulk_contact_completed'
+              } }}"
+            }
+          ],
+          "string": [
+            {
+              "name": "request_id",
+              "value": "={{ $node['CRM Webhook'].json.request_id }}"
+            },
+            {
+              "name": "action",
+              "value": "=bulk_contact_leads"
+            },
+            {
+              "name": "timestamp",
+              "value": "={{ new Date().toISOString() }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.3,
+      "position": [1400, 900],
+      "id": "format-bulk-response",
+      "name": "Format Bulk Response"
+    },
+    {
+      "parameters": {
+        "values": {
+          "boolean": [
+            {
+              "name": "success",
+              "value": "=true"
+            }
+          ],
+          "object": [
+            {
+              "name": "data",
+              "value": "={{ $json }}"
+            }
+          ],
+          "string": [
+            {
+              "name": "request_id",
+              "value": "={{ $node['CRM Webhook'].json.request_id }}"
+            },
+            {
+              "name": "action",
+              "value": "=resolve_escalation"
+            },
+            {
+              "name": "timestamp",
+              "value": "={{ new Date().toISOString() }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.3,
+      "position": [800, 1000],
+      "id": "format-escalation-response",
+      "name": "Format Escalation Response"
+    },
+    {
+      "parameters": {
+        "values": {
+          "boolean": [
+            {
+              "name": "success",
+              "value": "=true"
+            }
+          ],
+          "object": [
+            {
+              "name": "data",
+              "value": "={{ {
+                database: true,
+                n8n: true,
+                timestamp: new Date().toISOString()
+              } }}"
+            }
+          ],
+          "string": [
+            {
+              "name": "request_id",
+              "value": "={{ $node['CRM Webhook'].json.request_id }}"
+            },
+            {
+              "name": "action",
+              "value": "=health_check"
+            },
+            {
+              "name": "timestamp",
+              "value": "={{ new Date().toISOString() }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.3,
+      "position": [600, 1100],
+      "id": "health-check-response",
+      "name": "Health Check Response"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4,
+      "position": [1000, 300],
+      "id": "respond-to-webhook",
+      "name": "Respond to Webhook"
+    }
+  ],
+  "connections": {
+    "CRM Webhook": {
+      "main": [
+        [
+          {
+            "node": "Action Router",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Action Router": {
+      "main": [
+        [
+          {
+            "node": "Get Quick Stats",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Get Customers",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Get Leads",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Get Escalations",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Get Recent Chats",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Get Recent Activities",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Send WhatsApp Message",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Contact Lead WhatsApp",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Get Bulk Leads",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Resolve Escalation DB",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Health Check Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Quick Stats": {
+      "main": [
+        [
+          {
+            "node": "Format Stats Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Customers": {
+      "main": [
+        [
+          {
+            "node": "Format Customers Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Leads": {
+      "main": [
+        [
+          {
+            "node": "Format Leads Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Escalations": {
+      "main": [
+        [
+          {
+            "node": "Format Escalations Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Recent Chats": {
+      "main": [
+        [
+          {
+            "node": "Format Chats Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Recent Activities": {
+      "main": [
+        [
+          {
+            "node": "Format Activities Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send WhatsApp Message": {
+      "main": [
+        [
+          {
+            "node": "Format WhatsApp Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Contact Lead WhatsApp": {
+      "main": [
+        [
+          {
+            "node": "Update Lead Status",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update Lead Status": {
+      "main": [
+        [
+          {
+            "node": "Format Contact Lead Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Bulk Leads": {
+      "main": [
+        [
+          {
+            "node": "Split Leads Batch",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split Leads Batch": {
+      "main": [
+        [
+          {
+            "node": "Send Bulk WhatsApp",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Bulk WhatsApp": {
+      "main": [
+        [
+          {
+            "node": "Wait Between Messages",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait Between Messages": {
+      "main": [
+        [
+          {
+            "node": "Split Leads Batch",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Format Bulk Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Resolve Escalation DB": {
+      "main": [
+        [
+          {
+            "node": "Format Escalation Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format Stats Response": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format Customers Response": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format Leads Response": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format Escalations Response": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format Chats Response": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format Activities Response": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format WhatsApp Response": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format Contact Lead Response": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format Bulk Response": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format Escalation Response": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Health Check Response": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "tags": [
+    {
+      "createdAt": "2024-10-22T04:20:00.000Z",
+      "updatedAt": "2024-10-22T04:20:00.000Z",
+      "id": "crm-integration",
+      "name": "CRM Integration"
+    }
+  ],
+  "triggerCount": 1,
+  "updatedAt": "2024-10-22T04:20:00.000Z",
+  "versionId": "crm-integration-v2"
+}
