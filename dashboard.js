@@ -1,4 +1,4 @@
-// CRM Dashboard JavaScript
+// CRM Dashboard JavaScript dengan Real Database Integration
 class CRMDashboard {
     constructor() {
         this.currentTab = 'overview';
@@ -7,13 +7,17 @@ class CRMDashboard {
         this.escalations = [];
         this.activities = [];
         this.chats = [];
+        this.apiConnector = null;
         
         this.init();
     }
 
-    init() {
+    async init() {
+        // Initialize API connector
+        this.apiConnector = new APIConnector();
+        
         this.setupEventListeners();
-        this.loadInitialData();
+        await this.loadInitialData();
         this.startRealTimeUpdates();
     }
 
@@ -65,6 +69,7 @@ class CRMDashboard {
             refreshButton.addEventListener('click', () => this.refreshAllData());
         }
 
+        // Initialize tab indicator
         requestAnimationFrame(() => {
             const defaultTab = document.querySelector('.tab-button[data-tab="overview"]');
             if (defaultTab) {
@@ -127,13 +132,17 @@ class CRMDashboard {
         this.showLoading(true);
         
         try {
+            // Test database connection first
+            const healthCheck = await this.apiConnector.healthCheck();
+            console.log('Database health:', healthCheck);
+            
             await Promise.all([
                 this.loadQuickStats(),
                 this.loadOverviewData()
             ]);
         } catch (error) {
             console.error('Error loading initial data:', error);
-            this.showError('Gagal memuat data awal');
+            this.showError('Gagal memuat data awal. Menggunakan data fallback.');
         } finally {
             this.showLoading(false);
         }
@@ -141,28 +150,28 @@ class CRMDashboard {
 
     async loadQuickStats() {
         try {
-            // Simulate API calls with mock data
-            const stats = await this.fetchQuickStats();
+            const stats = await this.apiConnector.getQuickStats();
             
-            document.getElementById('total-customers').textContent = stats.totalCustomers;
-            document.getElementById('total-leads').textContent = stats.totalLeads;
-            document.getElementById('total-escalations').textContent = stats.totalEscalations;
+            document.getElementById('total-customers').textContent = stats.totalCustomers.toLocaleString('id-ID');
+            document.getElementById('total-leads').textContent = stats.totalLeads.toLocaleString('id-ID');
+            document.getElementById('total-escalations').textContent = stats.totalEscalations.toLocaleString('id-ID');
             document.getElementById('response-rate').textContent = stats.responseRate + '%';
         } catch (error) {
             console.error('Error loading quick stats:', error);
+            // Keep default values if error
         }
     }
 
     async loadOverviewData() {
         try {
             const [chats, activities] = await Promise.all([
-                this.fetchRecentChats(),
-                this.fetchRecentActivities()
+                this.apiConnector.getRecentChats(10),
+                this.apiConnector.getRecentActivities(20)
             ]);
 
             this.renderChatMonitor(chats);
             this.renderRecentActivities(activities);
-            this.renderAnalyticsCharts();
+            await this.renderAnalyticsCharts();
         } catch (error) {
             console.error('Error loading overview data:', error);
         }
@@ -192,253 +201,48 @@ class CRMDashboard {
     }
 
     async loadCustomerServiceData() {
-        const [customers, escalations] = await Promise.all([
-            this.fetchCustomers(),
-            this.fetchEscalations()
-        ]);
+        try {
+            const [customers, escalations] = await Promise.all([
+                this.apiConnector.getCustomers(),
+                this.apiConnector.getEscalations()
+            ]);
 
-        this.customers = customers;
-        this.escalations = escalations;
-        
-        this.renderCustomerList();
-        this.renderEscalationsTable();
+            this.customers = customers;
+            this.escalations = escalations;
+            
+            this.renderCustomerList();
+            this.renderEscalationsTable();
+        } catch (error) {
+            console.error('Error loading customer service data:', error);
+        }
     }
 
     async loadMarketingData() {
-        const [leads, campaignStats] = await Promise.all([
-            this.fetchLeads(),
-            this.fetchCampaignStats()
-        ]);
+        try {
+            const [leads, campaignStats] = await Promise.all([
+                this.apiConnector.getBusinessLeads(),
+                this.apiConnector.getCampaignStats()
+            ]);
 
-        this.leads = leads;
-        this.renderCampaignStats(campaignStats);
-        this.renderLeadsTable();
+            this.leads = leads;
+            this.renderCampaignStats(campaignStats);
+            this.renderLeadsTable();
+        } catch (error) {
+            console.error('Error loading marketing data:', error);
+        }
     }
 
     async loadAnalyticsData() {
-        const analyticsData = await this.fetchAnalyticsData();
-        this.renderAnalyticsCharts(analyticsData);
-        this.renderAnalyticsStats(analyticsData);
-    }
-
-    // Mock API methods - replace with real API calls
-    async fetchQuickStats() {
-        // Simulate API delay
-        await new Promise(resolve => setTimeout(resolve, 500));
-        
-        return {
-            totalCustomers: 1247,
-            totalLeads: 892,
-            totalEscalations: 23,
-            responseRate: 78
-        };
-    }
-
-    async fetchRecentChats() {
-        await new Promise(resolve => setTimeout(resolve, 800));
-        
-        return [
-            {
-                id: 1,
-                customerName: 'Bapak Andi',
-                phone: '6281234567890',
-                message: 'Halo, saya ingin pesan laser cutting untuk pagar rumah',
-                type: 'in',
-                timestamp: new Date().toISOString(),
-                classification: 'BUYING_READY'
-            },
-            {
-                id: 2,
-                customerName: 'AI Agent',
-                phone: '6281234567890',
-                message: 'Baik Pak Andi, untuk pesanan laser cutting pagar rumah, bisa tolong informasikan ukuran dan material yang diinginkan?',
-                type: 'out',
-                timestamp: new Date(Date.now() - 300000).toISOString(),
-                classification: 'AI_AGENT'
-            },
-            {
-                id: 3,
-                customerName: 'Ibu Siti',
-                phone: '6289876543210',
-                message: 'Berapa harga laser cutting akrilik ukuran 50x30 cm?',
-                type: 'in',
-                timestamp: new Date(Date.now() - 600000).toISOString(),
-                classification: 'ESCALATE_PRICE'
-            }
-        ];
-    }
-
-    async fetchRecentActivities() {
-        await new Promise(resolve => setTimeout(resolve, 600));
-        
-        return [
-            {
-                id: 1,
-                type: 'escalation',
-                description: 'Escalation baru: Customer minta harga urgent',
-                timestamp: new Date().toISOString(),
-                customer: 'Bapak Budi'
-            },
-            {
-                id: 2,
-                type: 'lead_contact',
-                description: 'Berhasil kontak 15 leads baru',
-                timestamp: new Date(Date.now() - 900000).toISOString(),
-                customer: null
-            },
-            {
-                id: 3,
-                type: 'conversion',
-                description: 'Customer mengkonfirmasi pesanan',
-                timestamp: new Date(Date.now() - 1800000).toISOString(),
-                customer: 'Ibu Ratna'
-            }
-        ];
-    }
-
-    async fetchCustomers() {
-        await new Promise(resolve => setTimeout(resolve, 1000));
-        
-        return [
-            {
-                id: 1,
-                name: 'Bapak Andi',
-                phone: '6281234567890',
-                location: 'Jakarta Selatan',
-                material: 'Besi',
-                conversationStage: 'waiting_size',
-                lastInteraction: new Date().toISOString(),
-                status: 'active',
-                isCooldownActive: false
-            },
-            {
-                id: 2,
-                name: 'Ibu Siti',
-                phone: '6289876543210',
-                location: 'Tangerang',
-                material: 'Akrilik',
-                conversationStage: 'greeting',
-                lastInteraction: new Date(Date.now() - 3600000).toISOString(),
-                status: 'cooldown',
-                isCooldownActive: true
-            },
-            {
-                id: 3,
-                name: 'Bapak Budi',
-                phone: '6281122334455',
-                location: 'Bekasi',
-                material: 'Stainless Steel',
-                conversationStage: 'escalated',
-                lastInteraction: new Date(Date.now() - 7200000).toISOString(),
-                status: 'escalated',
-                isCooldownActive: false
-            }
-        ];
-    }
-
-    async fetchEscalations() {
-        await new Promise(resolve => setTimeout(resolve, 700));
-        
-        return [
-            {
-                id: 1,
-                customerName: 'Bapak Budi',
-                type: 'ESCALATE_PRICE',
-                priority: 'high',
-                status: 'open',
-                reason: 'Customer minta penawaran harga segera',
-                createdAt: new Date().toISOString()
-            },
-            {
-                id: 2,
-                customerName: 'Ibu Ratna',
-                type: 'ESCALATE_URGENT',
-                priority: 'urgent',
-                status: 'in_progress',
-                reason: 'Komplain keterlambatan pengiriman',
-                createdAt: new Date(Date.now() - 3600000).toISOString()
-            }
-        ];
-    }
-
-    async fetchLeads() {
-        await new Promise(resolve => setTimeout(resolve, 1200));
-        
-        return [
-            {
-                id: 1,
-                name: 'CV. Surya Laser',
-                phone: '6281234567890',
-                marketSegment: 'advertising_signage',
-                leadScore: 85,
-                status: 'new',
-                address: 'Jl. Sudirman No. 123, Jakarta',
-                rating: 4.5
-            },
-            {
-                id: 2,
-                name: 'Bengkel Las Sejahtera',
-                phone: '6289876543210',
-                marketSegment: 'metal_fabrication',
-                leadScore: 72,
-                status: 'contacted',
-                address: 'Jl. Ahmad Yani No. 45, Tangerang',
-                rating: 4.2
-            },
-            {
-                id: 3,
-                name: 'Furniture Indah',
-                phone: '6281122334455',
-                marketSegment: 'furniture_manufacturing',
-                leadScore: 68,
-                status: 'new',
-                address: 'Jl. Gatot Subroto No. 78, Bekasi',
-                rating: 4.0
-            }
-        ];
-    }
-
-    async fetchCampaignStats() {
-        await new Promise(resolve => setTimeout(resolve, 500));
-        
-        return {
-            totalSent: 156,
-            totalDelivered: 142,
-            totalFailed: 14,
-            successRate: 91.0,
-            responseCount: 23,
-            conversionCount: 8
-        };
-    }
-
-    async fetchAnalyticsData() {
-        await new Promise(resolve => setTimeout(resolve, 800));
-        
-        return {
-            classifications: {
-                'AI_AGENT': 45,
-                'ESCALATE_PRICE': 25,
-                'ESCALATE_URGENT': 15,
-                'BUYING_READY': 15
-            },
-            interactions: [
-                { date: '2024-01-01', count: 120 },
-                { date: '2024-01-02', count: 135 },
-                { date: '2024-01-03', count: 148 },
-                { date: '2024-01-04', count: 162 },
-                { date: '2024-01-05', count: 178 }
-            ],
-            responseTimes: {
-                average: 2.3,
-                fastest: 0.5,
-                slowest: 8.7
-            },
-            targets: {
-                daily: 100,
-                contacted: 78,
-                percentage: 78
-            }
-        };
+        try {
+            const [classifications, interactions] = await Promise.all([
+                this.apiConnector.getMessageClassifications(),
+                this.apiConnector.getInteractionTrends()
+            ]);
+            
+            this.renderAnalyticsCharts({ classifications, interactions });
+        } catch (error) {
+            console.error('Error loading analytics data:', error);
+        }
     }
 
     // Render methods
@@ -459,8 +263,8 @@ class CRMDashboard {
         }
 
         container.innerHTML = chats.map(chat => {
-            const isInbound = chat.type === 'in';
-            const avatarTone = this.getChatAvatarTone(chat.type);
+            const isInbound = chat.message_type === 'in';
+            const avatarTone = this.getChatAvatarTone(chat.message_type);
             const pillClasses = this.getClassificationPillClasses(chat.classification);
             const classificationLabel = this.formatClassificationLabel(chat.classification);
             const bubbleClasses = isInbound
@@ -472,19 +276,19 @@ class CRMDashboard {
             return `
                 <div class="group flex ${alignment} items-start gap-3">
                     <div class="icon-ring flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-2xl ${avatarTone.background} ${avatarTone.text}">
-                        ${this.getChatIcon(chat.type)}
+                        ${this.getChatIcon(chat.message_type)}
                     </div>
                     <div class="max-w-full flex-1 space-y-2 sm:max-w-md">
                         <div class="chat-bubble rounded-3xl px-4 py-3 ${bubbleClasses}">
                             <div class="flex items-center justify-between gap-3">
-                                <p class="text-sm font-semibold ${isInbound ? 'text-slate-800' : 'text-white'}">${chat.customerName}</p>
-                                <span class="text-xs ${isInbound ? 'text-slate-400' : 'text-white/80'}">${this.formatTime(chat.timestamp)}</span>
+                                <p class="text-sm font-semibold ${isInbound ? 'text-slate-800' : 'text-white'}">${chat.customer_name}</p>
+                                <span class="text-xs ${isInbound ? 'text-slate-400' : 'text-white/80'}">${this.formatTime(chat.created_at)}</span>
                             </div>
-                            <p class="mt-2 text-sm ${isInbound ? 'text-slate-600' : 'text-white/90'}">${chat.message}</p>
+                            <p class="mt-2 text-sm ${isInbound ? 'text-slate-600' : 'text-white/90'}">${chat.content}</p>
                         </div>
                         <div class="flex items-center gap-2 ${metaAlignment}">
                             <span class="${pillClasses}">${classificationLabel}</span>
-                            <span class="text-xs ${isInbound ? 'text-slate-400' : 'text-white/70'}">${chat.phone}</span>
+                            <span class="text-xs ${isInbound ? 'text-slate-400' : 'text-white/70'}">${chat.customer_phone}</span>
                         </div>
                     </div>
                 </div>
@@ -534,6 +338,16 @@ class CRMDashboard {
         const container = document.getElementById('customer-list');
         if (!container) return;
 
+        if (!this.customers || this.customers.length === 0) {
+            container.innerHTML = `
+                <div class="text-center text-gray-500 py-8">
+                    <i class="fas fa-users text-4xl mb-4"></i>
+                    <p>Belum ada data pelanggan</p>
+                </div>
+            `;
+            return;
+        }
+
         container.innerHTML = this.customers.map(customer => `
             <div class="flex items-center justify-between p-4 border border-gray-200 rounded-lg hover:bg-gray-50 cursor-pointer" 
                  onclick="dashboard.selectCustomer(${customer.id})">
@@ -548,82 +362,90 @@ class CRMDashboard {
                     </div>
                 </div>
                 <div class="text-right">
-                    <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${this.getStatusColor(customer.status)}">
-                        ${this.getStatusLabel(customer.status)}
+                    <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${this.getStatusColor(customer.is_cooldown_active ? 'cooldown' : 'active')}">
+                        ${customer.is_cooldown_active ? 'Cooldown' : 'Aktif'}
                     </span>
-                    <p class="text-xs text-gray-400 mt-1">${this.formatTime(customer.lastInteraction)}</p>
+                    <p class="text-xs text-gray-400 mt-1">${this.formatTime(customer.last_interaction)}</p>
                 </div>
             </div>
         `).join('');
     }
 
-    renderCustomerDetails(customerId) {
-        const customer = this.customers.find(c => c.id === customerId);
-        if (!customer) return;
+    async renderCustomerDetails(customerId) {
+        try {
+            const customer = await this.apiConnector.getCustomerDetails(customerId);
+            if (!customer) return;
 
-        const container = document.getElementById('customer-details');
-        if (!container) return;
+            const container = document.getElementById('customer-details');
+            if (!container) return;
 
-        container.innerHTML = `
-            <div class="text-center mb-4">
-                <div class="w-16 h-16 rounded-full bg-blue-500 flex items-center justify-center mx-auto mb-3">
-                    <i class="fas fa-user text-white text-2xl"></i>
+            container.innerHTML = `
+                <div class="text-center mb-4">
+                    <div class="w-16 h-16 rounded-full bg-blue-500 flex items-center justify-center mx-auto mb-3">
+                        <i class="fas fa-user text-white text-2xl"></i>
+                    </div>
+                    <h4 class="font-semibold text-gray-900">${customer.name}</h4>
+                    <p class="text-sm text-gray-500">${customer.phone}</p>
                 </div>
-                <h4 class="font-semibold text-gray-900">${customer.name}</h4>
-                <p class="text-sm text-gray-500">${customer.phone}</p>
-            </div>
-            
-            <div class="space-y-3">
-                <div class="flex justify-between">
-                    <span class="text-sm text-gray-600">Lokasi:</span>
-                    <span class="text-sm font-medium">${customer.location || '-'}</span>
+                
+                <div class="space-y-3">
+                    <div class="flex justify-between">
+                        <span class="text-sm text-gray-600">Lokasi:</span>
+                        <span class="text-sm font-medium">${customer.location || '-'}</span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span class="text-sm text-gray-600">Stage:</span>
+                        <span class="text-sm font-medium">${customer.conversation_stage}</span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span class="text-sm text-gray-600">Total Pesan:</span>
+                        <span class="text-sm font-medium">${customer.total_messages || 0}</span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span class="text-sm text-gray-600">Cooldown:</span>
+                        <span class="text-sm font-medium">${customer.is_cooldown_active ? 'Aktif' : 'Tidak Aktif'}</span>
+                    </div>
                 </div>
-                <div class="flex justify-between">
-                    <span class="text-sm text-gray-600">Material:</span>
-                    <span class="text-sm font-medium">${customer.material || '-'}</span>
-                </div>
-                <div class="flex justify-between">
-                    <span class="text-sm text-gray-600">Stage:</span>
-                    <span class="text-sm font-medium">${customer.conversationStage}</span>
-                </div>
-                <div class="flex justify-between">
-                    <span class="text-sm text-gray-600">Status:</span>
-                    <span class="text-sm font-medium">${customer.status}</span>
-                </div>
-                <div class="flex justify-between">
-                    <span class="text-sm text-gray-600">Cooldown:</span>
-                    <span class="text-sm font-medium">${customer.isCooldownActive ? 'Aktif' : 'Tidak Aktif'}</span>
-                </div>
-            </div>
-            
-            <div class="mt-4 space-y-2">
-                <button class="w-full bg-blue-600 text-white py-2 px-4 rounded-lg hover:bg-blue-700 transition-colors">
-                    <i class="fas fa-comment mr-2"></i>Lihat Chat History
-                </button>
-                <button class="w-full bg-green-600 text-white py-2 px-4 rounded-lg hover:bg-green-700 transition-colors">
-                    <i class="fas fa-phone mr-2"></i>Hubungi Customer
-                </button>
-                ${customer.status === 'escalated' ? `
-                    <button class="w-full bg-red-600 text-white py-2 px-4 rounded-lg hover:bg-red-700 transition-colors">
-                        <i class="fas fa-handshake mr-2"></i>Handle Escalation
+                
+                <div class="mt-4 space-y-2">
+                    <button onclick="dashboard.showChatHistory(${customer.id})" class="w-full bg-blue-600 text-white py-2 px-4 rounded-lg hover:bg-blue-700 transition-colors">
+                        <i class="fas fa-comment mr-2"></i>Lihat Chat History
                     </button>
-                ` : ''}
-            </div>
-        `;
+                    <button onclick="dashboard.contactCustomer('${customer.phone}')" class="w-full bg-green-600 text-white py-2 px-4 rounded-lg hover:bg-green-700 transition-colors">
+                        <i class="fas fa-phone mr-2"></i>Hubungi Customer
+                    </button>
+                </div>
+            `;
+        } catch (error) {
+            console.error('Error loading customer details:', error);
+        }
     }
 
     renderEscalationsTable() {
         const container = document.getElementById('escalations-table');
         if (!container) return;
 
+        if (!this.escalations || this.escalations.length === 0) {
+            container.innerHTML = `
+                <tr>
+                    <td colspan="6" class="px-6 py-8 text-center text-gray-500">
+                        <i class="fas fa-exclamation-triangle text-4xl mb-4"></i>
+                        <p>Belum ada escalations</p>
+                    </td>
+                </tr>
+            `;
+            return;
+        }
+
         container.innerHTML = this.escalations.map(escalation => `
             <tr>
                 <td class="px-6 py-4 whitespace-nowrap">
-                    <div class="text-sm font-medium text-gray-900">${escalation.customerName}</div>
+                    <div class="text-sm font-medium text-gray-900">${escalation.customer_name}</div>
+                    <div class="text-sm text-gray-500">${escalation.customer_phone}</div>
                 </td>
                 <td class="px-6 py-4 whitespace-nowrap">
                     <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-                        ${escalation.type}
+                        ${escalation.escalation_type}
                     </span>
                 </td>
                 <td class="px-6 py-4 whitespace-nowrap">
@@ -637,13 +459,13 @@ class CRMDashboard {
                     </span>
                 </td>
                 <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    ${this.formatTime(escalation.createdAt)}
+                    ${this.formatTime(escalation.created_at)}
                 </td>
                 <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                    <button class="text-blue-600 hover:text-blue-900 mr-3">
+                    <button onclick="dashboard.handleEscalation(${escalation.id})" class="text-blue-600 hover:text-blue-900 mr-3">
                         <i class="fas fa-eye mr-1"></i>Detail
                     </button>
-                    <button class="text-green-600 hover:text-green-900">
+                    <button onclick="dashboard.resolveEscalation(${escalation.id})" class="text-green-600 hover:text-green-900">
                         <i class="fas fa-handshake mr-1"></i>Handle
                     </button>
                 </td>
@@ -655,6 +477,9 @@ class CRMDashboard {
         const container = document.getElementById('campaign-stats');
         if (!container) return;
 
+        const successRate = stats.totalSent > 0 ? Math.round((stats.totalDelivered / stats.totalSent) * 100) : 0;
+        const responseRate = stats.totalDelivered > 0 ? Math.round((stats.responseCount / stats.totalDelivered) * 100) : 0;
+
         container.innerHTML = `
             <div class="grid grid-cols-2 gap-4">
                 <div class="text-center p-4 bg-blue-50 rounded-lg">
@@ -663,25 +488,25 @@ class CRMDashboard {
                 </div>
                 <div class="text-center p-4 bg-green-50 rounded-lg">
                     <div class="text-2xl font-bold text-green-600">${stats.totalDelivered}</div>
-                    <div class="text-sm text-gray-600">Terkirim</div>
+                    <div class="text-sm text-gray-600">Berhasil</div>
                 </div>
                 <div class="text-center p-4 bg-red-50 rounded-lg">
                     <div class="text-2xl font-bold text-red-600">${stats.totalFailed}</div>
                     <div class="text-sm text-gray-600">Gagal</div>
                 </div>
                 <div class="text-center p-4 bg-purple-50 rounded-lg">
-                    <div class="text-2xl font-bold text-purple-600">${stats.successRate}%</div>
+                    <div class="text-2xl font-bold text-purple-600">${successRate}%</div>
                     <div class="text-sm text-gray-600">Sukses Rate</div>
                 </div>
             </div>
             <div class="mt-4 space-y-2">
                 <div class="flex justify-between">
                     <span class="text-sm text-gray-600">Response:</span>
-                    <span class="font-semibold">${stats.responseCount}</span>
+                    <span class="font-semibold">${stats.responseCount} (${responseRate}%)</span>
                 </div>
                 <div class="flex justify-between">
-                    <span class="text-sm text-gray-600">Konversi:</span>
-                    <span class="font-semibold">${stats.conversionCount}</span>
+                    <span class="text-sm text-gray-600">Update terakhir:</span>
+                    <span class="font-semibold">${this.formatTime(new Date().toISOString())}</span>
                 </div>
             </div>
         `;
@@ -691,6 +516,18 @@ class CRMDashboard {
         const container = document.getElementById('leads-table');
         if (!container) return;
 
+        if (!this.leads || this.leads.length === 0) {
+            container.innerHTML = `
+                <tr>
+                    <td colspan="7" class="px-6 py-8 text-center text-gray-500">
+                        <i class="fas fa-address-book text-4xl mb-4"></i>
+                        <p>Belum ada data leads</p>
+                    </td>
+                </tr>
+            `;
+            return;
+        }
+
         container.innerHTML = this.leads.map(lead => `
             <tr>
                 <td class="px-6 py-4 whitespace-nowrap">
@@ -698,21 +535,21 @@ class CRMDashboard {
                 </td>
                 <td class="px-6 py-4 whitespace-nowrap">
                     <div class="text-sm font-medium text-gray-900">${lead.name}</div>
-                    <div class="text-sm text-gray-500">${lead.address}</div>
+                    <div class="text-sm text-gray-500">${lead.address || ''}</div>
                 </td>
                 <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                     ${lead.phone}
                 </td>
                 <td class="px-6 py-4 whitespace-nowrap">
                     <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-                        ${lead.marketSegment}
+                        ${this.formatMarketSegment(lead.market_segment)}
                     </span>
                 </td>
                 <td class="px-6 py-4 whitespace-nowrap">
                     <div class="flex items-center">
-                        <div class="text-sm font-medium text-gray-900">${lead.leadScore}</div>
+                        <div class="text-sm font-medium text-gray-900">${lead.lead_score}</div>
                         <div class="ml-2 w-16 bg-gray-200 rounded-full h-2">
-                            <div class="bg-blue-600 h-2 rounded-full" style="width: ${lead.leadScore}%"></div>
+                            <div class="bg-blue-600 h-2 rounded-full" style="width: ${lead.lead_score}%"></div>
                         </div>
                     </div>
                 </td>
@@ -722,10 +559,7 @@ class CRMDashboard {
                     </span>
                 </td>
                 <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                    <button class="text-blue-600 hover:text-blue-900 mr-3">
-                        <i class="fas fa-eye mr-1"></i>Detail
-                    </button>
-                    <button class="text-green-600 hover:text-green-900">
+                    <button onclick="dashboard.contactLead('${lead.phone}', '${lead.name}')" class="text-green-600 hover:text-green-900">
                         <i class="fas fa-paper-plane mr-1"></i>Kontak
                     </button>
                 </td>
@@ -733,167 +567,299 @@ class CRMDashboard {
         `).join('');
     }
 
-    renderAnalyticsCharts(data = null) {
-        // Classification Chart
-        const classificationData = data ? data.classifications : {
-            'AI_AGENT': 45,
-            'ESCALATE_PRICE': 25,
-            'ESCALATE_URGENT': 15,
-            'BUYING_READY': 15
-        };
-
-        const palette = CONFIG?.ui?.chartPalette || {};
-        const classificationTrace = {
-            values: Object.values(classificationData),
-            labels: Object.keys(classificationData),
-            type: 'pie',
-            hole: 0.45,
-            marker: {
-                colors: palette.pie || ['#2563eb', '#38bdf8', '#f97316', '#10b981'],
-                line: { color: '#ffffff', width: 2 }
-            },
-            hoverinfo: 'label+percent',
-            textinfo: 'value'
-        };
-
-        const classificationLayout = {
-            margin: { t: 10, b: 10, l: 10, r: 10 },
-            showlegend: true,
-            legend: {
-                orientation: 'h',
-                x: 0.5,
-                y: -0.2,
-                xanchor: 'center',
-                font: { family: 'Inter, sans-serif', color: '#475569' }
-            },
-            paper_bgcolor: 'rgba(0,0,0,0)',
-            plot_bgcolor: 'rgba(0,0,0,0)',
-            font: { family: 'Inter, sans-serif', color: '#0f172a' }
-        };
-
-        Plotly.newPlot('classification-chart', [classificationTrace], classificationLayout, {
-            responsive: true,
-            displayModeBar: false
-        });
-
-        // Interaction Chart
-        const interactionData = data ? data.interactions : [
-            { date: '2024-01-01', count: 120 },
-            { date: '2024-01-02', count: 135 },
-            { date: '2024-01-03', count: 148 },
-            { date: '2024-01-04', count: 162 },
-            { date: '2024-01-05', count: 178 }
-        ];
-
-        const interactionTrace = {
-            x: interactionData.map(d => d.date),
-            y: interactionData.map(d => d.count),
-            type: 'scatter',
-            mode: 'lines+markers',
-            line: { color: palette.line || '#2563eb', width: 3, shape: 'spline' },
-            marker: {
-                color: palette.line || '#2563eb',
-                size: 8,
-                line: { color: '#ffffff', width: 2 }
-            },
-            hovertemplate: '%{y} interaksi<extra>%{x}</extra>'
-        };
-
-        const interactionLayout = {
-            margin: { t: 20, b: 40, l: 50, r: 20 },
-            xaxis: {
-                title: '',
-                showgrid: true,
-                gridcolor: 'rgba(148, 163, 184, 0.25)',
-                tickfont: { color: '#64748b' }
-            },
-            yaxis: {
-                title: '',
-                showgrid: true,
-                gridcolor: 'rgba(148, 163, 184, 0.25)',
-                zeroline: false,
-                tickfont: { color: '#64748b' }
-            },
-            hovermode: 'x unified',
-            paper_bgcolor: 'rgba(0,0,0,0)',
-            plot_bgcolor: 'rgba(0,0,0,0)',
-            showlegend: false
-        };
-
-        Plotly.newPlot('interaction-chart', [interactionTrace], interactionLayout, {
-            responsive: true,
-            displayModeBar: false
-        });
-
-        // AI Performance Chart
-        const aiPerformanceTrace = {
-            x: ['AI_AGENT', 'ESCALATE_PRICE', 'ESCALATE_URGENT', 'BUYING_READY'],
-            y: [92, 87, 94, 89],
-            type: 'bar',
-            marker: {
-                color: palette.bar || ['#2563eb', '#38bdf8', '#f97316', '#10b981'],
-                line: { color: '#ffffff', width: 1.5 }
+    async renderAnalyticsCharts(data = null) {
+        try {
+            // Get real data if not provided
+            if (!data) {
+                const [classifications, interactions] = await Promise.all([
+                    this.apiConnector.getMessageClassifications(),
+                    this.apiConnector.getInteractionTrends()
+                ]);
+                data = { classifications, interactions };
             }
-        };
 
-        const aiPerformanceLayout = {
-            margin: { t: 20, b: 60, l: 50, r: 20 },
-            xaxis: {
-                title: '',
-                tickfont: { color: '#475569' },
-                showgrid: false
-            },
-            yaxis: {
-                title: 'Akurasi (%)',
-                gridcolor: 'rgba(148, 163, 184, 0.25)',
-                tickfont: { color: '#475569' }
-            },
-            paper_bgcolor: 'rgba(0,0,0,0)',
-            plot_bgcolor: 'rgba(0,0,0,0)',
-            showlegend: false,
-            font: { family: 'Inter, sans-serif', color: '#0f172a' }
-        };
+            // Classification Chart
+            const classificationTrace = {
+                values: Object.values(data.classifications),
+                labels: Object.keys(data.classifications).map(key => this.formatClassificationLabel(key)),
+                type: 'pie',
+                hole: 0.45,
+                marker: {
+                    colors: ['#2563eb', '#38bdf8', '#f97316', '#10b981'],
+                    line: { color: '#ffffff', width: 2 }
+                },
+                hoverinfo: 'label+percent',
+                textinfo: 'value'
+            };
 
-        Plotly.newPlot('ai-performance-chart', [aiPerformanceTrace], aiPerformanceLayout, {
-            responsive: true,
-            displayModeBar: false
-        });
+            const classificationLayout = {
+                margin: { t: 10, b: 10, l: 10, r: 10 },
+                showlegend: true,
+                legend: {
+                    orientation: 'h',
+                    x: 0.5,
+                    y: -0.2,
+                    xanchor: 'center',
+                    font: { family: 'Inter, sans-serif', color: '#475569' }
+                },
+                paper_bgcolor: 'rgba(0,0,0,0)',
+                plot_bgcolor: 'rgba(0,0,0,0)',
+                font: { family: 'Inter, sans-serif', color: '#0f172a' }
+            };
 
-        // Marketing Conversion Chart
-        const conversionTrace = {
-            x: ['Sent', 'Delivered', 'Responded', 'Converted'],
-            y: [156, 142, 23, 8],
-            type: 'funnel',
-            marker: {
-                color: palette.funnel || ['#94a3b8', '#2563eb', '#f97316', '#10b981']
+            Plotly.newPlot('classification-chart', [classificationTrace], classificationLayout, {
+                responsive: true,
+                displayModeBar: false
+            });
+
+            // Interaction Chart
+            const interactionTrace = {
+                x: data.interactions.map(d => d.date),
+                y: data.interactions.map(d => d.count),
+                type: 'scatter',
+                mode: 'lines+markers',
+                line: { color: '#2563eb', width: 3, shape: 'spline' },
+                marker: {
+                    color: '#2563eb',
+                    size: 8,
+                    line: { color: '#ffffff', width: 2 }
+                },
+                hovertemplate: '%{y} interaksi<extra>%{x}</extra>'
+            };
+
+            const interactionLayout = {
+                margin: { t: 20, b: 40, l: 50, r: 20 },
+                xaxis: {
+                    title: '',
+                    showgrid: true,
+                    gridcolor: 'rgba(148, 163, 184, 0.25)',
+                    tickfont: { color: '#64748b' }
+                },
+                yaxis: {
+                    title: '',
+                    showgrid: true,
+                    gridcolor: 'rgba(148, 163, 184, 0.25)',
+                    zeroline: false,
+                    tickfont: { color: '#64748b' }
+                },
+                hovermode: 'x unified',
+                paper_bgcolor: 'rgba(0,0,0,0)',
+                plot_bgcolor: 'rgba(0,0,0,0)',
+                showlegend: false
+            };
+
+            Plotly.newPlot('interaction-chart', [interactionTrace], interactionLayout, {
+                responsive: true,
+                displayModeBar: false
+            });
+        } catch (error) {
+            console.error('Error rendering charts:', error);
+        }
+    }
+
+    // Event handlers dan utility methods
+    async selectCustomer(customerId) {
+        await this.renderCustomerDetails(customerId);
+    }
+
+    async showChatHistory(customerId) {
+        try {
+            const chats = await this.apiConnector.getChatHistory(customerId);
+            // Open modal or navigate to chat history page
+            console.log('Chat history:', chats);
+            this.showSuccess('Chat history dimuat');
+        } catch (error) {
+            this.showError('Gagal memuat chat history');
+        }
+    }
+
+    async contactCustomer(phone) {
+        const message = prompt('Masukkan pesan untuk customer:');
+        if (message) {
+            try {
+                await this.apiConnector.sendWhatsAppMessage(phone, message);
+                this.showSuccess('Pesan berhasil dikirim');
+            } catch (error) {
+                this.showError('Gagal mengirim pesan');
             }
-        };
+        }
+    }
 
-        const conversionLayout = {
-            margin: { t: 20, b: 40, l: 40, r: 20 },
-            paper_bgcolor: 'rgba(0,0,0,0)',
-            plot_bgcolor: 'rgba(0,0,0,0)',
-            font: { family: 'Inter, sans-serif', color: '#0f172a' },
-            showlegend: false
-        };
+    async contactLead(phone, name) {
+        const defaultMessage = `Halo ${name}, kami dari Tepat Laser. Kami melihat bisnis Anda mungkin membutuhkan layanan laser cutting. Boleh kami informasikan penawaran terbaik kami?`;
+        const message = prompt('Pesan untuk lead:', defaultMessage);
+        
+        if (message) {
+            try {
+                await this.apiConnector.sendWhatsAppMessage(phone, message);
+                // Trigger N8N webhook to update lead status
+                await this.apiConnector.triggerN8NWebhook({
+                    action: 'lead_contacted',
+                    phone: phone,
+                    name: name,
+                    message: message
+                });
+                this.showSuccess('Pesan berhasil dikirim ke lead');
+                // Refresh leads data
+                await this.loadMarketingData();
+            } catch (error) {
+                this.showError('Gagal mengirim pesan ke lead');
+            }
+        }
+    }
 
-        Plotly.newPlot('marketing-conversion-chart', [conversionTrace], conversionLayout, {
-            responsive: true,
-            displayModeBar: false
+    async handleEscalation(escalationId) {
+        // Handle escalation logic
+        console.log('Handling escalation:', escalationId);
+        this.showSuccess('Escalation sedang dihandle');
+    }
+
+    async resolveEscalation(escalationId) {
+        const confirm = window.confirm('Apakah Anda yakin ingin menyelesaikan escalation ini?');
+        if (confirm) {
+            try {
+                // Update escalation status via N8N webhook
+                await this.apiConnector.triggerN8NWebhook({
+                    action: 'resolve_escalation',
+                    escalation_id: escalationId
+                });
+                this.showSuccess('Escalation berhasil diselesaikan');
+                await this.loadCustomerServiceData();
+            } catch (error) {
+                this.showError('Gagal menyelesaikan escalation');
+            }
+        }
+    }
+
+    async filterCustomers() {
+        const searchTerm = document.getElementById('customer-search')?.value || '';
+        const filterStatus = document.getElementById('customer-filter')?.value || '';
+        
+        try {
+            const customers = await this.apiConnector.getCustomers({
+                search: searchTerm,
+                status: filterStatus
+            });
+            this.customers = customers;
+            this.renderCustomerList();
+        } catch (error) {
+            console.error('Error filtering customers:', error);
+        }
+    }
+
+    async applyMarketingFilters() {
+        const segment = document.getElementById('segment-filter')?.value || '';
+        const status = document.getElementById('contact-status-filter')?.value || '';
+        const score = document.getElementById('lead-score-filter')?.value || '';
+        
+        try {
+            const leads = await this.apiConnector.getBusinessLeads({
+                segment: segment,
+                status: status,
+                leadScore: score
+            });
+            this.leads = leads;
+            this.renderLeadsTable();
+        } catch (error) {
+            console.error('Error applying filters:', error);
+        }
+    }
+
+    toggleSelectAllLeads() {
+        const checkboxes = document.querySelectorAll('.lead-checkbox');
+        const selectAll = document.getElementById('select-all-leads');
+        
+        checkboxes.forEach(checkbox => {
+            checkbox.checked = selectAll.checked;
         });
     }
 
-    renderAnalyticsStats(data) {
-        if (data && data.responseTimes) {
-            document.getElementById('avg-response-time').textContent = data.responseTimes.average + ' detik';
-            document.getElementById('fastest-response-time').textContent = data.responseTimes.fastest + ' detik';
-            document.getElementById('slowest-response-time').textContent = data.responseTimes.slowest + ' detik';
+    async exportLeadsCSV() {
+        try {
+            const filters = this.getCurrentMarketingFilters();
+            await this.apiConnector.exportLeadsToCSV(filters);
+            this.showSuccess('Export leads berhasil! File CSV telah diunduh.');
+        } catch (error) {
+            this.showError('Gagal mengexport leads');
+        }
+    }
+
+    getCurrentMarketingFilters() {
+        return {
+            segment: document.getElementById('segment-filter')?.value || '',
+            status: document.getElementById('contact-status-filter')?.value || '',
+            leadScore: document.getElementById('lead-score-filter')?.value || ''
+        };
+    }
+
+    async bulkContactLeads() {
+        const selectedLeads = Array.from(document.querySelectorAll('.lead-checkbox:checked'))
+            .map(cb => parseInt(cb.value));
+        
+        if (selectedLeads.length === 0) {
+            this.showError('Pilih leads yang ingin dihubungi');
+            return;
         }
 
-        if (data && data.targets) {
-            document.getElementById('contacts-today').textContent = data.targets.contacted;
-            document.getElementById('target-percentage').textContent = data.targets.percentage + '%';
+        const message = prompt('Masukkan pesan untuk semua leads yang dipilih:');
+        if (message) {
+            try {
+                // Trigger bulk contact via N8N webhook
+                await this.apiConnector.triggerN8NWebhook({
+                    action: 'bulk_contact_leads',
+                    lead_ids: selectedLeads,
+                    message: message
+                });
+                this.showSuccess(`Proses kontak massal untuk ${selectedLeads.length} leads dimulai`);
+            } catch (error) {
+                this.showError('Gagal memulai kontak massal');
+            }
         }
+    }
+
+    async refreshAllData() {
+        this.showLoading(true);
+        
+        try {
+            await Promise.all([
+                this.loadQuickStats(),
+                this.loadTabData(this.currentTab)
+            ]);
+            
+            if (this.currentTab === 'overview') {
+                await this.loadOverviewData();
+            }
+            
+            this.showSuccess('Data berhasil diperbarui!');
+        } catch (error) {
+            this.showError('Gagal memperbarui data');
+        } finally {
+            this.showLoading(false);
+        }
+    }
+
+    // Real-time updates
+    startRealTimeUpdates() {
+        // Update chat monitor setiap 30 detik
+        setInterval(async () => {
+            if (this.currentTab === 'overview') {
+                try {
+                    const chats = await this.apiConnector.getRecentChats(10);
+                    this.renderChatMonitor(chats);
+                } catch (error) {
+                    console.error('Error updating chats:', error);
+                }
+            }
+        }, 30000);
+
+        // Update stats setiap 5 menit
+        setInterval(async () => {
+            try {
+                await this.loadQuickStats();
+            } catch (error) {
+                console.error('Error updating stats:', error);
+            }
+        }, 300000);
     }
 
     // Utility methods
@@ -908,12 +874,22 @@ class CRMDashboard {
         return date.toLocaleDateString('id-ID');
     }
 
+    formatMarketSegment(segment) {
+        const segments = {
+            'advertising_signage': 'Advertising & Signage',
+            'metal_fabrication': 'Metal Fabrication',
+            'furniture_manufacturing': 'Furniture Manufacturing',
+            'automotive_workshop': 'Automotive Workshop',
+            'interior_design': 'Interior Design'
+        };
+        return segments[segment] || segment;
+    }
+
     getChatAvatarTone(type) {
         const tones = {
             in: { background: 'bg-sky-500/10', text: 'text-sky-600' },
             out: { background: 'bg-indigo-500/10', text: 'text-indigo-600' }
         };
-
         return tones[type] || tones.in;
     }
 
@@ -925,7 +901,6 @@ class CRMDashboard {
                 </svg>
             `;
         }
-
         return `
             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor" class="h-5 w-5">
                 <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 6a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0ZM4.501 20.118a7.5 7.5 0 0 1 14.998 0A17.933 17.933 0 0 1 12 21.75c-2.749 0-5.362-.608-7.499-1.632Z" />
@@ -935,71 +910,53 @@ class CRMDashboard {
 
     getClassificationPillClasses(classification) {
         const normalized = classification ? classification.toUpperCase() : '';
-        const palette = CONFIG?.ui?.classificationPills || {};
-        const colorClass = palette[normalized] || 'bg-slate-100 text-slate-600 border border-slate-200';
-
+        const classes = {
+            'AI_AGENT': 'bg-sky-50 text-sky-600 border-sky-100',
+            'ESCALATE_PRICE': 'bg-amber-50 text-amber-600 border-amber-100',
+            'ESCALATE_URGENT': 'bg-rose-50 text-rose-600 border-rose-100',
+            'BUYING_READY': 'bg-emerald-50 text-emerald-600 border-emerald-100'
+        };
+        const colorClass = classes[normalized] || 'bg-slate-100 text-slate-600 border border-slate-200';
         return `inline-flex items-center rounded-full px-3 py-1 text-xs font-medium border ${colorClass}`;
     }
 
     formatClassificationLabel(value) {
         if (!value) return 'Tidak diketahui';
-        return value
-            .toLowerCase()
-            .split('_')
-            .map(word => word.charAt(0).toUpperCase() + word.slice(1))
-            .join(' ');
+        const labels = {
+            'AI_AGENT': 'AI Agent',
+            'ESCALATE_PRICE': 'Escalate Price',
+            'ESCALATE_URGENT': 'Escalate Urgent',
+            'BUYING_READY': 'Buying Ready'
+        };
+        return labels[value.toUpperCase()] || value;
     }
 
     getActivityStyle(type) {
-        const badgeConfig = CONFIG?.ui?.activityBadges || {};
-        const styles = badgeConfig[type] || badgeConfig.default || {
-            iconBg: 'bg-slate-500/10 text-slate-600',
-            badge: 'bg-slate-100 text-slate-600'
+        const styles = {
+            escalation: {
+                iconBg: 'bg-rose-500/10 text-rose-600',
+                badge: 'bg-rose-100 text-rose-600',
+                icon: `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor" class="h-5 w-5"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z" /></svg>`,
+                label: 'Escalation'
+            },
+            lead_contact: {
+                iconBg: 'bg-sky-500/10 text-sky-600',
+                badge: 'bg-sky-100 text-sky-600',
+                icon: `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor" class="h-5 w-5"><path stroke-linecap="round" stroke-linejoin="round" d="M21.75 6.75 11.25 12l10.5 5.25m0-10.5L11.25 12 2.25 6.75m19.5 10.5L11.25 12 2.25 17.25m19.5-10.5-10.5 5.25-10.5-5.25" /></svg>`,
+                label: 'Kontak Lead'
+            },
+            conversion: {
+                iconBg: 'bg-emerald-500/10 text-emerald-600',
+                badge: 'bg-emerald-100 text-emerald-600',
+                icon: `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor" class="h-5 w-5"><path stroke-linecap="round" stroke-linejoin="round" d="M8.25 7.5h-1.5A2.25 2.25 0 0 0 4.5 9.75v8.25A2.25 2.25 0 0 0 6.75 20.25h10.5A2.25 2.25 0 0 0 19.5 18V9.75a2.25 2.25 0 0 0-2.25-2.25h-1.5m-7.5 0V5.25a3 3 0 0 1 3-3h1.5a3 3 0 0 1 3 3V7.5m-7.5 0h7.5" /></svg>`,
+                label: 'Konversi'
+            }
         };
-
-        const iconMap = {
-            escalation: `
-                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor" class="h-5 w-5">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z" />
-                </svg>
-            `,
-            lead_contact: `
-                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor" class="h-5 w-5">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M21.75 6.75 11.25 12l10.5 5.25m0-10.5L11.25 12 2.25 6.75m19.5 10.5L11.25 12 2.25 17.25m19.5-10.5-10.5 5.25-10.5-5.25" />
-                </svg>
-            `,
-            conversion: `
-                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor" class="h-5 w-5">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M8.25 7.5h-1.5A2.25 2.25 0 0 0 4.5 9.75v8.25A2.25 2.25 0 0 0 6.75 20.25h10.5A2.25 2.25 0 0 0 19.5 18V9.75a2.25 2.25 0 0 0-2.25-2.25h-1.5m-7.5 0V5.25a3 3 0 0 1 3-3h1.5a3 3 0 0 1 3 3V7.5m-7.5 0h7.5" />
-                </svg>
-            `,
-            default: `
-                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor" class="h-5 w-5">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M11.25 11.25a.75.75 0 0 1 .75-.75h.008a.75.75 0 0 1 .75.75v.008a.75.75 0 0 1-.75.75h-.008a.75.75 0 0 1-.75-.75V11.25Zm.75 2.25h.008v3h-.008v-3ZM21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
-                </svg>
-            `
-        };
-
-        const labelMap = {
-            escalation: 'Escalation',
-            lead_contact: 'Kontak Lead',
-            conversion: 'Konversi',
-            default: 'Aktivitas'
-        };
-
-        const badgeIcon = `
-            <span class="flex h-5 w-5 items-center justify-center rounded-full bg-white/50 text-current">
-                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 8 8" class="h-2 w-2 fill-current"><circle cx="4" cy="4" r="4" /></svg>
-            </span>
-        `;
-
-        return {
-            iconBg: styles.iconBg,
-            badge: styles.badge,
-            icon: iconMap[type] || iconMap.default,
-            badgeIcon,
-            label: labelMap[type] || labelMap.default
-        };
+        
+        const style = styles[type] || styles.lead_contact;
+        style.badgeIcon = `<span class="flex h-5 w-5 items-center justify-center rounded-full bg-white/50 text-current"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 8 8" class="h-2 w-2 fill-current"><circle cx="4" cy="4" r="4" /></svg></span>`;
+        
+        return style;
     }
 
     getStatusColor(status) {
@@ -1007,16 +964,10 @@ class CRMDashboard {
             case 'active': return 'bg-green-100 text-green-800';
             case 'cooldown': return 'bg-yellow-100 text-yellow-800';
             case 'escalated': return 'bg-red-100 text-red-800';
+            case 'open': return 'bg-red-100 text-red-800';
+            case 'in_progress': return 'bg-yellow-100 text-yellow-800';
+            case 'closed': return 'bg-green-100 text-green-800';
             default: return 'bg-gray-100 text-gray-800';
-        }
-    }
-
-    getStatusLabel(status) {
-        switch (status) {
-            case 'active': return 'Aktif';
-            case 'cooldown': return 'Cooldown';
-            case 'escalated': return 'Escalated';
-            default: return status;
         }
     }
 
@@ -1024,6 +975,7 @@ class CRMDashboard {
         switch (priority) {
             case 'urgent': return 'bg-red-100 text-red-800';
             case 'high': return 'bg-orange-100 text-orange-800';
+            case 'medium': return 'bg-blue-100 text-blue-800';
             case 'normal': return 'bg-blue-100 text-blue-800';
             default: return 'bg-gray-100 text-gray-800';
         }
@@ -1049,73 +1001,6 @@ class CRMDashboard {
         }
     }
 
-    // Event handlers
-    selectCustomer(customerId) {
-        this.renderCustomerDetails(customerId);
-    }
-
-    filterCustomers() {
-        const searchTerm = document.getElementById('customer-search').value.toLowerCase();
-        const filterStatus = document.getElementById('customer-filter').value;
-        
-        // Filter logic here
-        console.log('Filtering customers:', { searchTerm, filterStatus });
-    }
-
-    applyMarketingFilters() {
-        const segment = document.getElementById('segment-filter').value;
-        const status = document.getElementById('contact-status-filter').value;
-        const score = document.getElementById('lead-score-filter').value;
-        
-        console.log('Applying marketing filters:', { segment, status, score });
-    }
-
-    toggleSelectAllLeads() {
-        const checkboxes = document.querySelectorAll('.lead-checkbox');
-        const selectAll = document.getElementById('select-all-leads');
-        
-        checkboxes.forEach(checkbox => {
-            checkbox.checked = selectAll.checked;
-        });
-    }
-
-    exportLeadsCSV() {
-        console.log('Exporting leads to CSV');
-        this.showSuccess('Export leads berhasil! File CSV akan diunduh.');
-    }
-
-    bulkContactLeads() {
-        const selectedLeads = document.querySelectorAll('.lead-checkbox:checked');
-        console.log('Bulk contacting leads:', selectedLeads.length);
-        this.showSuccess(`Mengontak ${selectedLeads.length} leads...`);
-    }
-
-    refreshAllData() {
-        this.showLoading(true);
-        
-        setTimeout(() => {
-            this.loadInitialData();
-            this.loadTabData(this.currentTab);
-            this.showLoading(false);
-            this.showSuccess('Data berhasil diperbarui!');
-        }, 2000);
-    }
-
-    // Real-time updates
-    startRealTimeUpdates() {
-        // Update chat monitor every 30 seconds
-        setInterval(() => {
-            this.fetchRecentChats().then(chats => {
-                this.renderChatMonitor(chats);
-            });
-        }, 30000);
-
-        // Update stats every 5 minutes
-        setInterval(() => {
-            this.loadQuickStats();
-        }, 300000);
-    }
-
     // UI helpers
     showLoading(show) {
         const overlay = document.getElementById('loading-overlay');
@@ -1125,7 +1010,6 @@ class CRMDashboard {
     }
 
     showSuccess(message) {
-        // Create and show success notification
         const notification = document.createElement('div');
         notification.className = 'fixed top-4 right-4 bg-green-500 text-white px-6 py-3 rounded-lg shadow-lg z-50';
         notification.innerHTML = `
@@ -1143,7 +1027,6 @@ class CRMDashboard {
     }
 
     showError(message) {
-        // Create and show error notification
         const notification = document.createElement('div');
         notification.className = 'fixed top-4 right-4 bg-red-500 text-white px-6 py-3 rounded-lg shadow-lg z-50';
         notification.innerHTML = `
