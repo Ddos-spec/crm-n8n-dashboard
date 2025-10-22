@@ -108,6 +108,35 @@
         #loading-overlay {
             backdrop-filter: blur(6px);
         }
+        
+        /* Connection status indicator */
+        .connection-status {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 500;
+        }
+        
+        .status-connected {
+            background: rgba(16, 185, 129, 0.1);
+            color: #059669;
+            border: 1px solid rgba(16, 185, 129, 0.2);
+        }
+        
+        .status-connecting {
+            background: rgba(245, 158, 11, 0.1);
+            color: #d97706;
+            border: 1px solid rgba(245, 158, 11, 0.2);
+        }
+        
+        .status-disconnected {
+            background: rgba(239, 68, 68, 0.1);
+            color: #dc2626;
+            border: 1px solid rgba(239, 68, 68, 0.2);
+        }
     </style>
 </head>
 <body class="relative min-h-screen">
@@ -128,12 +157,13 @@
                             </div>
                         </div>
                         <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-end">
-                            <div class="flex items-center gap-3 rounded-full bg-emerald-50/90 px-4 py-2 text-sm font-medium text-emerald-600 shadow-inner">
+                            <!-- Connection Status -->
+                            <div id="connection-status" class="connection-status status-connecting">
                                 <span class="relative flex h-2.5 w-2.5">
-                                    <span class="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75"></span>
-                                    <span class="relative inline-flex h-2.5 w-2.5 rounded-full bg-emerald-500"></span>
+                                    <span class="absolute inline-flex h-full w-full animate-ping rounded-full bg-current opacity-75"></span>
+                                    <span class="relative inline-flex h-2.5 w-2.5 rounded-full bg-current"></span>
                                 </span>
-                                Sistem Aktif
+                                <span id="connection-text">Connecting to N8N...</span>
                             </div>
                             <button id="refresh-data" class="inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-sky-600 to-blue-600 px-5 py-3 text-sm font-semibold text-white shadow-lg shadow-sky-500/40 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-500">
                                 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" class="h-5 w-5">
@@ -156,7 +186,7 @@
                         <div class="flex items-start justify-between">
                             <div>
                                 <p class="text-xs font-semibold uppercase tracking-[0.25em] text-slate-400">Total Pelanggan</p>
-                                <p class="mt-4 text-3xl font-semibold text-slate-900 md:text-4xl" id="total-customers">0</p>
+                                <p class="mt-4 text-3xl font-semibold text-slate-900 md:text-4xl" id="total-customers">-</p>
                                 <p class="mt-2 text-sm text-slate-500">Semua pelanggan aktif dalam sistem</p>
                             </div>
                             <div class="icon-ring flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-sky-500 to-cyan-400 text-white shadow-lg">
@@ -172,7 +202,7 @@
                         <div class="flex items-start justify-between">
                             <div>
                                 <p class="text-xs font-semibold uppercase tracking-[0.25em] text-slate-400">Leads Marketing</p>
-                                <p class="mt-4 text-3xl font-semibold text-slate-900 md:text-4xl" id="total-leads">0</p>
+                                <p class="mt-4 text-3xl font-semibold text-slate-900 md:text-4xl" id="total-leads">-</p>
                                 <p class="mt-2 text-sm text-slate-500">Prospek marketing siap di-follow up</p>
                             </div>
                             <div class="icon-ring flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-emerald-500 to-teal-400 text-white shadow-lg">
@@ -188,7 +218,7 @@
                         <div class="flex items-start justify-between">
                             <div>
                                 <p class="text-xs font-semibold uppercase tracking-[0.25em] text-slate-400">Escalations</p>
-                                <p class="mt-4 text-3xl font-semibold text-slate-900 md:text-4xl" id="total-escalations">0</p>
+                                <p class="mt-4 text-3xl font-semibold text-slate-900 md:text-4xl" id="total-escalations">-</p>
                                 <p class="mt-2 text-sm text-slate-500">Kasus prioritas yang butuh perhatian</p>
                             </div>
                             <div class="icon-ring flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-amber-500 to-orange-400 text-white shadow-lg">
@@ -204,7 +234,7 @@
                         <div class="flex items-start justify-between">
                             <div>
                                 <p class="text-xs font-semibold uppercase tracking-[0.25em] text-slate-400">Response Rate</p>
-                                <p class="mt-4 text-3xl font-semibold text-slate-900 md:text-4xl" id="response-rate">0%</p>
+                                <p class="mt-4 text-3xl font-semibold text-slate-900 md:text-4xl" id="response-rate">-%</p>
                                 <p class="mt-2 text-sm text-slate-500">Kecepatan tim menanggapi chat</p>
                             </div>
                             <div class="icon-ring flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-indigo-500 to-sky-500 text-white shadow-lg">
@@ -235,7 +265,7 @@
                                     <button class="tab-button relative z-10 flex h-10 items-center gap-2 rounded-xl px-4 text-sm font-medium text-slate-500 transition-all duration-300" data-tab="customers">
                                         <span class="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-500/10 text-blue-600">
                                             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor" class="h-4 w-4">
-                                                <path stroke-linecap="round" stroke-linejoin="round" d="M11.7 3.793a.75.75 0 0 1 .6-.293h4.5a.75.75 0 0 1 .75.75v4.5a.75.75 0 0 1-.293.6L12 14.408 6.743 9.15a.75.75 0 0 1 0-1.06l4.957-4.958Zm-6.45 7.512a.75.75 0 0 1 1.061 0L9.9 14.893l-2.94 2.94a.75.75 0 0 1-1.06 0L3.75 15.684a.75.75 0 0 1 0-1.06l1.5-1.5Zm6.45 3.978 4.957 4.957a.75.75 0 0 0 1.293-.53v-4.5a.75.75 0 0 0-.293-.6L12 12.25Z" />
+                                                <path stroke-linecap="round" stroke-linejoin="round" d="M15 19.128a9.38 9.38 0 0 0 2.625.372 9.337 9.337 0 0 0 4.121-.952 4.125 4.125 0 0 0-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 0 1 8.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0 1 11.964-3.07M12 6.375a3.375 3.375 0 1 1-6.75 0 3.375 3.375 0 0 1 6.75 0Zm8.25 2.25a2.625 2.625 0 1 1-5.25 0 2.625 2.625 0 0 1 5.25 0Z" />
                                             </svg>
                                         </span>
                                         Customer Service
@@ -243,7 +273,7 @@
                                     <button class="tab-button relative z-10 flex h-10 items-center gap-2 rounded-xl px-4 text-sm font-medium text-slate-500 transition-all duration-300" data-tab="marketing">
                                         <span class="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-500/10 text-emerald-600">
                                             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor" class="h-4 w-4">
-                                                <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 5.25H6l1.5 4.5h11.25M14.25 15a3 3 0 0 1-6 0m6 0V9.75m0 5.25h1.5m-7.5 0H6.75m6-10.5 4.5 4.5m-4.5-4.5v4.5h4.5" />
+                                                <path stroke-linecap="round" stroke-linejoin="round" d="M10.34 15.84c-.688-.06-1.386-.09-2.09-.09H7.5a4.5 4.5 0 1 1 0-9h.75c.704 0 1.402-.03 2.09-.09m0 9.18c.253.962.584 1.892.985 2.783.247.55.06 1.21-.463 1.511l-.657.38c-.551.318-1.26.117-1.527-.461a20.845 20.845 0 0 1-1.44-4.282m3.102.069a18.03 18.03 0 0 1-.59-4.59c0-1.586.205-3.124.59-4.59m0 9.18a23.848 23.848 0 0 1 8.835 2.535M10.34 6.66a23.847 23.847 0 0 0 8.835-2.535m0 0A23.74 23.74 0 0 0 18.795 3m.38 1.125a23.91 23.91 0 0 1 1.014 5.395m-1.014 8.855c-.118.38-.245.754-.38 1.125m.38-1.125a23.91 23.91 0 0 0 1.014-5.395m0-3.46c.495.413.811 1.035.811 1.73 0 .695-.316 1.317-.811 1.73m0-3.46a24.347 24.347 0 0 1 0 3.46" />
                                             </svg>
                                         </span>
                                         Marketing
@@ -348,258 +378,42 @@
 
                 <!-- Customer Service Tab -->
                 <section id="customers-tab" class="tab-content mt-10 hidden">
-                    <!-- existing content remains unchanged -->
-                    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                        <!-- Customer List -->
-                        <div class="lg:col-span-2">
-                            <div class="glass-card rounded-3xl p-6">
-                                <div class="flex justify-between items-center mb-4">
-                                    <h3 class="text-lg font-semibold text-gray-900">
-                                        <i class="fas fa-users text-blue-600 mr-2"></i>Daftar Pelanggan
-                                    </h3>
-                                    <div class="flex space-x-2">
-                                        <input type="text" id="customer-search" placeholder="Cari pelanggan..."
-                                               class="px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
-                                        <select id="customer-filter" class="px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
-                                            <option value="">Semua Status</option>
-                                            <option value="active">Aktif</option>
-                                            <option value="cooldown">Cooldown</option>
-                                            <option value="escalated">Escalated</option>
-                                        </select>
-                                    </div>
-                                </div>
-                                <div class="space-y-3" id="customer-list">
-                                    <div class="text-center text-gray-500 py-8">
-                                        <i class="fas fa-users text-4xl mb-4"></i>
-                                        <p>Memuat daftar pelanggan...</p>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- Customer Details -->
-                        <div class="glass-card rounded-3xl p-6">
-                            <h3 class="text-lg font-semibold text-gray-900 mb-4">
-                                <i class="fas fa-user text-green-600 mr-2"></i>Detail Pelanggan
-                            </h3>
-                            <div id="customer-details">
-                                <div class="text-center text-gray-500 py-8">
-                                    <i class="fas fa-user-circle text-4xl mb-4"></i>
-                                    <p>Pilih pelanggan untuk melihat detail</p>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Escalations Section -->
-                    <div class="mt-6 glass-card rounded-3xl p-6">
+                    <div class="glass-card rounded-3xl p-6">
                         <h3 class="text-lg font-semibold text-gray-900 mb-4">
-                            <i class="fas fa-exclamation-triangle text-red-600 mr-2"></i>Daftar Escalations
+                            <i class="fas fa-users text-blue-600 mr-2"></i>Customer Service Management
                         </h3>
-                        <div class="overflow-x-auto">
-                            <table class="min-w-full divide-y divide-gray-200">
-                                <thead class="bg-gray-50">
-                                    <tr>
-                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Customer</th>
-                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Tipe</th>
-                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Prioritas</th>
-                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Waktu</th>
-                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Aksi</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="escalations-table" class="bg-white divide-y divide-gray-200">
-                                    <tr>
-                                        <td colspan="6" class="px-6 py-8 text-center text-gray-500">
-                                            <i class="fas fa-exclamation-triangle text-4xl mb-4"></i>
-                                            <p>Memuat escalations...</p>
-                                        </td>
-                                    </tr>
-                                </tbody>
-                            </table>
+                        <p class="text-gray-600">Kelola pelanggan, chat history, dan escalations dari sini.</p>
+                        <div class="mt-6 text-center py-12">
+                            <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
+                            <p class="mt-4 text-gray-500">Loading customer data...</p>
                         </div>
                     </div>
                 </section>
 
                 <!-- Marketing Tab -->
                 <section id="marketing-tab" class="tab-content mt-10 hidden">
-                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                        <!-- Lead Management -->
-                        <div class="glass-card rounded-3xl p-6">
-                            <h3 class="text-lg font-semibold text-gray-900 mb-4">
-                                <i class="fas fa-filter text-blue-600 mr-2"></i>Filter Leads
-                            </h3>
-                            <div class="space-y-4">
-                                <div>
-                                    <label class="block text-sm font-medium text-gray-700 mb-2">Segment Pasar</label>
-                                    <select id="segment-filter" class="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
-                                        <option value="">Semua Segment</option>
-                                        <option value="advertising_signage">Advertising & Signage</option>
-                                        <option value="metal_fabrication">Metal Fabrication</option>
-                                        <option value="furniture_manufacturing">Furniture Manufacturing</option>
-                                        <option value="automotive_workshop">Automotive Workshop</option>
-                                        <option value="interior_design">Interior Design</option>
-                                    </select>
-                                </div>
-                                <div>
-                                    <label class="block text-sm font-medium text-gray-700 mb-2">Status Kontak</label>
-                                    <select id="contact-status-filter" class="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
-                                        <option value="">Semua Status</option>
-                                        <option value="new">Baru</option>
-                                        <option value="contacted">Sudah Dikontak</option>
-                                        <option value="invalid_whatsapp">WhatsApp Invalid</option>
-                                        <option value="blocked">Terblokir</option>
-                                    </select>
-                                </div>
-                                <div>
-                                    <label class="block text-sm font-medium text-gray-700 mb-2">Skor Lead</label>
-                                    <select id="lead-score-filter" class="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
-                                        <option value="">Semua Skor</option>
-                                        <option value="high">Tinggi (70+)</option>
-                                        <option value="medium">Sedang (40-69)</option>
-                                        <option value="low">Rendah (&lt;40)</option>
-                                    </select>
-                                </div>
-                                <button id="apply-filters" class="w-full bg-blue-600 text-white py-2 px-4 rounded-lg hover:bg-blue-700 transition-colors">
-                                    <i class="fas fa-search mr-2"></i>Terapkan Filter
-                                </button>
-                            </div>
-                        </div>
-
-                        <!-- Campaign Stats -->
-                        <div class="glass-card rounded-3xl p-6">
-                            <h3 class="text-lg font-semibold text-gray-900 mb-4">
-                                <i class="fas fa-chart-bar text-green-600 mr-2"></i>Statistik Campaign
-                            </h3>
-                            <div class="space-y-4" id="campaign-stats">
-                                <div class="text-center text-gray-500 py-8">
-                                    <i class="fas fa-chart-bar text-4xl mb-4"></i>
-                                    <p>Memuat statistik campaign...</p>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Leads Table -->
-                    <div class="mt-6 glass-card rounded-3xl p-6">
-                        <div class="flex justify-between items-center mb-4">
-                            <h3 class="text-lg font-semibold text-gray-900">
-                                <i class="fas fa-address-book text-purple-600 mr-2"></i>Daftar Leads
-                            </h3>
-                            <div class="flex space-x-2">
-                                <button id="export-leads" class="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors">
-                                    <i class="fas fa-download mr-2"></i>Export CSV
-                                </button>
-                                <button id="bulk-contact" class="bg-orange-600 text-white px-4 py-2 rounded-lg hover:bg-orange-700 transition-colors">
-                                    <i class="fas fa-paper-plane mr-2"></i>Kontak Massal
-                                </button>
-                            </div>
-                        </div>
-                        <div class="overflow-x-auto">
-                            <table class="min-w-full divide-y divide-gray-200">
-                                <thead class="bg-gray-50">
-                                    <tr>
-                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                            <input type="checkbox" id="select-all-leads" class="rounded">
-                                        </th>
-                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Nama Bisnis</th>
-                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Telepon</th>
-                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Segment</th>
-                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Skor</th>
-                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Aksi</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="leads-table" class="bg-white divide-y divide-gray-200">
-                                    <tr>
-                                        <td colspan="7" class="px-6 py-8 text-center text-gray-500">
-                                            <i class="fas fa-address-book text-4xl mb-4"></i>
-                                            <p>Memuat leads...</p>
-                                        </td>
-                                    </tr>
-                                </tbody>
-                            </table>
+                    <div class="glass-card rounded-3xl p-6">
+                        <h3 class="text-lg font-semibold text-gray-900 mb-4">
+                            <i class="fas fa-bullhorn text-green-600 mr-2"></i>Marketing & Lead Management
+                        </h3>
+                        <p class="text-gray-600">Kelola leads, campaign, dan marketing automation.</p>
+                        <div class="mt-6 text-center py-12">
+                            <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-green-600 mx-auto"></div>
+                            <p class="mt-4 text-gray-500">Loading marketing data...</p>
                         </div>
                     </div>
                 </section>
 
                 <!-- Analytics Tab -->
                 <section id="analytics-tab" class="tab-content mt-10 hidden">
-                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                        <div class="glass-card rounded-3xl p-6">
-                            <h3 class="text-lg font-semibold text-gray-900 mb-4">
-                                <i class="fas fa-chart-pie text-blue-600 mr-2"></i>Performa AI Agent
-                            </h3>
-                            <div id="ai-performance-chart" style="height: 350px;"></div>
-                        </div>
-
-                        <div class="glass-card rounded-3xl p-6">
-                            <h3 class="text-lg font-semibold text-gray-900 mb-4">
-                                <i class="fas fa-chart-line text-green-600 mr-2"></i>Konversi Marketing
-                            </h3>
-                            <div id="marketing-conversion-chart" style="height: 350px;"></div>
-                        </div>
-                    </div>
-
-                    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mt-6">
-                        <div class="glass-card rounded-3xl p-6">
-                            <h3 class="text-lg font-semibold text-gray-900 mb-4">
-                                <i class="fas fa-clock text-purple-600 mr-2"></i>Waktu Respons
-                            </h3>
-                            <div class="space-y-3" id="response-time-stats">
-                                <div class="flex justify-between items-center">
-                                    <span class="text-sm text-gray-600">Rata-rata</span>
-                                    <span class="font-semibold text-blue-600" id="avg-response-time">-</span>
-                                </div>
-                                <div class="flex justify-between items-center">
-                                    <span class="text-sm text-gray-600">Tercepat</span>
-                                    <span class="font-semibold text-green-600" id="fastest-response-time">-</span>
-                                </div>
-                                <div class="flex justify-between items-center">
-                                    <span class="text-sm text-gray-600">Terlambat</span>
-                                    <span class="font-semibold text-red-600" id="slowest-response-time">-</span>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div class="glass-card rounded-3xl p-6">
-                            <h3 class="text-lg font-semibold text-gray-900 mb-4">
-                                <i class="fas fa-target text-orange-600 mr-2"></i>Target vs Realisasi
-                            </h3>
-                            <div class="space-y-3" id="target-stats">
-                                <div class="flex justify-between items-center">
-                                    <span class="text-sm text-gray-600">Target Harian</span>
-                                    <span class="font-semibold">100 kontak</span>
-                                </div>
-                                <div class="flex justify-between items-center">
-                                    <span class="text-sm text-gray-600">Terkontak Hari Ini</span>
-                                    <span class="font-semibold text-blue-600" id="contacts-today">-</span>
-                                </div>
-                                <div class="flex justify-between items-center">
-                                    <span class="text-sm text-gray-600">Persentase</span>
-                                    <span class="font-semibold text-green-600" id="target-percentage">-</span>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div class="glass-card rounded-3xl p-6">
-                            <h3 class="text-lg font-semibold text-gray-900 mb-4">
-                                <i class="fas fa-trophy text-yellow-600 mr-2"></i>Prestasi Tim
-                            </h3>
-                            <div class="space-y-3" id="team-achievements">
-                                <div class="flex justify-between items-center">
-                                    <span class="text-sm text-gray-600">Lead Terbaik</span>
-                                    <span class="font-semibold text-yellow-600">Advertising Signage</span>
-                                </div>
-                                <div class="flex justify-between items-center">
-                                    <span class="text-sm text-gray-600">Response Rate Tertinggi</span>
-                                    <span class="font-semibold text-green-600">85%</span>
-                                </div>
-                                <div class="flex justify-between items-center">
-                                    <span class="text-sm text-gray-600">Conversion Rate</span>
-                                    <span class="font-semibold text-blue-600">12.5%</span>
-                                </div>
-                            </div>
+                    <div class="glass-card rounded-3xl p-6">
+                        <h3 class="text-lg font-semibold text-gray-900 mb-4">
+                            <i class="fas fa-chart-bar text-purple-600 mr-2"></i>Analytics & Reporting
+                        </h3>
+                        <p class="text-gray-600">Analisis performa, conversion rate, dan insights bisnis.</p>
+                        <div class="mt-6 text-center py-12">
+                            <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600 mx-auto"></div>
+                            <p class="mt-4 text-gray-500">Loading analytics data...</p>
                         </div>
                     </div>
                 </section>
@@ -627,7 +441,9 @@
         </div>
     </div>
 
+    <!-- Scripts -->
     <script src="config.js"></script>
+    <script src="webhook-handler.js"></script>
     <script src="dashboard.js"></script>
 </body>
 </html>
