@@ -2,8 +2,8 @@
 class WebhookHandler {
     constructor() {
         this.config = {
-            n8nWebhookUrl: 'https://projek-n8n-n8n.qk6yxt.easypanel.host/webhook/crm',
-            responseWebhookUrl: 'https://projek-n8n-n8n.qk6yxt.easypanel.host/webhook/crm-response',
+            n8nWebhookUrl: 'https://n8n-cors-proxy.setgraph69.workers.dev/webhook/crm',
+            responseWebhookUrl: 'https://n8n-cors-proxy.setgraph69.workers.dev/webhook/crm-response',
             workflowId: 'C92dXduOKH38M3pj',
             retryAttempts: 3,
             timeout: 30000
