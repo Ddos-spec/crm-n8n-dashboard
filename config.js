@@ -1,8 +1,7 @@
 // config.js - PURE FRONTEND VERSION (GitHub Pages Compatible)
 const CONFIG = {
   n8n: {
-    baseUrl: 'https://projek-n8n-nginx.qk6yxt.easypanel.host',
-    // ✅ FIXED: Correct path dengan double webhook prefix
+    baseUrl: 'https://n8n-cors-proxy.setgraph69.workers.dev',    // ✅ FIXED: Correct path dengan double webhook prefix
     webhookUrl: 'https://projek-n8n-nginx.qk6yxt.easypanel.host/webhook',
     workflowId: 'MWurQU8hFbk2EzP3'
   },
