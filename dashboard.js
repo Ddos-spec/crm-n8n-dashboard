@@ -879,7 +879,7 @@ function capitalize(value) {
 
 function deriveActivities(state) {
   const items = [];
-  state.customers.slice(0, 5).forEach((customer) => {
+  (Array.isArray(state.customers) ? state.customers : []).slice(0, 5).forEach((customer) => {
     items.push({
       title: `${customer.name || 'Unknown'} melakukan interaksi`,
       detail: `Status: ${capitalize(customer.status || 'active')} • Prioritas ${capitalize(customer.priority || 'medium')}`,
@@ -887,7 +887,7 @@ function deriveActivities(state) {
     });
   });
 
-  state.leads.slice(0, 5).forEach((lead) => {
+  (Array.isArray(state.leads) ? state.leads : []).slice(0, 5).forEach((lead) => {
     items.push({
       title: `Lead ${lead.name || 'Unknown'} diperbarui`,
       detail: `Source ${lead.source || lead.market_segment || 'N/A'} • Score ${lead.lead_score || lead.score || '-'}`,
