@@ -4,447 +4,759 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>CRM Dashboard - Tepat Laser</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/js/all.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/plotly.js/3.0.3/plotly.min.js"></script>
+    <meta name="description" content="CRM Dashboard Tepat Laser dengan integrasi n8n untuk customer service, marketing, dan analitik.">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/lucide/0.469.0/lucide.min.js" defer></script>
+    <script src="https://cdn.jsdelivr.net/npm/moment@2.29.4/moment.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/moment@2.29.4/locale/id.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
     <style>
         :root {
-            --primary: #2563eb;
-            --primary-soft: rgba(37, 99, 235, 0.08);
-            --accent: #059669;
-            --glass-border: rgba(255, 255, 255, 0.65);
-            --glass-shadow: 0 24px 45px -30px rgba(15, 23, 42, 0.45);
+            --bg-gradient-start: #0f172a;
+            --bg-gradient-end: #1e293b;
+            --glass-surface: rgba(255, 255, 255, 0.08);
+            --glass-border: rgba(255, 255, 255, 0.18);
+            --glass-shadow: 0 24px 45px -30px rgba(15, 23, 42, 0.55);
+            --primary: #38bdf8;
+            --primary-soft: rgba(56, 189, 248, 0.15);
+            --accent: #22d3ee;
+            --success: #34d399;
+            --warning: #fbbf24;
+            --danger: #f87171;
+            --info: #60a5fa;
+        }
+
+        :root[data-theme="light"] {
+            --page-bg: linear-gradient(180deg, #f8fbff 0%, #ecfdf5 100%);
+            --text-primary: #0f172a;
+            --text-secondary: #475569;
+            --surface: rgba(255, 255, 255, 0.92);
+            --surface-muted: rgba(255, 255, 255, 0.7);
+            --border-subtle: rgba(15, 23, 42, 0.06);
+        }
+
+        :root[data-theme="dark"] {
+            --page-bg: radial-gradient(circle at 20% 20%, rgba(37, 99, 235, 0.18), transparent 50%),
+                radial-gradient(circle at 80% 10%, rgba(6, 182, 212, 0.15), transparent 45%),
+                radial-gradient(circle at 50% 70%, rgba(14, 165, 233, 0.12), transparent 55%),
+                #020617;
+            --text-primary: #e2e8f0;
+            --text-secondary: #94a3b8;
+            --surface: rgba(15, 23, 42, 0.6);
+            --surface-muted: rgba(15, 23, 42, 0.4);
+            --border-subtle: rgba(148, 163, 184, 0.12);
         }
 
         body {
             font-family: 'Inter', sans-serif;
-            background: linear-gradient(180deg, #f8fbff 0%, #ecfdf5 100%);
-            color: #0f172a;
+            background: var(--page-bg);
+            color: var(--text-primary);
+            min-height: 100vh;
+            position: relative;
         }
 
         .glass-card {
-            background: linear-gradient(135deg, rgba(255, 255, 255, 0.92), rgba(255, 255, 255, 0.72));
+            background: var(--surface);
             border: 1px solid var(--glass-border);
             backdrop-filter: blur(18px);
             box-shadow: var(--glass-shadow);
         }
 
+        .glass-muted {
+            background: var(--surface-muted);
+            border: 1px solid var(--border-subtle);
+            backdrop-filter: blur(10px);
+        }
+
+        .tab-button {
+            transition: all 0.3s ease;
+        }
+
+        .tab-button.active {
+            color: var(--primary);
+        }
+
+        .tab-panel {
+            display: none;
+        }
+
+        .tab-panel.active {
+            display: block;
+        }
+
         .stat-card {
             position: relative;
             overflow: hidden;
-            transition: transform 0.3s ease, box-shadow 0.3s ease;
+            transition: transform 0.35s ease, box-shadow 0.35s ease;
         }
 
         .stat-card::after {
             content: "";
             position: absolute;
             inset: 0;
-            background: linear-gradient(135deg, rgba(37, 99, 235, 0.12), rgba(5, 150, 105, 0.08));
             opacity: 0;
-            transition: opacity 0.4s ease;
+            background: linear-gradient(140deg, rgba(56, 189, 248, 0.22), rgba(34, 211, 238, 0.12));
+            transition: opacity 0.35s ease;
         }
 
         .stat-card:hover {
-            transform: translateY(-4px);
-            box-shadow: 0 28px 50px -30px rgba(37, 99, 235, 0.35);
+            transform: translateY(-6px);
+            box-shadow: 0 30px 60px -40px rgba(14, 165, 233, 0.55);
         }
 
         .stat-card:hover::after {
             opacity: 1;
         }
 
-        .icon-ring {
-            position: relative;
-        }
-
-        .icon-ring::after {
-            content: "";
-            position: absolute;
-            inset: -4px;
-            border-radius: 9999px;
-            border: 2px solid rgba(255, 255, 255, 0.45);
-            opacity: 0.65;
-        }
-
-        #refresh-data {
-            transition: transform 0.25s ease, box-shadow 0.25s ease, background 0.25s ease;
-        }
-
-        #refresh-data:hover {
-            transform: translateY(-3px);
-            box-shadow: 0 18px 30px -20px rgba(37, 99, 235, 0.65);
-        }
-
-        #refresh-data:active {
-            transform: translateY(0) scale(0.98);
-        }
-
-        #tab-indicator {
-            transition: transform 0.45s cubic-bezier(0.19, 1, 0.22, 1), width 0.3s ease, height 0.3s ease, opacity 0.3s ease;
-            will-change: transform, width, height;
-            opacity: 0;
-        }
-
-        .chat-bubble {
-            position: relative;
-            transition: transform 0.3s ease, box-shadow 0.3s ease;
-        }
-
-        .chat-bubble:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 18px 35px -25px rgba(15, 23, 42, 0.4);
-        }
-
-        .activity-item {
-            transition: background 0.3s ease, transform 0.3s ease;
-        }
-
-        .activity-item:hover {
-            background: rgba(15, 23, 42, 0.03);
-            transform: translateY(-2px);
-        }
-
-        #loading-overlay {
-            backdrop-filter: blur(6px);
-        }
-        
-        /* Connection status indicator */
-        .connection-status {
-            display: flex;
+        .badge {
+            display: inline-flex;
             align-items: center;
-            gap: 8px;
-            padding: 8px 16px;
-            border-radius: 20px;
-            font-size: 12px;
+            gap: 0.35rem;
+            border-radius: 9999px;
             font-weight: 500;
+            font-size: 0.75rem;
+            padding: 0.25rem 0.75rem;
+            letter-spacing: 0.02em;
         }
-        
-        .status-connected {
-            background: rgba(16, 185, 129, 0.1);
-            color: #059669;
-            border: 1px solid rgba(16, 185, 129, 0.2);
+
+        .badge-success { background: rgba(52, 211, 153, 0.15); color: #10b981; }
+        .badge-warning { background: rgba(251, 191, 36, 0.15); color: #d97706; }
+        .badge-danger { background: rgba(248, 113, 113, 0.18); color: #dc2626; }
+        .badge-info { background: rgba(96, 165, 250, 0.18); color: #2563eb; }
+        .badge-neutral { background: rgba(148, 163, 184, 0.16); color: #475569; }
+
+        .status-indicator {
+            width: 10px;
+            height: 10px;
+            border-radius: 9999px;
+            display: inline-block;
         }
-        
-        .status-connecting {
-            background: rgba(245, 158, 11, 0.1);
-            color: #d97706;
-            border: 1px solid rgba(245, 158, 11, 0.2);
+
+        .table-wrap {
+            overflow: hidden;
+            border-radius: 1.25rem;
         }
-        
-        .status-disconnected {
-            background: rgba(239, 68, 68, 0.1);
-            color: #dc2626;
-            border: 1px solid rgba(239, 68, 68, 0.2);
+
+        table {
+            border-collapse: separate;
+            border-spacing: 0;
+            width: 100%;
+        }
+
+        thead th {
+            position: sticky;
+            top: 0;
+            z-index: 5;
+            background: rgba(15, 23, 42, 0.05);
+            backdrop-filter: blur(12px);
+            text-transform: uppercase;
+            font-size: 0.7rem;
+            letter-spacing: 0.12em;
+            font-weight: 600;
+            color: var(--text-secondary);
+        }
+
+        tbody tr {
+            transition: background 0.25s ease, transform 0.25s ease;
+        }
+
+        tbody tr:hover {
+            background: rgba(56, 189, 248, 0.08);
+            transform: translateY(-2px);
+        }
+
+        tbody td, thead th {
+            padding: 1rem 1.25rem;
+            border-bottom: 1px solid var(--border-subtle);
+        }
+
+        .actions button {
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+        }
+
+        .actions button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 12px 20px -12px rgba(14, 165, 233, 0.45);
+        }
+
+        .skeleton {
+            background: linear-gradient(90deg, rgba(148, 163, 184, 0.2), rgba(148, 163, 184, 0.35), rgba(148, 163, 184, 0.2));
+            background-size: 200% 100%;
+            animation: pulse 1.5s ease-in-out infinite;
+        }
+
+        @keyframes pulse {
+            0% { background-position: 200% 0; }
+            100% { background-position: -200% 0; }
+        }
+
+        @media (max-width: 1024px) {
+            .stat-grid {
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+            }
+        }
+
+        @media (max-width: 768px) {
+            thead { display: none; }
+            tbody tr {
+                display: grid;
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+                gap: 0.5rem;
+                padding: 0.75rem 0.5rem;
+            }
+
+            tbody td {
+                padding: 0.5rem;
+                border: none;
+                font-size: 0.875rem;
+            }
+
+            tbody td::before {
+                content: attr(data-label);
+                font-weight: 600;
+                display: block;
+                color: var(--text-secondary);
+                margin-bottom: 0.25rem;
+            }
         }
     </style>
 </head>
-<body class="relative min-h-screen">
-    <div class="absolute inset-x-0 -top-40 h-96 bg-gradient-to-br from-sky-100 via-white to-emerald-100 blur-3xl opacity-70"></div>
-    <div class="relative flex min-h-screen flex-col">
-        <!-- Navigation -->
-        <nav class="relative z-10">
-            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-8">
-                <div class="glass-card rounded-3xl px-6 py-6 md:px-8 md:py-7">
-                    <div class="flex flex-col gap-6 md:flex-row md:items-center md:justify-between">
-                        <div class="flex items-center gap-4">
-                            <div class="icon-ring flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-sky-500 to-emerald-400 text-white shadow-lg shadow-sky-500/30">
-                                <span class="text-xl font-semibold">TL</span>
+<body class="antialiased" data-theme="light">
+    <div class="pointer-events-none fixed inset-x-0 top-0 z-0 h-[540px] bg-gradient-to-br from-sky-300/20 via-cyan-200/25 to-emerald-200/20 blur-3xl"></div>
+    <div class="relative z-10 flex min-h-screen flex-col">
+        <header class="max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 pt-10">
+            <div class="glass-card rounded-3xl px-6 py-6 md:px-10 md:py-8">
+                <div class="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
+                    <div class="flex flex-col gap-4 sm:flex-row sm:items-center">
+                        <div class="flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-sky-500 via-cyan-400 to-emerald-400 text-white shadow-xl shadow-sky-500/30">
+                            <span class="text-xl font-semibold">TL</span>
+                        </div>
+                        <div>
+                            <p class="text-xs font-medium uppercase tracking-[0.35em] text-slate-400">CRM Dashboard</p>
+                            <h1 class="text-3xl font-semibold">Tepat Laser Command Center</h1>
+                            <p class="mt-1 text-sm text-slate-500">Integrasi real-time dengan workflow n8n &amp; PostgreSQL</p>
+                        </div>
+                    </div>
+                    <div class="flex flex-col-reverse gap-4 sm:flex-row sm:items-center">
+                        <div class="flex items-center gap-4 rounded-full bg-white/60 px-4 py-2 text-sm text-slate-600 shadow-sm shadow-sky-200/40">
+                            <div class="flex items-center gap-2">
+                                <span class="status-indicator bg-emerald-400" id="connection-indicator"></span>
+                                <span id="connection-status">Mengecek koneksi...</span>
                             </div>
-                            <div>
-                                <p class="text-xs font-medium uppercase tracking-[0.35em] text-slate-400">CRM Dashboard</p>
-                                <h1 class="text-2xl font-semibold text-slate-900 md:text-3xl">Tepat Laser</h1>
+                            <span class="hidden sm:block text-slate-400">•</span>
+                            <div class="flex items-center gap-2 text-slate-500">
+                                <i data-lucide="clock"></i>
+                                <span>Update terakhir: <span id="last-updated">-</span></span>
                             </div>
                         </div>
-                        <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-end">
-                            <!-- Connection Status -->
-                            <div id="connection-status" class="connection-status status-connecting">
-                                <span class="relative flex h-2.5 w-2.5">
-                                    <span class="absolute inline-flex h-full w-full animate-ping rounded-full bg-current opacity-75"></span>
-                                    <span class="relative inline-flex h-2.5 w-2.5 rounded-full bg-current"></span>
-                                </span>
-                                <span id="connection-text">Connecting to N8N...</span>
-                            </div>
-                            <button id="refresh-data" class="inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-sky-600 to-blue-600 px-5 py-3 text-sm font-semibold text-white shadow-lg shadow-sky-500/40 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-500">
-                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" class="h-5 w-5">
-                                    <path d="M21 12a9 9 0 1 0-2.64 6.36M21 12v5m0-5h-5" />
-                                </svg>
-                                Refresh Data
+                        <div class="flex items-center gap-3">
+                            <label class="flex items-center gap-2 rounded-full bg-white/60 px-3 py-2 text-xs font-semibold uppercase tracking-wide text-slate-500 shadow-sm shadow-sky-200/40">
+                                Auto refresh
+                                <select id="refresh-interval" class="rounded-full border-none bg-transparent text-slate-700 focus:ring-0">
+                                    <option value="0">Off</option>
+                                    <option value="30000">30s</option>
+                                    <option value="60000">1m</option>
+                                    <option value="300000">5m</option>
+                                </select>
+                            </label>
+                            <button id="refresh-data" class="inline-flex items-center gap-2 rounded-full bg-gradient-to-r from-sky-500 to-cyan-400 px-4 py-2 text-sm font-semibold text-white shadow-lg shadow-sky-500/40 transition">
+                                <i data-lucide="refresh-ccw" class="h-4 w-4"></i>
+                                Refresh data
+                                <span id="refresh-countdown" class="ml-2 text-xs font-medium text-white/70"></span>
                             </button>
                         </div>
                     </div>
                 </div>
+
+                <div class="mt-6 grid gap-4 rounded-2xl bg-slate-900/5 p-4 text-xs text-slate-500 sm:grid-cols-3">
+                    <div class="flex items-center gap-2">
+                        <i data-lucide="bell-ring" class="h-4 w-4 text-amber-400"></i>
+                        <span>Ada <strong id="new-items-count">0</strong> update baru sejak refresh terakhir</span>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <i data-lucide="activity" class="h-4 w-4 text-sky-400"></i>
+                        <span>Status real-time: <strong id="realtime-status" class="text-emerald-500">Standby</strong></span>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <i data-lucide="calendar-range" class="h-4 w-4 text-cyan-400"></i>
+                        <span>Periode: <span id="active-date-range">Semua waktu</span></span>
+                    </div>
+                </div>
             </div>
-        </nav>
+        </header>
 
-        <!-- Main Content -->
-        <main class="relative z-10 flex-1">
-            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
-                <!-- Quick Stats -->
-                <section class="grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-4">
-                    <article class="glass-card stat-card rounded-3xl p-6">
-                        <div class="flex items-start justify-between">
-                            <div>
-                                <p class="text-xs font-semibold uppercase tracking-[0.25em] text-slate-400">Total Pelanggan</p>
-                                <p class="mt-4 text-3xl font-semibold text-slate-900 md:text-4xl" id="total-customers">-</p>
-                                <p class="mt-2 text-sm text-slate-500">Semua pelanggan aktif dalam sistem</p>
+        <main class="relative mx-auto w-full max-w-7xl flex-1 px-4 pb-16 sm:px-6 lg:px-8">
+            <div class="mt-10">
+                <div class="glass-card rounded-3xl p-4 sm:p-6 lg:p-8">
+                    <div class="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+                        <div>
+                            <h2 class="text-2xl font-semibold">Ringkasan Operasional</h2>
+                            <p class="text-sm text-slate-500">Monitor performa harian, analitik marketing, dan kesehatan tim layanan pelanggan.</p>
+                        </div>
+                        <div class="flex flex-wrap items-center gap-3 text-xs text-slate-500">
+                            <div class="flex items-center gap-2 rounded-full bg-slate-900/5 px-3 py-1">
+                                <span class="h-2 w-2 rounded-full bg-sky-400"></span>
+                                Trend harian
                             </div>
-                            <div class="icon-ring flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-sky-500 to-cyan-400 text-white shadow-lg">
-                                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor" class="h-6 w-6">
-                                    <path stroke-linecap="round" stroke-linejoin="round" d="M18 20a6 6 0 0 0-12 0m12 0h1a2 2 0 0 0 2-2v-1a2 2 0 0 0-2-2h-1.26M18 20H6m0 0H4a2 2 0 0 1-2-2v-1a2 2 0 0 1 2-2h1.26M15 7a3 3 0 1 1-6 0 3 3 0 0 1 6 0Zm6 3a2 2 0 1 1-4 0 2 2 0 0 1 4 0Zm-14 0a2 2 0 1 1-4 0 2 2 0 0 1 4 0Z" />
-                                </svg>
+                            <div class="flex items-center gap-2 rounded-full bg-slate-900/5 px-3 py-1">
+                                <span class="h-2 w-2 rounded-full bg-emerald-400"></span>
+                                Mingguan
+                            </div>
+                            <div class="flex items-center gap-2 rounded-full bg-slate-900/5 px-3 py-1">
+                                <span class="h-2 w-2 rounded-full bg-violet-400"></span>
+                                Bulanan
                             </div>
                         </div>
-                        <div class="mt-6 h-px w-full bg-gradient-to-r from-transparent via-sky-200 to-transparent"></div>
-                    </article>
+                    </div>
 
-                    <article class="glass-card stat-card rounded-3xl p-6">
-                        <div class="flex items-start justify-between">
-                            <div>
-                                <p class="text-xs font-semibold uppercase tracking-[0.25em] text-slate-400">Leads Marketing</p>
-                                <p class="mt-4 text-3xl font-semibold text-slate-900 md:text-4xl" id="total-leads">-</p>
-                                <p class="mt-2 text-sm text-slate-500">Prospek marketing siap di-follow up</p>
-                            </div>
-                            <div class="icon-ring flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-emerald-500 to-teal-400 text-white shadow-lg">
-                                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor" class="h-6 w-6">
-                                    <path stroke-linecap="round" stroke-linejoin="round" d="M3 5.25a.75.75 0 0 1 .75-.75h3.5a.75.75 0 0 1 .75.75v13.5a.75.75 0 0 1-.75.75h-3.5A.75.75 0 0 1 3 18.75V5.25ZM9.5 4.5h3a.75.75 0 0 1 .75.75v5.5a.75.75 0 0 1-.75.75h-3a.75.75 0 0 1-.75-.75v-5.5A.75.75 0 0 1 9.5 4.5Zm0 8h3a.75.75 0 0 1 .75.75v4.5a.75.75 0 0 1-.75.75h-3a.75.75 0 0 1-.75-.75v-4.5a.75.75 0 0 1 .75-.75Zm7-9h3.5a.75.75 0 0 1 .75.75V9a.75.75 0 0 1-.75.75H16.5A.75.75 0 0 1 15.75 9V4.5a.75.75 0 0 1 .75-.75Zm0 7h3.5a.75.75 0 0 1 .75.75v5.5a.75.75 0 0 1-.75.75H16.5a.75.75 0 0 1-.75-.75v-5.5a.75.75 0 0 1 .75-.75Z" />
-                                </svg>
-                            </div>
-                        </div>
-                        <div class="mt-6 h-px w-full bg-gradient-to-r from-transparent via-emerald-200 to-transparent"></div>
-                    </article>
-
-                    <article class="glass-card stat-card rounded-3xl p-6">
-                        <div class="flex items-start justify-between">
-                            <div>
-                                <p class="text-xs font-semibold uppercase tracking-[0.25em] text-slate-400">Escalations</p>
-                                <p class="mt-4 text-3xl font-semibold text-slate-900 md:text-4xl" id="total-escalations">-</p>
-                                <p class="mt-2 text-sm text-slate-500">Kasus prioritas yang butuh perhatian</p>
-                            </div>
-                            <div class="icon-ring flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-amber-500 to-orange-400 text-white shadow-lg">
-                                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor" class="h-6 w-6">
-                                    <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z" />
-                                </svg>
-                            </div>
-                        </div>
-                        <div class="mt-6 h-px w-full bg-gradient-to-r from-transparent via-amber-200 to-transparent"></div>
-                    </article>
-
-                    <article class="glass-card stat-card rounded-3xl p-6">
-                        <div class="flex items-start justify-between">
-                            <div>
-                                <p class="text-xs font-semibold uppercase tracking-[0.25em] text-slate-400">Response Rate</p>
-                                <p class="mt-4 text-3xl font-semibold text-slate-900 md:text-4xl" id="response-rate">-%</p>
-                                <p class="mt-2 text-sm text-slate-500">Kecepatan tim menanggapi chat</p>
-                            </div>
-                            <div class="icon-ring flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-indigo-500 to-sky-500 text-white shadow-lg">
-                                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor" class="h-6 w-6">
-                                    <path stroke-linecap="round" stroke-linejoin="round" d="M3 13.5a8.25 8.25 0 0 0 8.25 8.25h1.5A8.25 8.25 0 0 0 21 13.5v-1.5A8.25 8.25 0 0 0 12.75 3h-1.5A8.25 8.25 0 0 0 3 12v1.5Zm8.25-4.5V12l2.25 2.25" />
-                                </svg>
-                            </div>
-                        </div>
-                        <div class="mt-6 h-px w-full bg-gradient-to-r from-transparent via-indigo-200 to-transparent"></div>
-                    </article>
-                </section>
-
-                <!-- Tab Navigation -->
-                <section class="mt-10">
-                    <div class="glass-card rounded-3xl px-6 py-6">
-                        <div class="flex flex-col gap-6">
-                            <div class="relative">
-                                <div id="tablist" class="relative flex flex-wrap gap-2 rounded-2xl bg-white/80 p-1 shadow-inner shadow-white/40 backdrop-blur">
-                                    <span id="tab-indicator" class="absolute rounded-xl bg-gradient-to-r from-sky-500 via-blue-500 to-emerald-400 opacity-20"></span>
-                                    <button class="tab-button relative z-10 flex h-10 items-center gap-2 rounded-xl px-4 text-sm font-medium text-slate-500 transition-all duration-300" data-tab="overview">
-                                        <span class="flex h-8 w-8 items-center justify-center rounded-lg bg-sky-500/10 text-sky-600">
-                                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor" class="h-4 w-4">
-                                                <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6A2.25 2.25 0 0 1 6 3.75h2.25A2.25 2.25 0 0 1 10.5 6v2.25A2.25 2.25 0 0 1 8.25 10.5H6A2.25 2.25 0 0 1 3.75 8.25V6Zm9.75 0A2.25 2.25 0 0 1 15.75 3.75H18a2.25 2.25 0 0 1 2.25 2.25v2.25A2.25 2.25 0 0 1 18 10.5h-2.25A2.25 2.25 0 0 1 13.5 8.25V6ZM3.75 15.75A2.25 2.25 0 0 1 6 13.5h2.25a2.25 2.25 0 0 1 2.25 2.25V18A2.25 2.25 0 0 1 8.25 20.25H6A2.25 2.25 0 0 1 3.75 18v-2.25Zm9.75 0a2.25 2.25 0 0 1 2.25-2.25H18a2.25 2.25 0 0 1 2.25 2.25V18A2.25 2.25 0 0 1 18 20.25h-2.25A2.25 2.25 0 0 1 13.5 18v-2.25Z" />
-                                            </svg>
-                                        </span>
-                                        Overview
-                                    </button>
-                                    <button class="tab-button relative z-10 flex h-10 items-center gap-2 rounded-xl px-4 text-sm font-medium text-slate-500 transition-all duration-300" data-tab="customers">
-                                        <span class="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-500/10 text-blue-600">
-                                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor" class="h-4 w-4">
-                                                <path stroke-linecap="round" stroke-linejoin="round" d="M15 19.128a9.38 9.38 0 0 0 2.625.372 9.337 9.337 0 0 0 4.121-.952 4.125 4.125 0 0 0-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 0 1 8.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0 1 11.964-3.07M12 6.375a3.375 3.375 0 1 1-6.75 0 3.375 3.375 0 0 1 6.75 0Zm8.25 2.25a2.625 2.625 0 1 1-5.25 0 2.625 2.625 0 0 1 5.25 0Z" />
-                                            </svg>
-                                        </span>
-                                        Customer Service
-                                    </button>
-                                    <button class="tab-button relative z-10 flex h-10 items-center gap-2 rounded-xl px-4 text-sm font-medium text-slate-500 transition-all duration-300" data-tab="marketing">
-                                        <span class="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-500/10 text-emerald-600">
-                                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor" class="h-4 w-4">
-                                                <path stroke-linecap="round" stroke-linejoin="round" d="M10.34 15.84c-.688-.06-1.386-.09-2.09-.09H7.5a4.5 4.5 0 1 1 0-9h.75c.704 0 1.402-.03 2.09-.09m0 9.18c.253.962.584 1.892.985 2.783.247.55.06 1.21-.463 1.511l-.657.38c-.551.318-1.26.117-1.527-.461a20.845 20.845 0 0 1-1.44-4.282m3.102.069a18.03 18.03 0 0 1-.59-4.59c0-1.586.205-3.124.59-4.59m0 9.18a23.848 23.848 0 0 1 8.835 2.535M10.34 6.66a23.847 23.847 0 0 0 8.835-2.535m0 0A23.74 23.74 0 0 0 18.795 3m.38 1.125a23.91 23.91 0 0 1 1.014 5.395m-1.014 8.855c-.118.38-.245.754-.38 1.125m.38-1.125a23.91 23.91 0 0 0 1.014-5.395m0-3.46c.495.413.811 1.035.811 1.73 0 .695-.316 1.317-.811 1.73m0-3.46a24.347 24.347 0 0 1 0 3.46" />
-                                            </svg>
-                                        </span>
-                                        Marketing
-                                    </button>
-                                    <button class="tab-button relative z-10 flex h-10 items-center gap-2 rounded-xl px-4 text-sm font-medium text-slate-500 transition-all duration-300" data-tab="analytics">
-                                        <span class="flex h-8 w-8 items-center justify-center rounded-lg bg-indigo-500/10 text-indigo-600">
-                                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor" class="h-4 w-4">
-                                                <path stroke-linecap="round" stroke-linejoin="round" d="M3 13.125C3 11.4 4.4 10 6.125 10H20.25M3 13.125C3 14.85 4.4 16.25 6.125 16.25H11M3 13.125v7.125M20.25 10c1.725 0 3.125-1.4 3.125-3.125S21.975 3.75 20.25 3.75H6.125C4.4 3.75 3 5.15 3 6.875V10m8 6.25v3.75m5-9v9m5-6v6" />
-                                            </svg>
-                                        </span>
-                                        Analitik
-                                    </button>
+                    <div class="mt-8 grid gap-4 md:grid-cols-2 lg:grid-cols-4 stat-grid" id="stat-cards">
+                        <article class="stat-card glass-muted rounded-3xl p-6 shadow-lg">
+                            <div class="flex items-center justify-between">
+                                <div>
+                                    <p class="text-xs font-semibold uppercase tracking-wide text-slate-400">Total Pelanggan</p>
+                                    <h3 class="mt-2 text-3xl font-semibold" id="total-customers">-</h3>
+                                    <p class="mt-2 flex items-center gap-2 text-sm text-slate-500">
+                                        <span id="customers-delta" class="badge badge-success">0%</span>
+                                        <span id="customers-period">vs minggu lalu</span>
+                                    </p>
+                                </div>
+                                <div class="rounded-2xl bg-sky-500/10 p-3 text-sky-500">
+                                    <i data-lucide="users" class="h-6 w-6"></i>
                                 </div>
                             </div>
-                        </div>
-                    </div>
-                </section>
-
-                <!-- Overview Tab -->
-                <section id="overview-tab" class="tab-content mt-10">
-                    <div class="grid grid-cols-1 gap-6 lg:grid-cols-2">
-                        <!-- Real-time Chat Monitor -->
-                        <div class="glass-card rounded-3xl p-6">
+                            <canvas id="sparkline-customers" class="mt-4 h-16"></canvas>
+                        </article>
+                        <article class="stat-card glass-muted rounded-3xl p-6 shadow-lg">
                             <div class="flex items-center justify-between">
-                                <h3 class="text-lg font-semibold text-slate-900 flex items-center gap-2">
-                                    <span class="flex h-9 w-9 items-center justify-center rounded-xl bg-sky-500/10 text-sky-600">
-                                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor" class="h-5 w-5">
-                                            <path stroke-linecap="round" stroke-linejoin="round" d="M21 12a9 9 0 1 1-9-9m0 0 3 3m-3-3 3-3" />
-                                        </svg>
-                                    </span>
-                                    Monitor Chat Real-time
-                                </h3>
-                                <span class="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-500">Live feed</span>
-                            </div>
-                            <div class="mt-5 space-y-4" id="chat-monitor">
-                                <div class="flex flex-col items-center justify-center rounded-2xl border border-dashed border-slate-200 bg-white/60 py-10 text-center text-slate-400">
-                                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.6" stroke="currentColor" class="h-10 w-10">
-                                        <path stroke-linecap="round" stroke-linejoin="round" d="M7.5 8.25h9m-9 3h5.25M21 12a9 9 0 1 0-18 0 9 9 0 0 0 18 0Zm-5.25 5.25 4.5 4.5" />
-                                    </svg>
-                                    <p class="mt-4 text-sm font-medium">Memuat data chat...</p>
+                                <div>
+                                    <p class="text-xs font-semibold uppercase tracking-wide text-slate-400">Leads Marketing</p>
+                                    <h3 class="mt-2 text-3xl font-semibold" id="total-leads">-</h3>
+                                    <p class="mt-2 flex items-center gap-2 text-sm text-slate-500">
+                                        <span id="leads-delta" class="badge badge-info">0%</span>
+                                        <span id="leads-period">vs minggu lalu</span>
+                                    </p>
+                                </div>
+                                <div class="rounded-2xl bg-cyan-500/10 p-3 text-cyan-500">
+                                    <i data-lucide="radar" class="h-6 w-6"></i>
                                 </div>
                             </div>
-                        </div>
-
-                        <!-- Recent Activities -->
-                        <div class="glass-card rounded-3xl p-6">
+                            <canvas id="sparkline-leads" class="mt-4 h-16"></canvas>
+                        </article>
+                        <article class="stat-card glass-muted rounded-3xl p-6 shadow-lg">
                             <div class="flex items-center justify-between">
-                                <h3 class="text-lg font-semibold text-slate-900 flex items-center gap-2">
-                                    <span class="flex h-9 w-9 items-center justify-center rounded-xl bg-emerald-500/10 text-emerald-600">
-                                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor" class="h-5 w-5">
-                                            <path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6h6m4.5 0a10.5 10.5 0 1 1-21 0 10.5 10.5 0 0 1 21 0Z" />
-                                        </svg>
-                                    </span>
-                                    Aktivitas Terbaru
-                                </h3>
-                                <span class="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-500">Sinkron real-time</span>
-                            </div>
-                            <div class="mt-5 space-y-3" id="recent-activities">
-                                <div class="flex flex-col items-center justify-center rounded-2xl border border-dashed border-slate-200 bg-white/60 py-10 text-center text-slate-400">
-                                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.6" stroke="currentColor" class="h-10 w-10">
-                                        <path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6h6m4.5 0a10.5 10.5 0 1 1-21 0 10.5 10.5 0 0 1 21 0Z" />
-                                    </svg>
-                                    <p class="mt-4 text-sm font-medium">Memuat aktivitas...</p>
+                                <div>
+                                    <p class="text-xs font-semibold uppercase tracking-wide text-slate-400">Escalations</p>
+                                    <h3 class="mt-2 text-3xl font-semibold" id="total-escalations">-</h3>
+                                    <p class="mt-2 flex items-center gap-2 text-sm text-slate-500">
+                                        <span id="escalations-delta" class="badge badge-warning">0%</span>
+                                        <span id="escalations-period">vs minggu lalu</span>
+                                    </p>
+                                </div>
+                                <div class="rounded-2xl bg-amber-500/10 p-3 text-amber-500">
+                                    <i data-lucide="alert-triangle" class="h-6 w-6"></i>
                                 </div>
                             </div>
-                        </div>
-                    </div>
-
-                    <!-- Analytics Charts -->
-                    <div class="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-2">
-                        <div class="glass-card rounded-3xl p-6">
+                            <canvas id="sparkline-escalations" class="mt-4 h-16"></canvas>
+                        </article>
+                        <article class="stat-card glass-muted rounded-3xl p-6 shadow-lg">
                             <div class="flex items-center justify-between">
-                                <h3 class="text-lg font-semibold text-slate-900 flex items-center gap-2">
-                                    <span class="flex h-9 w-9 items-center justify-center rounded-xl bg-sky-500/10 text-sky-600">
-                                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor" class="h-5 w-5">
-                                            <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 12c0-4.556 3.694-8.25 8.25-8.25s8.25 3.694 8.25 8.25-3.694 8.25-8.25 8.25S3.75 16.556 3.75 12Zm12-3.75v7.5l-6-3.75 6-3.75Z" />
-                                        </svg>
-                                    </span>
-                                    Klasifikasi Pesan
-                                </h3>
-                                <span class="text-xs font-medium text-slate-400">Pie chart realtime</span>
+                                <div>
+                                    <p class="text-xs font-semibold uppercase tracking-wide text-slate-400">Response Rate</p>
+                                    <h3 class="mt-2 text-3xl font-semibold" id="response-rate">-</h3>
+                                    <p class="mt-2 flex items-center gap-2 text-sm text-slate-500">
+                                        <span id="response-rate-delta" class="badge badge-success">0%</span>
+                                        <span id="response-period">SLA realtime</span>
+                                    </p>
+                                </div>
+                                <div class="rounded-2xl bg-emerald-500/10 p-3 text-emerald-500">
+                                    <i data-lucide="message-circle" class="h-6 w-6"></i>
+                                </div>
                             </div>
-                            <div class="mt-5" id="classification-chart" style="height: 320px;"></div>
+                            <canvas id="sparkline-response" class="mt-4 h-16"></canvas>
+                        </article>
+                    </div>
+
+                    <div class="mt-10 grid gap-6 lg:grid-cols-3">
+                        <section class="glass-muted rounded-3xl p-6 shadow-lg lg:col-span-2">
+                            <header class="flex items-center justify-between">
+                                <div>
+                                    <h3 class="text-lg font-semibold">Response Time Trend</h3>
+                                    <p class="text-sm text-slate-500">Rata-rata waktu respon harian dan performa SLA.</p>
+                                </div>
+                                <div class="flex items-center gap-3 text-xs text-slate-500">
+                                    <span class="inline-flex items-center gap-1 rounded-full bg-emerald-500/10 px-2 py-1 text-emerald-600">
+                                        <i data-lucide="trending-up" class="h-4 w-4"></i>
+                                        7 hari terakhir
+                                    </span>
+                                </div>
+                            </header>
+                            <canvas id="chart-response-time" class="mt-6 h-72"></canvas>
+                        </section>
+                        <section class="glass-muted rounded-3xl p-6 shadow-lg">
+                            <header class="flex items-center justify-between">
+                                <div>
+                                    <h3 class="text-lg font-semibold">Distribusi Escalation</h3>
+                                    <p class="text-sm text-slate-500">Status real-time tiket aktif vs terselesaikan.</p>
+                                </div>
+                                <button id="export-escalations" class="text-xs font-semibold uppercase tracking-wide text-sky-500">Export CSV</button>
+                            </header>
+                            <canvas id="chart-escalations" class="mt-6 h-64"></canvas>
+                        </section>
+                    </div>
+
+                    <div class="mt-6 grid gap-6 lg:grid-cols-3">
+                        <section class="glass-muted rounded-3xl p-6 shadow-lg">
+                            <header class="flex items-center justify-between">
+                                <div>
+                                    <h3 class="text-lg font-semibold">Funnel Konversi</h3>
+                                    <p class="text-sm text-slate-500">Perjalanan lead menjadi pelanggan.</p>
+                                </div>
+                            </header>
+                            <canvas id="chart-funnel" class="mt-6 h-72"></canvas>
+                        </section>
+                        <section class="glass-muted rounded-3xl p-6 shadow-lg">
+                            <header class="flex items-center justify-between">
+                                <div>
+                                    <h3 class="text-lg font-semibold">Leaderboard Tim</h3>
+                                    <p class="text-sm text-slate-500">Top performers berdasarkan SLA &amp; CSAT.</p>
+                                </div>
+                            </header>
+                            <ul class="mt-6 space-y-4" id="team-leaderboard"></ul>
+                        </section>
+                        <section class="glass-muted rounded-3xl p-6 shadow-lg">
+                            <header class="flex items-center justify-between">
+                                <div>
+                                    <h3 class="text-lg font-semibold">Kepuasan Pelanggan</h3>
+                                    <p class="text-sm text-slate-500">Skor CSAT dan feedback terbaru.</p>
+                                </div>
+                            </header>
+                            <div class="mt-6 flex flex-col gap-6">
+                                <div>
+                                    <div class="flex items-center gap-2 text-3xl font-semibold">
+                                        <span id="csat-score">4.7</span>
+                                        <div class="flex items-center gap-1 text-amber-400" id="csat-stars"></div>
+                                    </div>
+                                    <p class="mt-2 text-sm text-slate-500" id="csat-summary">Mayoritas pelanggan memberikan rating sangat baik.</p>
+                                </div>
+                                <div class="flex items-center gap-3 text-xs text-slate-500">
+                                    <span class="badge badge-success">+5% MoM</span>
+                                    <span class="inline-flex items-center gap-1 text-emerald-500">
+                                        <i data-lucide="smile"></i>
+                                        87% sentiment positif
+                                    </span>
+                                </div>
+                            </div>
+                        </section>
+                    </div>
+                </div>
+
+                <div class="mt-8">
+                    <nav class="glass-card flex flex-wrap items-center justify-between gap-4 rounded-3xl px-4 py-3 sm:px-6">
+                        <div class="flex flex-wrap items-center gap-2 sm:gap-4">
+                            <button class="tab-button rounded-full px-4 py-2 text-sm font-semibold text-slate-500 hover:text-sky-500" data-tab="overview">Overview</button>
+                            <button class="tab-button rounded-full px-4 py-2 text-sm font-semibold text-slate-500 hover:text-sky-500" data-tab="customer-service">Customer Service</button>
+                            <button class="tab-button rounded-full px-4 py-2 text-sm font-semibold text-slate-500 hover:text-sky-500" data-tab="marketing">Marketing</button>
+                            <button class="tab-button rounded-full px-4 py-2 text-sm font-semibold text-slate-500 hover:text-sky-500" data-tab="analytics">Analitik</button>
+                        </div>
+                        <div class="flex items-center gap-2 text-xs text-slate-500">
+                            <span id="active-tab-description">Insight global dan KPI utama.</span>
+                        </div>
+                    </nav>
+
+                    <section id="tab-overview" class="tab-panel mt-6 active space-y-6">
+                        <div class="grid gap-6 lg:grid-cols-[2fr_1fr]">
+                            <div class="glass-card rounded-3xl p-6">
+                                <header class="flex items-center justify-between">
+                                    <div>
+                                        <h3 class="text-lg font-semibold">Aktivitas Terbaru</h3>
+                                        <p class="text-sm text-slate-500">Chat, tugas, dan status terbaru dari tim.</p>
+                                    </div>
+                                    <button class="text-xs font-semibold uppercase tracking-wide text-sky-500">Lihat semua</button>
+                                </header>
+                                <ul id="recent-activities" class="mt-6 space-y-4"></ul>
+                            </div>
+                            <div class="glass-card rounded-3xl p-6">
+                                <header class="flex items-center justify-between">
+                                    <div>
+                                        <h3 class="text-lg font-semibold">Notifikasi</h3>
+                                        <p class="text-sm text-slate-500">Escalation dan SLA yang membutuhkan perhatian.</p>
+                                    </div>
+                                    <span class="badge badge-danger" id="notification-badge">0 Urgent</span>
+                                </header>
+                                <ul id="notification-list" class="mt-6 space-y-4"></ul>
+                            </div>
+                        </div>
+                        <div class="glass-card rounded-3xl p-6">
+                            <header class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                                <div>
+                                    <h3 class="text-lg font-semibold">Quick Actions</h3>
+                                    <p class="text-sm text-slate-500">Tindakan cepat untuk menjaga momentum tim.</p>
+                                </div>
+                                <div class="flex items-center gap-2 text-xs text-slate-500">
+                                    <i data-lucide="zap" class="h-4 w-4"></i>
+                                    <span>Semua aksi tercatat dalam log aktivitas</span>
+                                </div>
+                            </header>
+                            <div class="mt-6 grid gap-4 md:grid-cols-3">
+                                <button class="quick-action glass-muted flex items-center justify-between rounded-2xl px-5 py-4 text-left transition" data-action="assign-lead">
+                                    <div>
+                                        <h4 class="text-base font-semibold">Assign Lead</h4>
+                                        <p class="mt-1 text-sm text-slate-500">Distribusi lead baru ke tim marketing.</p>
+                                    </div>
+                                    <i data-lucide="user-plus" class="h-6 w-6 text-sky-500"></i>
+                                </button>
+                                <button class="quick-action glass-muted flex items-center justify-between rounded-2xl px-5 py-4 text-left transition" data-action="resolve-escalation">
+                                    <div>
+                                        <h4 class="text-base font-semibold">Resolve Escalation</h4>
+                                        <p class="mt-1 text-sm text-slate-500">Tandai tiket urgent sebagai selesai.</p>
+                                    </div>
+                                    <i data-lucide="shield-check" class="h-6 w-6 text-emerald-500"></i>
+                                </button>
+                                <button class="quick-action glass-muted flex items-center justify-between rounded-2xl px-5 py-4 text-left transition" data-action="send-message">
+                                    <div>
+                                        <h4 class="text-base font-semibold">Send Message</h4>
+                                        <p class="mt-1 text-sm text-slate-500">Follow-up pelanggan prioritas tinggi.</p>
+                                    </div>
+                                    <i data-lucide="send" class="h-6 w-6 text-violet-500"></i>
+                                </button>
+                            </div>
+                        </div>
+                    </section>
+
+                    <section id="tab-customer-service" class="tab-panel mt-6 space-y-6">
+                        <div class="glass-card rounded-3xl p-6">
+                            <header class="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+                                <div>
+                                    <h3 class="text-lg font-semibold">Customer Service Pipeline</h3>
+                                    <p class="text-sm text-slate-500">Monitor status interaksi pelanggan, SLA, dan prioritas.</p>
+                                </div>
+                                <div class="flex flex-wrap items-center gap-3 text-sm text-slate-500">
+                                    <label class="flex items-center gap-2 rounded-full bg-slate-900/5 px-3 py-1">
+                                        Cari
+                                        <input id="customer-search" type="search" placeholder="Nama / Telepon" class="rounded-full border-none bg-transparent text-sm focus:ring-0" />
+                                    </label>
+                                    <label class="flex items-center gap-2 rounded-full bg-slate-900/5 px-3 py-1">
+                                        Prioritas
+                                        <select id="customer-priority-filter" class="rounded-full border-none bg-transparent text-sm focus:ring-0">
+                                            <option value="all">Semua</option>
+                                            <option value="high">High</option>
+                                            <option value="medium">Medium</option>
+                                            <option value="low">Low</option>
+                                        </select>
+                                    </label>
+                                    <label class="flex items-center gap-2 rounded-full bg-slate-900/5 px-3 py-1">
+                                        Tanggal
+                                        <input id="customer-date-from" type="date" class="rounded-full border-none bg-transparent text-sm focus:ring-0" />
+                                        <span class="text-slate-400">→</span>
+                                        <input id="customer-date-to" type="date" class="rounded-full border-none bg-transparent text-sm focus:ring-0" />
+                                    </label>
+                                    <button id="customer-export" class="rounded-full bg-slate-900/5 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-sky-500">Export CSV</button>
+                                </div>
+                            </header>
+                            <div class="mt-6 table-wrap glass-muted">
+                                <table id="customer-table">
+                                    <thead>
+                                        <tr>
+                                            <th class="cursor-pointer" data-sort="name">Customer Name</th>
+                                            <th class="cursor-pointer" data-sort="status">Status</th>
+                                            <th class="cursor-pointer" data-sort="last_contact">Last Contact</th>
+                                            <th class="cursor-pointer" data-sort="response_time">Response Time</th>
+                                            <th class="cursor-pointer" data-sort="priority">Priority</th>
+                                            <th>Aksi</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody></tbody>
+                                </table>
+                            </div>
+                            <div class="mt-4 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                                <div id="customer-pagination" class="flex items-center gap-2 text-sm text-slate-500"></div>
+                                <div class="text-sm text-slate-400" id="customer-summary"></div>
+                            </div>
                         </div>
 
                         <div class="glass-card rounded-3xl p-6">
-                            <div class="flex items-center justify-between">
-                                <h3 class="text-lg font-semibold text-slate-900 flex items-center gap-2">
-                                    <span class="flex h-9 w-9 items-center justify-center rounded-xl bg-indigo-500/10 text-indigo-600">
-                                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor" class="h-5 w-5">
-                                            <path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v3.75m0-3.75 4.5-9 4.5 9 4.5-6 4.5 6m-18 0h18" />
-                                        </svg>
-                                    </span>
-                                    Tren Interaksi
-                                </h3>
-                                <span class="text-xs font-medium text-slate-400">Line chart dinamis</span>
+                            <header class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                                <div>
+                                    <h3 class="text-lg font-semibold">Escalation Tracker</h3>
+                                    <p class="text-sm text-slate-500">Prioritaskan tiket urgent dan monitor penyelesaiannya.</p>
+                                </div>
+                                <div class="flex items-center gap-2 text-xs text-slate-500">
+                                    <span class="badge badge-danger" id="open-escalations-count">0 Open</span>
+                                    <span class="badge badge-success" id="resolved-escalations-count">0 Resolved</span>
+                                </div>
+                            </header>
+                            <div class="mt-6 table-wrap glass-muted">
+                                <table id="escalation-table">
+                                    <thead>
+                                        <tr>
+                                            <th class="cursor-pointer" data-sort="customer_name">Customer</th>
+                                            <th class="cursor-pointer" data-sort="issue">Issue</th>
+                                            <th class="cursor-pointer" data-sort="priority">Priority</th>
+                                            <th class="cursor-pointer" data-sort="status">Status</th>
+                                            <th class="cursor-pointer" data-sort="created_at">Created At</th>
+                                            <th>Aksi</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody></tbody>
+                                </table>
                             </div>
-                            <div class="mt-5" id="interaction-chart" style="height: 320px;"></div>
+                            <div class="mt-4 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                                <div id="escalation-pagination" class="flex items-center gap-2 text-sm text-slate-500"></div>
+                                <div class="text-sm text-slate-400" id="escalation-summary"></div>
+                            </div>
                         </div>
-                    </div>
-                </section>
+                    </section>
 
-                <!-- Customer Service Tab -->
-                <section id="customers-tab" class="tab-content mt-10 hidden">
-                    <div class="glass-card rounded-3xl p-6">
-                        <h3 class="text-lg font-semibold text-gray-900 mb-4">
-                            <i class="fas fa-users text-blue-600 mr-2"></i>Customer Service Management
-                        </h3>
-                        <p class="text-gray-600">Kelola pelanggan, chat history, dan escalations dari sini.</p>
-                        <div class="mt-6 text-center py-12">
-                            <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
-                            <p class="mt-4 text-gray-500">Loading customer data...</p>
+                    <section id="tab-marketing" class="tab-panel mt-6 space-y-6">
+                        <div class="glass-card rounded-3xl p-6">
+                            <header class="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+                                <div>
+                                    <h3 class="text-lg font-semibold">Lead Intelligence</h3>
+                                    <p class="text-sm text-slate-500">Prioritaskan follow-up berdasarkan scoring &amp; sumber lead.</p>
+                                </div>
+                                <div class="flex flex-wrap items-center gap-3 text-sm text-slate-500">
+                                    <label class="flex items-center gap-2 rounded-full bg-slate-900/5 px-3 py-1">
+                                        Cari
+                                        <input id="lead-search" type="search" placeholder="Nama / Email" class="rounded-full border-none bg-transparent text-sm focus:ring-0" />
+                                    </label>
+                                    <label class="flex items-center gap-2 rounded-full bg-slate-900/5 px-3 py-1">
+                                        Status
+                                        <select id="lead-status-filter" class="rounded-full border-none bg-transparent text-sm focus:ring-0">
+                                            <option value="all">Semua</option>
+                                            <option value="new">New</option>
+                                            <option value="contacted">Contacted</option>
+                                            <option value="qualified">Qualified</option>
+                                            <option value="won">Won</option>
+                                        </select>
+                                    </label>
+                                    <label class="flex items-center gap-2 rounded-full bg-slate-900/5 px-3 py-1">
+                                        Assign
+                                        <select id="lead-owner-filter" class="rounded-full border-none bg-transparent text-sm focus:ring-0">
+                                            <option value="all">Semua</option>
+                                        </select>
+                                    </label>
+                                    <button id="lead-export" class="rounded-full bg-slate-900/5 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-sky-500">Export CSV</button>
+                                </div>
+                            </header>
+                            <div class="mt-6 table-wrap glass-muted">
+                                <table id="leads-table">
+                                    <thead>
+                                        <tr>
+                                            <th class="cursor-pointer" data-sort="name">Lead Name</th>
+                                            <th class="cursor-pointer" data-sort="source">Source</th>
+                                            <th class="cursor-pointer" data-sort="status">Status</th>
+                                            <th class="cursor-pointer" data-sort="score">Score</th>
+                                            <th class="cursor-pointer" data-sort="follow_up">Follow-up Date</th>
+                                            <th class="cursor-pointer" data-sort="owner">Assign To</th>
+                                            <th>Aksi</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody></tbody>
+                                </table>
+                            </div>
+                            <div class="mt-4 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                                <div id="lead-pagination" class="flex items-center gap-2 text-sm text-slate-500"></div>
+                                <div class="text-sm text-slate-400" id="lead-summary"></div>
+                            </div>
                         </div>
-                    </div>
-                </section>
+                    </section>
 
-                <!-- Marketing Tab -->
-                <section id="marketing-tab" class="tab-content mt-10 hidden">
-                    <div class="glass-card rounded-3xl p-6">
-                        <h3 class="text-lg font-semibold text-gray-900 mb-4">
-                            <i class="fas fa-bullhorn text-green-600 mr-2"></i>Marketing & Lead Management
-                        </h3>
-                        <p class="text-gray-600">Kelola leads, campaign, dan marketing automation.</p>
-                        <div class="mt-6 text-center py-12">
-                            <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-green-600 mx-auto"></div>
-                            <p class="mt-4 text-gray-500">Loading marketing data...</p>
+                    <section id="tab-analytics" class="tab-panel mt-6 space-y-6">
+                        <div class="glass-card rounded-3xl p-6">
+                            <header class="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+                                <div>
+                                    <h3 class="text-lg font-semibold">Analitik Kinerja</h3>
+                                    <p class="text-sm text-slate-500">Pantau KPI strategis, efisiensi tim, dan konversi.</p>
+                                </div>
+                                <div class="flex flex-wrap items-center gap-3 text-sm text-slate-500">
+                                    <label class="flex items-center gap-2 rounded-full bg-slate-900/5 px-3 py-1">
+                                        Periode
+                                        <select id="analytics-range" class="rounded-full border-none bg-transparent text-sm focus:ring-0">
+                                            <option value="7">7 Hari</option>
+                                            <option value="30">30 Hari</option>
+                                            <option value="90">90 Hari</option>
+                                        </select>
+                                    </label>
+                                    <button id="analytics-export" class="rounded-full bg-slate-900/5 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-sky-500">Export CSV</button>
+                                </div>
+                            </header>
+                            <div class="mt-6 grid gap-6 md:grid-cols-2 xl:grid-cols-3" id="analytics-widgets"></div>
                         </div>
-                    </div>
-                </section>
-
-                <!-- Analytics Tab -->
-                <section id="analytics-tab" class="tab-content mt-10 hidden">
-                    <div class="glass-card rounded-3xl p-6">
-                        <h3 class="text-lg font-semibold text-gray-900 mb-4">
-                            <i class="fas fa-chart-bar text-purple-600 mr-2"></i>Analytics & Reporting
-                        </h3>
-                        <p class="text-gray-600">Analisis performa, conversion rate, dan insights bisnis.</p>
-                        <div class="mt-6 text-center py-12">
-                            <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600 mx-auto"></div>
-                            <p class="mt-4 text-gray-500">Loading analytics data...</p>
-                        </div>
-                    </div>
-                </section>
+                    </section>
+                </div>
             </div>
         </main>
 
-        <!-- Footer -->
-        <footer class="relative z-10 bg-white/80 border-t border-white/60 backdrop-blur">
-            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-                <div class="text-center text-slate-500 text-sm">
-                    <p>&copy; 2024 Tepat Laser CRM Dashboard. Dibuat dengan <span class="text-rose-500">❤️</span> untuk tim sales dan customer service.</p>
-                </div>
+        <footer class="mt-auto bg-transparent pb-10">
+            <div class="mx-auto max-w-7xl px-4 text-xs text-slate-500">
+                <p>© <span id="current-year"></span> Tepat Laser CRM. Dibangun dengan n8n, Cloudflare Workers, dan PostgreSQL.</p>
             </div>
         </footer>
     </div>
 
-    <!-- Loading Overlay -->
-    <div id="loading-overlay" class="fixed inset-0 bg-slate-900/45 flex items-center justify-center z-50 hidden">
-        <div class="glass-card rounded-2xl p-8 text-center">
-            <svg class="mx-auto h-12 w-12 text-sky-500 animate-spin" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path>
-            </svg>
-            <p class="mt-4 text-sm font-medium text-slate-600">Memuat data...</p>
+    <div id="loading-overlay" class="fixed inset-0 z-40 hidden items-center justify-center bg-white/70 backdrop-blur-md">
+        <div class="glass-card flex flex-col items-center gap-4 rounded-3xl px-10 py-8 text-center text-slate-600">
+            <span class="text-sm font-semibold uppercase tracking-wide text-slate-400">Memuat data dashboard</span>
+            <div class="flex gap-2">
+                <span class="h-3 w-3 animate-bounce rounded-full bg-sky-400"></span>
+                <span class="h-3 w-3 animate-bounce rounded-full bg-cyan-400" style="animation-delay: 0.12s"></span>
+                <span class="h-3 w-3 animate-bounce rounded-full bg-emerald-400" style="animation-delay: 0.24s"></span>
+            </div>
+            <p class="text-xs text-slate-400">Mengambil data terbaru dari workflow n8n...</p>
         </div>
     </div>
 
-    <!-- Scripts -->
+    <template id="activity-item-template">
+        <li class="rounded-2xl bg-white/60 p-4 shadow-sm shadow-sky-100/50">
+            <div class="flex items-start justify-between">
+                <div>
+                    <p class="text-sm font-medium text-slate-700 activity-title"></p>
+                    <p class="mt-1 text-xs text-slate-500 activity-detail"></p>
+                </div>
+                <span class="text-xs text-slate-400 activity-time"></span>
+            </div>
+        </li>
+    </template>
+
+    <template id="notification-item-template">
+        <li class="rounded-2xl bg-white/60 p-4 shadow-sm shadow-rose-100/40">
+            <div class="flex items-start justify-between">
+                <div>
+                    <p class="text-sm font-semibold text-rose-600 notification-title"></p>
+                    <p class="mt-1 text-xs text-rose-400 notification-detail"></p>
+                </div>
+                <span class="badge badge-danger notification-priority"></span>
+            </div>
+        </li>
+    </template>
+
+    <div id="modal-overlay" class="fixed inset-0 z-50 hidden items-center justify-center bg-slate-900/60 backdrop-blur-sm">
+        <div class="modal glass-card w-full max-w-3xl rounded-3xl p-6 shadow-2xl">
+            <header class="flex items-center justify-between">
+                <div>
+                    <h3 id="modal-title" class="text-xl font-semibold"></h3>
+                    <p id="modal-subtitle" class="text-sm text-slate-500"></p>
+                </div>
+                <button id="modal-close" class="rounded-full bg-slate-900/5 p-2 text-slate-500 hover:text-slate-700">
+                    <i data-lucide="x"></i>
+                </button>
+            </header>
+            <div id="modal-content" class="mt-6 max-h-[65vh] overflow-y-auto pr-2"></div>
+        </div>
+    </div>
+
+    <div id="toast-container" class="pointer-events-none fixed bottom-6 right-6 z-50 flex max-w-sm flex-col gap-3"></div>
+
     <script src="config.js"></script>
-    <script src="webhook-handler.js"></script>
     <script src="api-connector.js"></script>
-    <script src="dashboard.js"></script>
+    <script src="dashboard.js" defer></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            document.getElementById('current-year').textContent = new Date().getFullYear();
+        });
+    </script>
 </body>
 </html>
