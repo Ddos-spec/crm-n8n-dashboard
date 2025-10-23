@@ -899,7 +899,7 @@ function deriveActivities(state) {
 }
 
 function deriveNotifications(state) {
-  return state.escalations
+  return (Array.isArray(state.escalation) ? state.escalations : [])s
     .filter((item) => (item.status || '').toLowerCase() !== 'resolved')
     .slice(0, 5)
     .map((item) => ({
