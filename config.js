@@ -1,27 +1,31 @@
-// config.js - FIXED VERSION
+// config.js - PURE FRONTEND VERSION (GitHub Pages Compatible)
 const CONFIG = {
   n8n: {
     baseUrl: 'https://projek-n8n-n8n.qk6yxt.easypanel.host',
-    webhookUrl: 'https://projek-n8n-n8n.qk6yxt.easypanel.host',
+    // ✅ FIXED: Correct path dengan double webhook prefix
+    webhookUrl: 'https://projek-n8n-n8n.qk6yxt.easypanel.host/webhook',
     workflowId: 'C92dXduOKH38M3pj'
   },
   apiEndpoints: {
-    // ✅ FIXED: Correct double-webhook prefix from Easypanel routing
-    customersList: '/webhook/webhook/crm/customers-list',
-    leadsList: '/webhook/webhook/crm/leads-list',
-    quickStats: '/webhook/webhook/crm/quick-stats',
-    escalationsList: '/webhook/webhook/crm/escalations-list',
-    chatHistory: '/webhook/webhook/crm/chat-history',
-    customerDetails: '/webhook/webhook/crm/customer-details',
-    contactLead: '/webhook/webhook/crm/contact-lead',
-    resolveEscalation: '/webhook/webhook/crm/resolve-escalation'
+    // ✅ All endpoints point directly to n8n webhooks
+    customersList: '/webhook/crm/customers-list',
+    leadsList: '/webhook/crm/leads-list',
+    quickStats: '/webhook/crm/quick-stats',
+    escalationsList: '/webhook/crm/escalations-list',
+    chatHistory: '/webhook/crm/chat-history',
+    customerDetails: '/webhook/crm/customer-details',
+    contactLead: '/webhook/crm/contact-lead',
+    resolveEscalation: '/webhook/crm/resolve-escalation'
   },
   ui: {
     itemsPerPage: 20,
     theme: 'light',
     dateFormat: 'YYYY-MM-DD HH:mm:ss',
-    language: 'id'
-  }
+    language: 'id',
+    refreshInterval: 30000 // 30 seconds
+  },
+  // ⚠️ REMOVED: database config (no direct DB access from browser!)
+  // ⚠️ REMOVED: whatsapp config (handled by n8n workflow)
 };
 
 if (typeof module !== 'undefined' && module.exports) {
