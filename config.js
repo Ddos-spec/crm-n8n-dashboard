@@ -4,7 +4,7 @@ const CONFIG = {
     baseUrl: 'https://projek-n8n-n8n.qk6yxt.easypanel.host',
     // ✅ FIXED: Correct path dengan double webhook prefix
     webhookUrl: 'https://projek-n8n-n8n.qk6yxt.easypanel.host/webhook',
-    workflowId: 'C92dXduOKH38M3pj'
+    workflowId: 'MWurQU8hFbk2EzP3'
   },
   apiEndpoints: {
     // ✅ All endpoints point directly to n8n webhooks
