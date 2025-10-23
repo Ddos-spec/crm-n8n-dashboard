@@ -6,15 +6,15 @@ const CONFIG = {
     workflowId: 'C92dXduOKH38M3pj'
   },
   apiEndpoints: {
-    // ✅ FIXED: Added full webhook paths
-    customersList: '/webhook/crm/customers-list',
-    leadsList: '/webhook/crm/leads-list',
-    quickStats: '/webhook/crm/quick-stats',
-    escalationsList: '/webhook/crm/escalations-list',
-    chatHistory: '/webhook/crm/chat-history',
-    customerDetails: '/webhook/crm/customer-details',
-    contactLead: '/webhook/crm/contact-lead',
-    resolveEscalation: '/webhook/crm/resolve-escalation'
+    // ✅ FIXED: Correct double-webhook prefix from Easypanel routing
+    customersList: '/webhook/webhook/crm/customers-list',
+    leadsList: '/webhook/webhook/crm/leads-list',
+    quickStats: '/webhook/webhook/crm/quick-stats',
+    escalationsList: '/webhook/webhook/crm/escalations-list',
+    chatHistory: '/webhook/webhook/crm/chat-history',
+    customerDetails: '/webhook/webhook/crm/customer-details',
+    contactLead: '/webhook/webhook/crm/contact-lead',
+    resolveEscalation: '/webhook/webhook/crm/resolve-escalation'
   },
   ui: {
     itemsPerPage: 20,
