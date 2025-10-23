@@ -6,7 +6,7 @@ class CRMApiConnector {
 
   async fetchApi(endpoint, method = 'GET', body = null) {
     const url = `${this.baseUrl}${endpoint}`;
-    
+
     const options = {
       method,
       headers: {
@@ -16,7 +16,11 @@ class CRMApiConnector {
       mode: 'cors',
       credentials: 'omit'
     };
-    
+
+    if (method === 'POST' && body === null) {
+      body = {};
+    }
+
     if (body) {
       options.body = JSON.stringify(body);
     }
@@ -47,9 +51,21 @@ class CRMApiConnector {
     }
   }
 
+  buildPayload(action, data = {}) {
+    return {
+      action,
+      request_id: `req_${Date.now()}`,
+      data
+    };
+  }
+
   // GET Methods - Updated dengan proper HTTP method
   async getCustomers() {
-    return this.fetchApi(CONFIG.apiEndpoints.customersList, 'GET');
+    return this.fetchApi(
+      CONFIG.apiEndpoints.customersList,
+      'POST',
+      this.buildPayload('get_customers')
+    );
   }
   
   async getBusinessLeads() {
@@ -57,47 +73,51 @@ class CRMApiConnector {
   }
   
   async getQuickStats() {
-    return this.fetchApi(CONFIG.apiEndpoints.quickStats, 'GET');
+    return this.fetchApi(
+      CONFIG.apiEndpoints.quickStats,
+      'POST',
+      this.buildPayload('get_quick_stats')
+    );
   }
-  
+
   async getEscalations() {
-    return this.fetchApi(CONFIG.apiEndpoints.escalationsList, 'GET');
+    return this.fetchApi(
+      CONFIG.apiEndpoints.escalationsList,
+      'POST',
+      this.buildPayload('get_escalations')
+    );
   }
-  
+
   async getChatHistory(customer_id = null) {
-    const endpoint = customer_id 
-      ? `${CONFIG.apiEndpoints.chatHistory}?customer_id=${customer_id}`
-      : CONFIG.apiEndpoints.chatHistory;
-    return this.fetchApi(endpoint, 'GET');
+    return this.fetchApi(
+      CONFIG.apiEndpoints.chatHistory,
+      'POST',
+      this.buildPayload('get_chat_history', customer_id ? { customer_id } : {})
+    );
   }
-  
+
   async getCustomerDetails(phone) {
-    const endpoint = `${CONFIG.apiEndpoints.customerDetails}?phone=${phone}`;
-    return this.fetchApi(endpoint, 'GET');
+    return this.fetchApi(
+      CONFIG.apiEndpoints.customerDetails,
+      'POST',
+      this.buildPayload('get_customer_details', { phone })
+    );
   }
 
   // POST Methods
   async contactLead(to, message) {
     return this.fetchApi(
-      CONFIG.apiEndpoints.contactLead, 
-      'POST', 
-      { 
-        data: { phone: to, message },
-        action: 'contact_lead',
-        request_id: `req_${Date.now()}`
-      }
+      CONFIG.apiEndpoints.contactLead,
+      'POST',
+      this.buildPayload('contact_lead', { phone: to, message })
     );
   }
-  
+
   async resolveEscalation(escalation_id, notes = '') {
     return this.fetchApi(
-      CONFIG.apiEndpoints.resolveEscalation, 
-      'POST', 
-      { 
-        data: { escalation_id, notes },
-        action: 'resolve_escalation',
-        request_id: `req_${Date.now()}`
-      }
+      CONFIG.apiEndpoints.resolveEscalation,
+      'POST',
+      this.buildPayload('resolve_escalation', { escalation_id, notes })
     );
   }
 
