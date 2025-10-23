@@ -1,19 +1,20 @@
-// config.js
+// config.js - FIXED VERSION
 const CONFIG = {
   n8n: {
     baseUrl: 'https://projek-n8n-n8n.qk6yxt.easypanel.host',
-    webhookUrl: 'https://projek-n8n-n8n.qk6yxt.easypanel.host/webhook/crm',
+    webhookUrl: 'https://projek-n8n-n8n.qk6yxt.easypanel.host',
     workflowId: 'C92dXduOKH38M3pj'
   },
   apiEndpoints: {
-    customersList: '/customers-list',
-    leadsList: '/leads-list',
-    quickStats: '/quick-stats',
-    escalationsList: '/escalations-list',
-    chatHistory: '/chat-history',
-    customerDetails: '/customer-details',
-    contactLead: '/contact-lead',
-    resolveEscalation: '/resolve-escalation'
+    // ✅ FIXED: Added full webhook paths
+    customersList: '/webhook/crm/customers-list',
+    leadsList: '/webhook/crm/leads-list',
+    quickStats: '/webhook/crm/quick-stats',
+    escalationsList: '/webhook/crm/escalations-list',
+    chatHistory: '/webhook/crm/chat-history',
+    customerDetails: '/webhook/crm/customer-details',
+    contactLead: '/webhook/crm/contact-lead',
+    resolveEscalation: '/webhook/crm/resolve-escalation'
   },
   ui: {
     itemsPerPage: 20,
@@ -22,6 +23,7 @@ const CONFIG = {
     language: 'id'
   }
 };
+
 if (typeof module !== 'undefined' && module.exports) {
   module.exports = CONFIG;
 }
