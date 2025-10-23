@@ -2,7 +2,7 @@
 const CONFIG = {
   n8n: {
     baseUrl: 'https://n8n-cors-proxy.setgraph69.workers.dev',    // ✅ FIXED: Correct path dengan double webhook prefix
-    webhookUrl: 'https://projek-n8n-nginx.qk6yxt.easypanel.host/webhook',
+    webhookUrl: 'https://n8n-cors-proxy.setgraph69.workers.dev/webhook',
     workflowId: 'MWurQU8hFbk2EzP3'
   },
   apiEndpoints: {
@@ -26,7 +26,6 @@ const CONFIG = {
   // ⚠️ REMOVED: database config (no direct DB access from browser!)
   // ⚠️ REMOVED: whatsapp config (handled by n8n workflow)
 };
-
 if (typeof module !== 'undefined' && module.exports) {
   module.exports = CONFIG;
 }
