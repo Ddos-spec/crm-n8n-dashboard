@@ -66,7 +66,11 @@ export class ApiConnector {
   }
 
   async getBusinessLeads() {
-    return this.fetchApi(this.config.apiEndpoints.leadsList, 'POST');
+    return this.fetchApi(
+      this.config.apiEndpoints.leadsList,
+      'POST',
+      this.buildPayload('get_leads')
+    );
   }
 
   async getQuickStats() {

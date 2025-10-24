@@ -385,13 +385,19 @@ function bindExportButtons() {
 function prepareCustomerRows(customers) {
   return customers.map((customer) => {
     const priority = (customer.priority || customer.customer_priority || 'medium').toLowerCase();
-    const status = (customer.status || customer.customer_status || 'Active').toLowerCase();
+    const statusSource =
+      customer.conversation_stage ||
+      customer.conversationStage ||
+      customer.status ||
+      customer.customer_status ||
+      'Active';
+    const status = String(statusSource).toLowerCase();
     return {
       sourceId: customer.phone || customer.customer_id || customer.id || customer.email || customer.name,
       name: customer.name || customer.customer_name || 'Unknown Customer',
       phone: customer.phone || customer.whatsapp || '-',
       status,
-      statusLabel: capitalize(status),
+      statusLabel: typeof statusSource === 'string' ? statusSource : capitalize(status),
       lastContact: customer.last_contact || customer.last_interaction,
       responseTime: customer.response_time ? `${customer.response_time} mnt` : customer.avg_response_time ? `${customer.avg_response_time} mnt` : null,
       priority,
@@ -402,15 +408,22 @@ function prepareCustomerRows(customers) {
 
 function prepareEscalationRows(escalations) {
   return escalations.map((item) => {
-    const priority = (item.priority || 'medium').toLowerCase();
-    const status = (item.status || 'Open').toLowerCase();
+    const prioritySource = item.priority_level || item.priority || 'medium';
+    const priority = String(prioritySource).toLowerCase();
+    const statusSource = item.status || 'Open';
+    const status = String(statusSource).toLowerCase();
     const sourceId = item.id || item.escalation_id || `${item.customer_name}-${item.created_at}`;
+    const customerName = item.customer_name || item.customerName || item.name || 'Unknown Customer';
+    const contact = item.customer_phone || item.customerPhone || item.phone || item.contact || '-';
+    const issue = item.issue || item.escalation_type || item.escalationType || 'General';
     return {
       ...item,
       sourceId,
+      customer_name: customerName,
+      contact,
+      issue,
       priority,
       status,
-      contact: item.customer_phone || item.contact || '-',
       created_at: item.created_at || item.createdAt || item.created || item.updated_at
     };
   });
