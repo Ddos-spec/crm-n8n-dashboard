@@ -21,9 +21,13 @@ async function run() {
   const indexPath = path.join(rootDir, 'src/frontend/index.html');
   const indexHtml = await readFile(indexPath, 'utf-8');
   const rewritten = indexHtml.replace(
-    '/src/frontend/scripts/bootstrap/main.js',
+    './scripts/bootstrap/main.js',
     './assets/main.js'
   );
+
+  if (rewritten === indexHtml) {
+    throw new Error('Failed to rewrite bootstrap script path in index.html');
+  }
   await writeFile(path.join(distDir, 'index.html'), rewritten, 'utf-8');
 
   console.log('✅ Frontend built to dist/');
