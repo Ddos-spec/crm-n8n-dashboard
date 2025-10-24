@@ -28,23 +28,49 @@ function pruneContainerFields(item) {
   return copy;
 }
 
-function isNumericKeyObject(value) {
+const NUMERIC_KEY_PATTERN = /^\d+$/;
+const NUMERIC_OBJECT_METADATA_KEYS = new Set(['length']);
+
+function extractNumericArrayLike(value) {
   if (!isObject(value) || Array.isArray(value)) {
-    return false;
+    return null;
   }
 
-  const keys = Object.keys(value);
-  if (keys.length === 0) {
-    return false;
+  const entries = Object.entries(value);
+  if (entries.length === 0) {
+    return null;
   }
 
-  return keys.every((key) => /^\d+$/.test(key));
-}
+  const numericEntries = entries.filter(([key]) => NUMERIC_KEY_PATTERN.test(key));
+  if (numericEntries.length === 0) {
+    return null;
+  }
 
-function numericObjectToArray(value) {
-  return Object.keys(value)
-    .sort((a, b) => Number(a) - Number(b))
-    .map((key) => value[key]);
+  const sortedNumericEntries = numericEntries.slice().sort((a, b) => Number(a[0]) - Number(b[0]));
+  const indices = sortedNumericEntries.map(([key]) => Number(key));
+
+  const startIndex = indices[0];
+  const isSequential = indices.every((index, position) => index === startIndex + position);
+  if (!isSequential) {
+    return null;
+  }
+
+  const remainderEntries = entries.filter(([key]) => !NUMERIC_KEY_PATTERN.test(key));
+  const remainder = remainderEntries.reduce((acc, [key, entryValue]) => {
+    acc[key] = entryValue;
+    return acc;
+  }, {});
+
+  NUMERIC_OBJECT_METADATA_KEYS.forEach((metaKey) => {
+    if (metaKey in remainder) {
+      delete remainder[metaKey];
+    }
+  });
+
+  return {
+    values: sortedNumericEntries.map(([, entryValue]) => entryValue),
+    remainder,
+  };
 }
 
 function expandNestedCollections(value) {
@@ -81,10 +107,14 @@ function expandNestedCollections(value) {
 
     const container = pruneContainerFields(current);
 
-    if (isNumericKeyObject(container)) {
-      const numericValues = numericObjectToArray(container);
-      for (let i = numericValues.length - 1; i >= 0; i -= 1) {
-        queue.unshift(numericValues[i]);
+    const arrayLikeContainer = extractNumericArrayLike(container);
+    if (arrayLikeContainer) {
+      if (Object.keys(arrayLikeContainer.remainder).length > 0) {
+        queue.unshift(arrayLikeContainer.remainder);
+      }
+
+      for (let i = arrayLikeContainer.values.length - 1; i >= 0; i -= 1) {
+        queue.unshift(arrayLikeContainer.values[i]);
       }
       continue;
     }
@@ -94,8 +124,15 @@ function expandNestedCollections(value) {
       .filter(({ value }) => Array.isArray(value) && value.some((entry) => isObject(entry)));
 
     const numericCollections = Object.entries(container)
-      .filter(([, entryValue]) => isNumericKeyObject(entryValue))
-      .map(([key, entryValue]) => ({ key, value: numericObjectToArray(entryValue) }));
+      .map(([key, entryValue]) => {
+        const arrayLike = extractNumericArrayLike(entryValue);
+        if (!arrayLike) {
+          return null;
+        }
+
+        return { key, values: arrayLike.values, remainder: arrayLike.remainder };
+      })
+      .filter(Boolean);
 
     const hasNestedObject = nestedArrays.length > 0 || numericCollections.length > 0;
 
@@ -106,8 +143,25 @@ function expandNestedCollections(value) {
         }
       });
 
+      numericCollections.forEach(({ values }) => {
+        for (let i = values.length - 1; i >= 0; i -= 1) {
+          queue.unshift(values[i]);
+        }
+      });
+
       const retained = { ...container };
-      [...nestedArrays, ...numericCollections].forEach(({ key }) => delete retained[key]);
+
+      nestedArrays.forEach(({ key }) => {
+        delete retained[key];
+      });
+
+      numericCollections.forEach(({ key, remainder }) => {
+        if (Object.keys(remainder).length > 0) {
+          retained[key] = remainder;
+        } else {
+          delete retained[key];
+        }
+      });
 
       if (Object.keys(retained).length > 0) {
         queue.unshift(retained);
