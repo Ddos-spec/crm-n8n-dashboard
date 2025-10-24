@@ -28,6 +28,25 @@ function pruneContainerFields(item) {
   return copy;
 }
 
+function isNumericKeyObject(value) {
+  if (!isObject(value) || Array.isArray(value)) {
+    return false;
+  }
+
+  const keys = Object.keys(value);
+  if (keys.length === 0) {
+    return false;
+  }
+
+  return keys.every((key) => /^\d+$/.test(key));
+}
+
+function numericObjectToArray(value) {
+  return Object.keys(value)
+    .sort((a, b) => Number(a) - Number(b))
+    .map((key) => value[key]);
+}
+
 function expandNestedCollections(value) {
   const result = [];
   const queue = [];
@@ -62,21 +81,33 @@ function expandNestedCollections(value) {
 
     const container = pruneContainerFields(current);
 
+    if (isNumericKeyObject(container)) {
+      const numericValues = numericObjectToArray(container);
+      for (let i = numericValues.length - 1; i >= 0; i -= 1) {
+        queue.unshift(numericValues[i]);
+      }
+      continue;
+    }
+
     const nestedArrays = RESPONSE_COLLECTION_KEYS
       .map((key) => ({ key, value: container[key] }))
       .filter(({ value }) => Array.isArray(value) && value.some((entry) => isObject(entry)));
 
-    const hasNestedObject = nestedArrays.length > 0;
+    const numericCollections = Object.entries(container)
+      .filter(([, entryValue]) => isNumericKeyObject(entryValue))
+      .map(([key, entryValue]) => ({ key, value: numericObjectToArray(entryValue) }));
+
+    const hasNestedObject = nestedArrays.length > 0 || numericCollections.length > 0;
 
     if (hasNestedObject) {
-      nestedArrays.forEach(({ value }) => {
+      [...nestedArrays, ...numericCollections].forEach(({ value }) => {
         for (let i = value.length - 1; i >= 0; i -= 1) {
           queue.unshift(value[i]);
         }
       });
 
       const retained = { ...container };
-      nestedArrays.forEach(({ key }) => delete retained[key]);
+      [...nestedArrays, ...numericCollections].forEach(({ key }) => delete retained[key]);
 
       if (Object.keys(retained).length > 0) {
         queue.unshift(retained);
