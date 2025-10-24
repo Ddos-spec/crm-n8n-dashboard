@@ -16,6 +16,25 @@ const DashboardState = {
   theme: 'light'
 };
 
+function ensureArray(value) {
+  if (Array.isArray(value)) return value;
+  if (!value || typeof value !== 'object') return [];
+
+  if (Array.isArray(value.data)) return value.data;
+  if (Array.isArray(value.items)) return value.items;
+  if (Array.isArray(value.results)) return value.results;
+  if (Array.isArray(value.records)) return value.records;
+
+  return Object.values(value).reduce((acc, item) => {
+    if (Array.isArray(item)) {
+      acc.push(...item);
+    } else if (item && typeof item === 'object') {
+      acc.push(item);
+    }
+    return acc;
+  }, []);
+}
+
 class TableManager {
   constructor({
     tableId,
@@ -546,9 +565,9 @@ async function refreshData() {
     ]);
 
     DashboardState.stats = statsResponse.data || statsResponse;
-    DashboardState.customers = customersResponse.data || [];
-    DashboardState.leads = leadsResponse.data || [];
-    DashboardState.escalations = escalationsResponse.data || [];
+    DashboardState.customers = ensureArray(customersResponse.data ?? customersResponse);
+    DashboardState.leads = ensureArray(leadsResponse.data ?? leadsResponse);
+    DashboardState.escalations = ensureArray(escalationsResponse.data ?? escalationsResponse);
 
     DashboardState.activities = deriveActivities(DashboardState);
     DashboardState.notifications = deriveNotifications(DashboardState);
@@ -1149,7 +1168,9 @@ function renderEscalationChart() {
   const ctx = document.getElementById('chart-escalations');
   if (!ctx) return;
 
-  const statusGroups = DashboardState.escalations.reduce(
+  const escalations = ensureArray(DashboardState.escalations);
+
+  const statusGroups = escalations.reduce(
     (acc, item) => {
       const status = (item.status || 'Open').toLowerCase();
       if (status.includes('resolved')) acc.resolved += 1;
@@ -1226,10 +1247,37 @@ function renderFunnelChart() {
 }
 
 function createOrUpdateChart(id, ctx, config) {
+  const canvas = ctx instanceof HTMLCanvasElement ? ctx : document.getElementById(id);
+  if (!canvas) return;
+
+  if (!canvas.dataset.fixedHeight) {
+    let measuredHeight = canvas.clientHeight;
+    if (!measuredHeight) {
+      const inlineHeight = canvas.style.height || canvas.getAttribute('height');
+      if (inlineHeight && !Number.isNaN(parseFloat(inlineHeight))) {
+        measuredHeight = parseFloat(inlineHeight);
+      } else if (typeof window !== 'undefined' && window.getComputedStyle) {
+        const computedHeight = window.getComputedStyle(canvas).height;
+        measuredHeight = parseFloat(computedHeight);
+      }
+    }
+    canvas.dataset.fixedHeight = `${measuredHeight || 256}px`;
+  }
+
+  const fixedHeight = canvas.dataset.fixedHeight;
+  if (fixedHeight) {
+    canvas.style.height = fixedHeight;
+    const numericHeight = parseFloat(fixedHeight);
+    if (!Number.isNaN(numericHeight)) {
+      canvas.setAttribute('height', numericHeight);
+    }
+  }
+  canvas.style.width = '100%';
+
   if (DashboardState.charts[id]) {
     DashboardState.charts[id].destroy();
   }
-  DashboardState.charts[id] = new Chart(ctx, config);
+  DashboardState.charts[id] = new Chart(canvas, config);
 }
 
 function renderTeamLeaderboard() {
