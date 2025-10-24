@@ -14,8 +14,7 @@ export const CONFIG = {
     chatHistory: '/webhook/crm/chat-history',
     customerDetails: '/webhook/crm/customer-details',
     contactLead: '/webhook/crm/contact-lead',
-    resolveEscalation: '/webhook/crm/resolve-escalation',
-    campaignPerformance: '/webhook/crm/campaign-performance'
+    resolveEscalation: '/webhook/crm/resolve-escalation'
   },
   ui: {
     itemsPerPage: 20,
