@@ -6,10 +6,10 @@ import { showToast } from '../ui/toast.js';
 import { escapeHTML, refreshIcons, showLoadingOverlay, hideLoadingOverlay, updateConnectionStatus, formatDateCell, downloadFile } from '../ui/dom.js';
 import { statusToBadge, priorityToBadge, updateDeltaBadge } from '../ui/badges.js';
 import { renderAssignLeadForm, renderResolveEscalationForm, renderSendMessageForm, setupModal, openModal, closeModal, openQuickActionModal } from '../ui/modal.js';
-import { ensureArray, formatNumber, capitalize, extractUnique } from '../../../shared/utils/index.js';
-import { apiConnector } from '../../../services/apiConnector.js';
-import { webhookApiConnector } from '../../../services/webhookHandler.js';
-import { CONFIG } from '../../../shared/config.js';
+import { ensureArray, formatNumber, capitalize, extractUnique } from '../../shared/utils/index.js';
+import { apiConnector } from '../../services/apiConnector.js';
+import { webhookApiConnector } from '../../services/webhookHandler.js';
+import { CONFIG } from '../../shared/config.js';
 
 async function initializeDashboard() {
   moment.locale(CONFIG.ui.language || 'id');

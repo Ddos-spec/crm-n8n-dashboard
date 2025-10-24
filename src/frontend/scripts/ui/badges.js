@@ -1,4 +1,4 @@
-import { capitalize } from '../../../shared/utils/index.js';
+import { capitalize } from '../../shared/utils/index.js';
 
 export function statusToBadge(status) {
   const value = (status || '').toLowerCase();
