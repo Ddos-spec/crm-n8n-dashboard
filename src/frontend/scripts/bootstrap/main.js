@@ -10,6 +10,7 @@ import { ensureArray, formatNumber, capitalize, extractUnique } from '../../shar
 import { apiConnector } from '../../services/apiConnector.js';
 import { webhookApiConnector } from '../../services/webhookHandler.js';
 import { CONFIG } from '../../shared/config.js';
+import { initCampaignPerformance, loadCampaignPerformance } from '../marketing/campaignPerformance.js';
 
 async function initializeDashboard() {
   moment.locale(CONFIG.ui.language || 'id');
@@ -17,6 +18,7 @@ async function initializeDashboard() {
   setupTabs();
   setupQuickActions();
   setupModal();
+  initCampaignPerformance();
   setupAutoRefresh(refreshData);
   initializeTables();
   bindExportButtons();
@@ -124,6 +126,7 @@ async function refreshData() {
     DashboardState.tableManagers.escalations.setData(prepareEscalationRows(DashboardState.escalations));
     DashboardState.tableManagers.leads.setData(prepareLeadRows(DashboardState.leads));
 
+    await loadCampaignPerformance({ silent: true });
     renderAnalyticsWidgets();
     updateRefreshState();
     updateNewItemsBadge();

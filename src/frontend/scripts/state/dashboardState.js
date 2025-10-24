@@ -3,6 +3,7 @@ export const DashboardState = {
   customers: [],
   leads: [],
   escalations: [],
+  campaignPerformance: [],
   activities: [],
   notifications: [],
   lastRefresh: null,
