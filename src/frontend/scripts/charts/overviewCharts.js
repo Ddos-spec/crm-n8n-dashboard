@@ -1,6 +1,6 @@
 import { DashboardState } from '../state/dashboardState.js';
 import { ensureArray } from '../../shared/utils/index.js';
-import { lockChartArea } from './sizing.js';
+import { lockChartArea, unlockChartArea } from './sizing.js';
 
 function createOrUpdateChart(id, ctx, config) {
   const canvas = ctx instanceof HTMLCanvasElement ? ctx : document.getElementById(id);
@@ -20,25 +20,74 @@ function createOrUpdateChart(id, ctx, config) {
 }
 
 function renderLineChart() {
-  const ctx = document.getElementById('chart-response-time');
-  if (!ctx) return;
+  const canvas = document.getElementById('chart-response-time');
+  if (!canvas) return;
 
-  const dataPoints = (DashboardState.stats?.responseTimeTrend || DashboardState.stats?.response_time_trend || []).map((item) => ({
-    date: item.date || item.label,
-    value: item.value || item.avg || item.average
-  }));
+  const emptyState = document.getElementById('chart-response-time-empty');
+  const primaryMessage = emptyState?.querySelector('[data-empty-primary]');
+  const secondaryMessage = emptyState?.querySelector('[data-empty-secondary]');
 
-  const dataset = dataPoints.length
-    ? dataPoints
-    : Array.from({ length: 7 }).map((_, idx) => ({
-        date: moment().subtract(6 - idx, 'days').format('DD MMM'),
-        value: 30 + Math.round(Math.random() * 20)
-      }));
+  const trend = ensureArray(DashboardState.stats?.responseTimeTrend || DashboardState.stats?.response_time_trend);
+  const dataPoints = trend
+    .map((item) => {
+      const value = Number(item?.value ?? item?.avg ?? item?.average);
+      if (!Number.isFinite(value)) return null;
 
-  const labels = dataset.map((item) => item.date);
-  const values = dataset.map((item) => Number(item.value));
+      const dateInput = item?.date || item?.label || item?.period;
+      const label = dateInput
+        ? moment(dateInput).isValid()
+          ? moment(dateInput).format('DD MMM')
+          : dateInput
+        : null;
 
-  createOrUpdateChart('chart-response-time', ctx, {
+      return {
+        label,
+        value
+      };
+    })
+    .filter(Boolean);
+
+  if (!dataPoints.length) {
+    if (DashboardState.charts['chart-response-time']) {
+      DashboardState.charts['chart-response-time'].destroy();
+      delete DashboardState.charts['chart-response-time'];
+    }
+
+    unlockChartArea(canvas);
+    canvas.classList.add('hidden');
+
+    if (emptyState) {
+      emptyState.classList.remove('hidden');
+
+      if (primaryMessage) {
+        primaryMessage.textContent = DashboardState.emptyStateMessage || 'Belum ada data';
+      }
+
+      if (secondaryMessage) {
+        const latestAverage = Number(
+          DashboardState.stats?.avgResponseTime ?? DashboardState.stats?.avg_response_time
+        );
+
+        if (Number.isFinite(latestAverage)) {
+          secondaryMessage.textContent = `Rata-rata respon terakhir ${latestAverage} menit.`;
+        } else {
+          secondaryMessage.textContent = 'Data response time akan muncul setelah ada aktivitas terbaru.';
+        }
+      }
+    }
+
+    return;
+  }
+
+  canvas.classList.remove('hidden');
+  if (emptyState) {
+    emptyState.classList.add('hidden');
+  }
+
+  const labels = dataPoints.map((item, index) => item.label || `Poin ${index + 1}`);
+  const values = dataPoints.map((item) => item.value);
+
+  createOrUpdateChart('chart-response-time', canvas, {
     type: 'line',
     data: {
       labels,

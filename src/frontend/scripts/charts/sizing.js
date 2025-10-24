@@ -119,3 +119,25 @@ export function lockChartArea(canvas, fallbackHeight) {
 
   return { container, height };
 }
+
+export function unlockChartArea(canvas) {
+  if (!canvas) return;
+
+  const wrapper = canvas.parentElement?.dataset?.chartWrapper === 'true' ? canvas.parentElement : null;
+
+  const resetElement = (element) => {
+    if (!element) return;
+    element.style.removeProperty('height');
+    element.style.removeProperty('maxHeight');
+    if (element.dataset) {
+      delete element.dataset.fixedHeight;
+    }
+    if (element === wrapper) {
+      element.style.removeProperty('display');
+    }
+  };
+
+  resetElement(wrapper);
+  resetElement(canvas);
+  canvas.removeAttribute('height');
+}
