@@ -1,14 +1,17 @@
+import { CONFIG } from '../shared/config.js';
+
 // Webhook Handler untuk CRM Dashboard - N8N Integration
-class WebhookHandler {
-    constructor() {
+export class WebhookHandler {
+    constructor(config = CONFIG) {
+        const baseWebhook = config?.n8n?.webhookUrl || 'https://n8n-cors-proxy.setgraph69.workers.dev/webhook';
         this.config = {
-            n8nWebhookUrl: 'https://n8n-cors-proxy.setgraph69.workers.dev/webhook/crm',
-            responseWebhookUrl: 'https://n8n-cors-proxy.setgraph69.workers.dev/webhook/crm-response',
-            workflowId: 'C92dXduOKH38M3pj',
+            n8nWebhookUrl: `${baseWebhook}/crm`,
+            responseWebhookUrl: `${baseWebhook}/crm-response`,
+            workflowId: config?.n8n?.workflowId || 'C92dXduOKH38M3pj',
             retryAttempts: 3,
             timeout: 30000
         };
-        
+
         this.responseHandlers = new Map();
         this.init();
     }
@@ -257,9 +260,9 @@ class WebhookHandler {
 }
 
 // Alternative API Connector yang menggunakan webhook
-class WebhookAPIConnector {
-    constructor() {
-        this.webhookHandler = new WebhookHandler();
+export class WebhookAPIConnector {
+    constructor(config = CONFIG) {
+        this.webhookHandler = new WebhookHandler(config);
         this.fallbackData = new FallbackDataProvider();
         this.cache = new Map();
         this.cacheTimeout = 30000; // 30 seconds
@@ -616,6 +619,6 @@ if (typeof window !== 'undefined') {
 }
 
 // Export for module systems
-if (typeof module !== 'undefined' && module.exports) {
-    module.exports = { WebhookHandler, WebhookAPIConnector, FallbackDataProvider };
-}
+export const webhookHandler = new WebhookHandler();
+export const webhookApiConnector = new WebhookAPIConnector();
+export const fallbackDataProvider = new FallbackDataProvider();

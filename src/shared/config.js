@@ -1,7 +1,7 @@
 // config.js - PURE FRONTEND VERSION (GitHub Pages Compatible)
-const CONFIG = {
+export const CONFIG = {
   n8n: {
-    baseUrl: 'https://n8n-cors-proxy.setgraph69.workers.dev',    // ✅ FIXED: Correct path dengan double webhook prefix
+    baseUrl: 'https://n8n-cors-proxy.setgraph69.workers.dev', // ✅ FIXED: Correct path dengan double webhook prefix
     webhookUrl: 'https://n8n-cors-proxy.setgraph69.workers.dev/webhook',
     workflowId: 'MWurQU8hFbk2EzP3'
   },
@@ -22,10 +22,7 @@ const CONFIG = {
     dateFormat: 'YYYY-MM-DD HH:mm:ss',
     language: 'id',
     refreshInterval: 30000 // 30 seconds
-  },
-  // ⚠️ REMOVED: database config (no direct DB access from browser!)
-  // ⚠️ REMOVED: whatsapp config (handled by n8n workflow)
+  }
 };
-if (typeof module !== 'undefined' && module.exports) {
-  module.exports = CONFIG;
-}
+
+export default CONFIG;
