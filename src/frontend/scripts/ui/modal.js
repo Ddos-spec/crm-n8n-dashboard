@@ -1,6 +1,6 @@
 import { DashboardState } from '../state/dashboardState.js';
 import { escapeHTML, refreshIcons } from './dom.js';
-import { extractUnique } from '../../../shared/utils/index.js';
+import { extractUnique } from '../../shared/utils/index.js';
 
 export function renderAssignLeadForm() {
   const owners = extractUnique(DashboardState.leads, 'owner');

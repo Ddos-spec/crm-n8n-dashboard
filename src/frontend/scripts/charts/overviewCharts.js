@@ -1,5 +1,5 @@
 import { DashboardState } from '../state/dashboardState.js';
-import { ensureArray } from '../../../shared/utils/index.js';
+import { ensureArray } from '../../shared/utils/index.js';
 import { lockChartArea } from './sizing.js';
 
 function createOrUpdateChart(id, ctx, config) {

@@ -1,4 +1,4 @@
-import { parseNumeric } from '../../../shared/utils/index.js';
+import { parseNumeric } from '../../shared/utils/index.js';
 
 function readCanvasHeight(canvas) {
   if (!canvas) return null;
