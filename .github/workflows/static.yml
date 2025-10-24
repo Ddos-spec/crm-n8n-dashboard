@@ -33,11 +33,17 @@ jobs:
         uses: actions/checkout@v4
       - name: Setup Pages
         uses: actions/configure-pages@v5
-      - name: Prepare static bundle
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+      - name: Install dependencies
+        run: npm ci
+      - name: Build frontend bundle
+        run: npm run build
+      - name: Copy supplemental assets
         run: |
-          rm -rf dist
-          mkdir -p dist
-          cp -R src/frontend/. dist/
           cp -R src/shared dist/
           cp -R src/services dist/
       - name: Upload artifact
