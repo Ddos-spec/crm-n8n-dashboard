@@ -1,5 +1,9 @@
 const RESPONSE_COLLECTION_KEYS = ['data', 'items', 'results', 'records', 'rows', 'list'];
 
+function isObject(value) {
+  return value !== null && typeof value === 'object';
+}
+
 function flattenN8nItem(item) {
   if (!item || typeof item !== 'object') {
     return item;
@@ -12,74 +16,27 @@ function flattenN8nItem(item) {
   return item;
 }
 
-function collectFromObject(value, collector) {
-  if (!value || typeof value !== 'object') {
-    return;
+function pruneContainerFields(item) {
+  if (!isObject(item)) {
+    return item;
   }
 
-  for (const key of RESPONSE_COLLECTION_KEYS) {
-    if (Array.isArray(value[key])) {
-      value[key].forEach((nested) => collector(nested));
-      return;
-    }
-  }
-
-  // Handle wrapped single-record payloads like { success: true, data: { ... } }
-  if ('data' in value && value.data && typeof value.data === 'object' && !Array.isArray(value.data)) {
-    collector(value.data);
-    return;
-  }
-
-  // Fallback: treat object itself as a record
-  collector(value);
+  const copy = { ...item };
+  delete copy.json;
+  delete copy.binary;
+  delete copy.pairedItem;
+  return copy;
 }
 
-export function ensureArray(value) {
+function expandNestedCollections(value) {
+  const result = [];
+  const queue = [];
+
   if (Array.isArray(value)) {
-    return value.map((item) => flattenN8nItem(item));
+    queue.push(...value);
+  } else if (value !== undefined) {
+    queue.push(value);
   }
-
-  if (!value || typeof value !== 'object') {
-    return [];
-  }
-
-  const collected = [];
-  const collector = (item) => {
-    if (!item) return;
-    if (Array.isArray(item)) {
-      item.forEach((nested) => collector(nested));
-      return;
-    }
-    if (typeof item !== 'object') {
-      return;
-    }
-    if (item.json && typeof item.json === 'object' && !Array.isArray(item.json)) {
-      collected.push({ ...item.json });
-      return;
-    }
-    collected.push(item);
-  };
-
-  collectFromObject(value, collector);
-
-  return collected.map((item) => flattenN8nItem(item));
-}
-
-export function normalizeRecords(payload) {
-  if (payload === undefined || payload === null) {
-    return [];
-  }
-
-  if (Array.isArray(payload)) {
-    return payload.map((item) => flattenN8nItem(item));
-  }
-
-  if (typeof payload !== 'object') {
-    return [];
-  }
-
-  const collected = [];
-  const queue = [payload];
 
   while (queue.length) {
     const current = queue.shift();
@@ -88,38 +45,75 @@ export function normalizeRecords(payload) {
     }
 
     if (Array.isArray(current)) {
-      current.forEach((item) => queue.push(item));
-      continue;
-    }
-
-    if (typeof current !== 'object') {
-      continue;
-    }
-
-    if (current.json && typeof current.json === 'object' && !Array.isArray(current.json)) {
-      collected.push({ ...current.json });
-      continue;
-    }
-
-    const collectionKey = RESPONSE_COLLECTION_KEYS.find((key) => Array.isArray(current[key]));
-    if (collectionKey) {
-      queue.push(current[collectionKey]);
-      continue;
-    }
-
-    if ('data' in current) {
-      queue.push(current.data);
-      const remainingKeys = RESPONSE_COLLECTION_KEYS.filter((key) => key !== 'data' && key in current);
-      for (const key of remainingKeys) {
-        queue.push(current[key]);
+      for (let i = current.length - 1; i >= 0; i -= 1) {
+        queue.unshift(current[i]);
       }
       continue;
     }
 
-    collected.push(current);
+    if (!isObject(current)) {
+      continue;
+    }
+
+    if (current.json && isObject(current.json)) {
+      queue.unshift(current.json);
+      continue;
+    }
+
+    const container = pruneContainerFields(current);
+
+    const nestedArrays = RESPONSE_COLLECTION_KEYS
+      .map((key) => ({ key, value: container[key] }))
+      .filter(({ value }) => Array.isArray(value) && value.some((entry) => isObject(entry)));
+
+    const hasNestedObject = nestedArrays.length > 0;
+
+    if (hasNestedObject) {
+      nestedArrays.forEach(({ value }) => {
+        for (let i = value.length - 1; i >= 0; i -= 1) {
+          queue.unshift(value[i]);
+        }
+      });
+
+      const retained = { ...container };
+      nestedArrays.forEach(({ key }) => delete retained[key]);
+
+      if (Object.keys(retained).length > 0) {
+        queue.unshift(retained);
+      }
+
+      continue;
+    }
+
+    if ('data' in container && isObject(container.data)) {
+      queue.unshift(container.data);
+      continue;
+    }
+
+    result.push(container);
   }
 
-  return collected.map((item) => flattenN8nItem(item));
+  return result.map((item) => flattenN8nItem(item));
+}
+
+export function ensureArray(value) {
+  if (!value) {
+    return [];
+  }
+
+  return expandNestedCollections(value);
+}
+
+export function normalizeRecords(payload) {
+  if (payload === undefined || payload === null) {
+    return [];
+  }
+
+  if (typeof payload !== 'object' && !Array.isArray(payload)) {
+    return [];
+  }
+
+  return expandNestedCollections(payload);
 }
 
 export function parseNumeric(value) {
