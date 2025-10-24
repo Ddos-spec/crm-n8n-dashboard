@@ -28,6 +28,51 @@ function pruneContainerFields(item) {
   return copy;
 }
 
+const NUMERIC_KEY_PATTERN = /^\d+$/;
+const NUMERIC_OBJECT_METADATA_KEYS = new Set(['length']);
+
+function extractNumericArrayLike(value) {
+  if (!isObject(value) || Array.isArray(value)) {
+    return null;
+  }
+
+  const entries = Object.entries(value);
+  if (entries.length === 0) {
+    return null;
+  }
+
+  const numericEntries = entries.filter(([key]) => NUMERIC_KEY_PATTERN.test(key));
+  if (numericEntries.length === 0) {
+    return null;
+  }
+
+  const sortedNumericEntries = numericEntries.slice().sort((a, b) => Number(a[0]) - Number(b[0]));
+  const indices = sortedNumericEntries.map(([key]) => Number(key));
+
+  const startIndex = indices[0];
+  const isSequential = indices.every((index, position) => index === startIndex + position);
+  if (!isSequential) {
+    return null;
+  }
+
+  const remainderEntries = entries.filter(([key]) => !NUMERIC_KEY_PATTERN.test(key));
+  const remainder = remainderEntries.reduce((acc, [key, entryValue]) => {
+    acc[key] = entryValue;
+    return acc;
+  }, {});
+
+  NUMERIC_OBJECT_METADATA_KEYS.forEach((metaKey) => {
+    if (metaKey in remainder) {
+      delete remainder[metaKey];
+    }
+  });
+
+  return {
+    values: sortedNumericEntries.map(([, entryValue]) => entryValue),
+    remainder,
+  };
+}
+
 function expandNestedCollections(value) {
   const result = [];
   const queue = [];
@@ -62,11 +107,34 @@ function expandNestedCollections(value) {
 
     const container = pruneContainerFields(current);
 
+    const arrayLikeContainer = extractNumericArrayLike(container);
+    if (arrayLikeContainer) {
+      if (Object.keys(arrayLikeContainer.remainder).length > 0) {
+        queue.unshift(arrayLikeContainer.remainder);
+      }
+
+      for (let i = arrayLikeContainer.values.length - 1; i >= 0; i -= 1) {
+        queue.unshift(arrayLikeContainer.values[i]);
+      }
+      continue;
+    }
+
     const nestedArrays = RESPONSE_COLLECTION_KEYS
       .map((key) => ({ key, value: container[key] }))
       .filter(({ value }) => Array.isArray(value) && value.some((entry) => isObject(entry)));
 
-    const hasNestedObject = nestedArrays.length > 0;
+    const numericCollections = Object.entries(container)
+      .map(([key, entryValue]) => {
+        const arrayLike = extractNumericArrayLike(entryValue);
+        if (!arrayLike) {
+          return null;
+        }
+
+        return { key, values: arrayLike.values, remainder: arrayLike.remainder };
+      })
+      .filter(Boolean);
+
+    const hasNestedObject = nestedArrays.length > 0 || numericCollections.length > 0;
 
     if (hasNestedObject) {
       nestedArrays.forEach(({ value }) => {
@@ -75,8 +143,25 @@ function expandNestedCollections(value) {
         }
       });
 
+      numericCollections.forEach(({ values }) => {
+        for (let i = values.length - 1; i >= 0; i -= 1) {
+          queue.unshift(values[i]);
+        }
+      });
+
       const retained = { ...container };
-      nestedArrays.forEach(({ key }) => delete retained[key]);
+
+      nestedArrays.forEach(({ key }) => {
+        delete retained[key];
+      });
+
+      numericCollections.forEach(({ key, remainder }) => {
+        if (Object.keys(remainder).length > 0) {
+          retained[key] = remainder;
+        } else {
+          delete retained[key];
+        }
+      });
 
       if (Object.keys(retained).length > 0) {
         queue.unshift(retained);
