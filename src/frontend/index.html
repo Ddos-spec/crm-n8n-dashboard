@@ -424,7 +424,14 @@
                                     <p class="text-sm text-slate-500">Top performers berdasarkan SLA &amp; CSAT.</p>
                                 </div>
                             </header>
-                            <ul class="mt-6 space-y-4" id="team-leaderboard"></ul>
+                            <div class="mt-6 space-y-4" id="team-performance-container">
+                                <div id="team-leaderboard-empty" class="hidden rounded-2xl border border-dashed border-slate-200 bg-white/40 p-4 text-sm text-slate-500">
+                                    <p class="font-semibold text-slate-600">Data performa tim belum tersedia.</p>
+                                    <p class="mt-1 text-xs text-slate-400">Menampilkan metrik eskalasi berdasarkan status tiket sebagai pengganti.</p>
+                                </div>
+                                <ul class="space-y-4 hidden" id="team-leaderboard"></ul>
+                                <ul class="space-y-3 hidden" id="team-escalation-metrics"></ul>
+                            </div>
                         </section>
                         <section class="glass-muted rounded-3xl p-6 shadow-lg">
                             <header class="flex items-center justify-between">
