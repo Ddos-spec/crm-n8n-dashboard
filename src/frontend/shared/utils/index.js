@@ -1,20 +1,125 @@
-export function ensureArray(value) {
-  if (Array.isArray(value)) return value;
-  if (!value || typeof value !== 'object') return [];
+const RESPONSE_COLLECTION_KEYS = ['data', 'items', 'results', 'records', 'rows', 'list'];
 
-  if (Array.isArray(value.data)) return value.data;
-  if (Array.isArray(value.items)) return value.items;
-  if (Array.isArray(value.results)) return value.results;
-  if (Array.isArray(value.records)) return value.records;
+function flattenN8nItem(item) {
+  if (!item || typeof item !== 'object') {
+    return item;
+  }
 
-  return Object.values(value).reduce((acc, item) => {
-    if (Array.isArray(item)) {
-      acc.push(...item);
-    } else if (item && typeof item === 'object') {
-      acc.push(item);
+  if (item.json && typeof item.json === 'object' && !Array.isArray(item.json)) {
+    return { ...item.json };
+  }
+
+  return item;
+}
+
+function collectFromObject(value, collector) {
+  if (!value || typeof value !== 'object') {
+    return;
+  }
+
+  for (const key of RESPONSE_COLLECTION_KEYS) {
+    if (Array.isArray(value[key])) {
+      value[key].forEach((nested) => collector(nested));
+      return;
     }
-    return acc;
-  }, []);
+  }
+
+  // Handle wrapped single-record payloads like { success: true, data: { ... } }
+  if ('data' in value && value.data && typeof value.data === 'object' && !Array.isArray(value.data)) {
+    collector(value.data);
+    return;
+  }
+
+  // Fallback: treat object itself as a record
+  collector(value);
+}
+
+export function ensureArray(value) {
+  if (Array.isArray(value)) {
+    return value.map((item) => flattenN8nItem(item));
+  }
+
+  if (!value || typeof value !== 'object') {
+    return [];
+  }
+
+  const collected = [];
+  const collector = (item) => {
+    if (!item) return;
+    if (Array.isArray(item)) {
+      item.forEach((nested) => collector(nested));
+      return;
+    }
+    if (typeof item !== 'object') {
+      return;
+    }
+    if (item.json && typeof item.json === 'object' && !Array.isArray(item.json)) {
+      collected.push({ ...item.json });
+      return;
+    }
+    collected.push(item);
+  };
+
+  collectFromObject(value, collector);
+
+  return collected.map((item) => flattenN8nItem(item));
+}
+
+export function normalizeRecords(payload) {
+  if (payload === undefined || payload === null) {
+    return [];
+  }
+
+  if (Array.isArray(payload)) {
+    return payload.map((item) => flattenN8nItem(item));
+  }
+
+  if (typeof payload !== 'object') {
+    return [];
+  }
+
+  const collected = [];
+  const queue = [payload];
+
+  while (queue.length) {
+    const current = queue.shift();
+    if (current === null || current === undefined) {
+      continue;
+    }
+
+    if (Array.isArray(current)) {
+      current.forEach((item) => queue.push(item));
+      continue;
+    }
+
+    if (typeof current !== 'object') {
+      continue;
+    }
+
+    if (current.json && typeof current.json === 'object' && !Array.isArray(current.json)) {
+      collected.push({ ...current.json });
+      continue;
+    }
+
+    const collectionKey = RESPONSE_COLLECTION_KEYS.find((key) => Array.isArray(current[key]));
+    if (collectionKey) {
+      queue.push(current[collectionKey]);
+      continue;
+    }
+
+    if ('data' in current) {
+      queue.push(current.data);
+      const remainingKeys = RESPONSE_COLLECTION_KEYS.filter((key) => key !== 'data' && key in current);
+      for (const key of remainingKeys) {
+        queue.push(current[key]);
+      }
+      continue;
+    }
+
+    collected.push(current);
+  }
+
+  return collected.map((item) => flattenN8nItem(item));
 }
 
 export function parseNumeric(value) {
