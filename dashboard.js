@@ -35,6 +35,136 @@ function ensureArray(value) {
   }, []);
 }
 
+function parseNumeric(value) {
+  if (typeof value === 'number') {
+    return Number.isFinite(value) ? value : null;
+  }
+  if (typeof value === 'string') {
+    const parsed = parseFloat(value);
+    return Number.isNaN(parsed) ? null : parsed;
+  }
+  return null;
+}
+
+function readCanvasHeight(canvas) {
+  if (!canvas) return null;
+
+  const clientHeight = parseNumeric(canvas.clientHeight);
+  if (clientHeight) return clientHeight;
+
+  const inlineHeight = parseNumeric(canvas.style?.height);
+  if (inlineHeight) return inlineHeight;
+
+  const attrHeight = parseNumeric(canvas.getAttribute?.('height'));
+  if (attrHeight) return attrHeight;
+
+  if (typeof window !== 'undefined' && window.getComputedStyle) {
+    const computedHeight = parseNumeric(window.getComputedStyle(canvas)?.height);
+    if (computedHeight) return computedHeight;
+  }
+
+  return null;
+}
+
+function readInnerHeight(element) {
+  if (!element) return null;
+
+  let height = parseNumeric(element.clientHeight);
+  if (height && typeof window !== 'undefined' && window.getComputedStyle) {
+    const styles = window.getComputedStyle(element);
+    const paddingTop = parseNumeric(styles?.paddingTop) || 0;
+    const paddingBottom = parseNumeric(styles?.paddingBottom) || 0;
+    height -= paddingTop + paddingBottom;
+  }
+
+  if (height && height > 0) {
+    return height;
+  }
+
+  if (typeof window !== 'undefined' && window.getComputedStyle) {
+    const styles = window.getComputedStyle(element);
+    const computedHeight = parseNumeric(styles?.height);
+    if (computedHeight) {
+      const paddingTop = parseNumeric(styles?.paddingTop) || 0;
+      const paddingBottom = parseNumeric(styles?.paddingBottom) || 0;
+      const innerHeight = computedHeight - paddingTop - paddingBottom;
+      return innerHeight > 0 ? innerHeight : null;
+    }
+  }
+
+  return null;
+}
+
+function ensureChartWrapper(canvas) {
+  if (!canvas) return null;
+
+  const currentParent = canvas.parentElement;
+  if (!currentParent) return null;
+
+  if (currentParent.dataset?.chartWrapper === 'true') {
+    return currentParent;
+  }
+
+  const wrapper = document.createElement('div');
+  wrapper.dataset.chartWrapper = 'true';
+  wrapper.style.display = 'block';
+  wrapper.style.position = 'relative';
+  wrapper.style.width = '100%';
+
+  currentParent.insertBefore(wrapper, canvas);
+  wrapper.appendChild(canvas);
+
+  return wrapper;
+}
+
+function lockChartArea(canvas, fallbackHeight) {
+  if (!canvas) {
+    return { container: null, height: fallbackHeight };
+  }
+
+  const wrapper = ensureChartWrapper(canvas);
+  const container = wrapper || canvas.parentElement || null;
+
+  const baseFallback = fallbackHeight || 0;
+  let height = parseNumeric(canvas.dataset?.fixedHeight)
+    ?? readCanvasHeight(canvas)
+    ?? readInnerHeight(container)
+    ?? baseFallback;
+
+  if (!height || height <= 0) {
+    height = baseFallback || 256;
+  }
+
+  canvas.dataset.fixedHeight = `${height}px`;
+
+  if (container) {
+    if (!container.dataset.fixedHeight) {
+      let containerHeight = readInnerHeight(container);
+      if (!containerHeight || containerHeight <= 0) {
+        containerHeight = height;
+      }
+      container.dataset.fixedHeight = `${containerHeight}px`;
+    }
+
+    const lockedContainerHeight = parseNumeric(container.dataset.fixedHeight) || height;
+    const containerHeightPx = `${lockedContainerHeight}px`;
+    container.style.height = containerHeightPx;
+    container.style.maxHeight = containerHeightPx;
+  }
+
+  const heightPx = `${height}px`;
+  canvas.style.height = heightPx;
+  canvas.style.maxHeight = heightPx;
+  canvas.style.width = '100%';
+
+  const numericHeight = parseNumeric(height);
+  if (numericHeight && numericHeight > 0) {
+    canvas.setAttribute('height', Math.max(Math.round(numericHeight), 1));
+  }
+
+  return { container, height };
+}
+
 class TableManager {
   constructor({
     tableId,
@@ -1050,6 +1180,8 @@ function createSparkline(elementId, dataset) {
   const ctx = document.getElementById(elementId);
   if (!ctx) return;
 
+  const sizing = lockChartArea(ctx, 64);
+
   const labels = dataset.map((item) => item.label || moment(item.date).format('DD MMM'));
   const data = dataset.map((item) => Number(item.value || item.total || 0));
 
@@ -1057,6 +1189,7 @@ function createSparkline(elementId, dataset) {
     DashboardState.charts[elementId].data.labels = labels;
     DashboardState.charts[elementId].data.datasets[0].data = data;
     DashboardState.charts[elementId].update();
+    lockChartArea(ctx, sizing.height || 64);
     return;
   }
 
@@ -1084,6 +1217,8 @@ function createSparkline(elementId, dataset) {
       scales: { x: { display: false }, y: { display: false } }
     }
   });
+
+  lockChartArea(ctx, sizing.height || 64);
 }
 
 function renderOverviewCharts() {
@@ -1250,73 +1385,17 @@ function createOrUpdateChart(id, ctx, config) {
   const canvas = ctx instanceof HTMLCanvasElement ? ctx : document.getElementById(id);
   if (!canvas) return;
 
-  const container = canvas.parentElement;
-
-  const ensureFixedHeight = () => {
-    if (container && !container.dataset.fixedHeight) {
-      let measuredHeight = container.clientHeight;
-      if (typeof window !== 'undefined' && window.getComputedStyle) {
-        const computed = window.getComputedStyle(container);
-        if (computed) {
-          const paddingTop = parseFloat(computed.paddingTop) || 0;
-          const paddingBottom = parseFloat(computed.paddingBottom) || 0;
-          measuredHeight = Math.max(measuredHeight - (paddingTop + paddingBottom), 0);
-        }
-      }
-
-      if (!measuredHeight) {
-        measuredHeight = canvas.clientHeight;
-      }
-
-      if (!measuredHeight) {
-        const inlineHeight = canvas.style.height || canvas.getAttribute('height');
-        if (inlineHeight && !Number.isNaN(parseFloat(inlineHeight))) {
-          measuredHeight = parseFloat(inlineHeight);
-        } else if (typeof window !== 'undefined' && window.getComputedStyle) {
-          const computedHeight = window.getComputedStyle(canvas).height;
-          measuredHeight = parseFloat(computedHeight);
-        }
-      }
-
-      const normalizedHeight = `${measuredHeight || 256}px`;
-      container.dataset.fixedHeight = normalizedHeight;
-      canvas.dataset.fixedHeight = normalizedHeight;
-    } else if (!canvas.dataset.fixedHeight) {
-      let measuredHeight = canvas.clientHeight;
-      if (!measuredHeight) {
-        const inlineHeight = canvas.style.height || canvas.getAttribute('height');
-        if (inlineHeight && !Number.isNaN(parseFloat(inlineHeight))) {
-          measuredHeight = parseFloat(inlineHeight);
-        } else if (typeof window !== 'undefined' && window.getComputedStyle) {
-          const computedHeight = window.getComputedStyle(canvas).height;
-          measuredHeight = parseFloat(computedHeight);
-        }
-      }
-      canvas.dataset.fixedHeight = `${measuredHeight || 256}px`;
-    }
-  };
-
-  ensureFixedHeight();
-
-  const fixedHeight = container?.dataset.fixedHeight || canvas.dataset.fixedHeight;
-  if (fixedHeight) {
-    if (container) {
-      container.style.height = fixedHeight;
-      container.style.maxHeight = fixedHeight;
-    }
-
-    canvas.style.height = fixedHeight;
-    const numericHeight = parseFloat(fixedHeight);
-    if (!Number.isNaN(numericHeight)) {
-      canvas.setAttribute('height', numericHeight);
-    }
-  }
-  canvas.style.width = '100%';
+  const sizing = lockChartArea(canvas, 256);
 
   if (DashboardState.charts[id]) {
     DashboardState.charts[id].destroy();
   }
+
+  lockChartArea(canvas, sizing.height || 256);
+
   DashboardState.charts[id] = new Chart(canvas, config);
+
+  lockChartArea(canvas, sizing.height || 256);
 }
 
 function renderTeamLeaderboard() {
