@@ -3,14 +3,13 @@ import { TableManager } from '../tables/tableManager.js';
 import { renderSparklineCharts } from '../charts/sparklineCharts.js';
 import { renderOverviewCharts } from '../charts/overviewCharts.js';
 import { showToast } from '../ui/toast.js';
-import { escapeHTML, refreshIcons, showLoadingOverlay, hideLoadingOverlay, updateConnectionStatus, formatDateCell, downloadFile } from '../ui/dom.js';
+import { escapeHTML, refreshIcons, showLoadingOverlay, hideLoadingOverlay, updateConnectionStatus, formatDateCell } from '../ui/dom.js';
 import { statusToBadge, priorityToBadge, updateDeltaBadge } from '../ui/badges.js';
 import { renderAssignLeadForm, renderResolveEscalationForm, renderSendMessageForm, setupModal, openModal, closeModal, openQuickActionModal } from '../ui/modal.js';
 import { ensureArray, formatNumber, capitalize, extractUnique } from '../../shared/utils/index.js';
 import { apiConnector } from '../../services/apiConnector.js';
 import { webhookApiConnector } from '../../services/webhookHandler.js';
 import { CONFIG } from '../../shared/config.js';
-import { initCampaignPerformance, loadCampaignPerformance } from '../marketing/campaignPerformance.js';
 
 async function initializeDashboard() {
   moment.locale(CONFIG.ui.language || 'id');
@@ -18,12 +17,9 @@ async function initializeDashboard() {
   setupTabs();
   setupQuickActions();
   setupModal();
-  initCampaignPerformance();
   setupAutoRefresh(refreshData);
   initializeTables();
-  bindExportButtons();
   document.getElementById('refresh-data').addEventListener('click', handleManualRefresh);
-  document.getElementById('analytics-range').addEventListener('change', renderAnalyticsWidgets);
   document.getElementById('customer-date-from').addEventListener('change', () => filterByDateRange('customer'));
   document.getElementById('customer-date-to').addEventListener('change', () => filterByDateRange('customer'));
   await refreshData();
@@ -64,8 +60,7 @@ function setupTabs() {
   const descriptions = {
     overview: 'Insight global dan KPI utama.',
     'customer-service': 'Pipeline pelanggan, SLA, dan eskalasi.',
-    marketing: 'Leads intelligence & kampanye marketing.',
-    analytics: 'Analitik performa lintas tim.'
+    marketing: 'Leads intelligence & kampanye marketing.'
   };
 
   buttons.forEach((btn) => {
@@ -153,8 +148,6 @@ async function refreshData() {
     DashboardState.tableManagers.escalations.setData(prepareEscalationRows(DashboardState.escalations));
     DashboardState.tableManagers.leads.setData(prepareLeadRows(DashboardState.leads));
 
-    await loadCampaignPerformance({ silent: true });
-    renderAnalyticsWidgets();
     updateRefreshState();
     updateNewItemsBadge();
 
@@ -369,17 +362,6 @@ function initializeTables() {
       await handleResolveEscalation(id);
     }
   });
-}
-
-function bindExportButtons() {
-  const analyticsExport = document.getElementById('analytics-export');
-  if (analyticsExport) {
-    analyticsExport.addEventListener('click', () => {
-      const rows = DashboardState.analyticsWidgets.map((widget) => `"${widget.title}","${widget.value}","${widget.description}"`);
-      const header = '"Metric","Value","Description"';
-      downloadFile([header, ...rows].join('\n'), `analytics-${Date.now()}.csv`, 'text/csv;charset=utf-8;');
-    });
-  }
 }
 
 function prepareCustomerRows(customers) {
@@ -917,165 +899,6 @@ async function handleResolveEscalation(id, notes = '') {
       showToast('Gagal menyelesaikan escalation: ' + fallbackError.message, 'error');
     }
   }
-}
-
-function renderAnalyticsWidgets() {
-  const container = document.getElementById('analytics-widgets');
-  const emptyStateEl = document.getElementById('analytics-empty-state');
-  if (!container) return;
-
-  const range = Number(document.getElementById('analytics-range').value || 7);
-  const stats = DashboardState.stats || {};
-  const formatSignedPercentage = (trend) => {
-    const numericTrend = Number(trend);
-    if (!Number.isFinite(numericTrend)) {
-      return trend === undefined || trend === null || trend === '' ? null : String(trend);
-    }
-    const prefix = numericTrend > 0 ? '+' : '';
-    return `${prefix}${numericTrend.toFixed(1)}%`;
-  };
-
-  const formatCount = (value) => {
-    if (value === undefined || value === null || value === '') {
-      return '—';
-    }
-    const numeric = Number(value);
-    return Number.isFinite(numeric) ? formatNumber(numeric) : String(value);
-  };
-
-  const metricDefinitions = [
-    {
-      keys: ['conversionRate', 'conversion_rate'],
-      title: 'Conversion Rate',
-      icon: 'trending-up',
-      description: () => `Konversi periode ${range} hari`,
-      format: (value) => {
-        const numeric = Number(value);
-        return Number.isFinite(numeric) ? `${(numeric * 100).toFixed(1)}%` : String(value);
-      },
-      trendKeys: ['conversionTrend', 'conversion_trend'],
-      trendFormat: formatSignedPercentage
-    },
-    {
-      keys: ['avgResponseTime', 'avg_response_time'],
-      title: 'Average Response Time',
-      icon: 'timer',
-      description: () => 'Waktu rata-rata agent menanggapi tiket',
-      format: (value) => {
-        const numeric = Number(value);
-        return Number.isFinite(numeric) ? `${formatNumber(numeric)}m` : String(value);
-      },
-      trendKeys: ['responseDelta', 'response_delta'],
-      trendFormat: formatSignedPercentage
-    },
-    {
-      keys: ['resolvedTickets', 'resolved_tickets'],
-      title: 'Tickets Resolved',
-      icon: 'shield-check',
-      description: () => 'Jumlah tiket closed periode ini',
-      format: formatCount,
-      trendKeys: ['resolvedDelta', 'resolved_delta'],
-      trendFormat: formatSignedPercentage
-    },
-    {
-      keys: ['totalLeads', 'total_leads'],
-      title: 'Total Leads',
-      icon: 'user-plus',
-      description: () => 'Lead yang masuk dari seluruh channel',
-      format: formatCount,
-      trendKeys: ['totalLeadsTrend', 'total_leads_trend']
-    },
-    {
-      keys: ['totalCustomers', 'total_customers'],
-      title: 'Total Customers',
-      icon: 'users',
-      description: () => 'Customer aktif dalam periode yang dipilih',
-      format: formatCount,
-      trendKeys: ['totalCustomersTrend', 'total_customers_trend']
-    },
-    {
-      keys: ['openEscalations', 'open_escalations', 'escalationsOpen', 'escalations_open'],
-      title: 'Open Escalations',
-      icon: 'alert-triangle',
-      description: () => 'Eskalasi yang membutuhkan tindakan',
-      format: formatCount,
-      trendKeys: ['openEscalationsTrend', 'open_escalations_trend']
-    }
-  ];
-
-  const getMetricValue = (source, keys = []) => {
-    if (!source || !keys?.length) return undefined;
-    for (const key of keys) {
-      const candidate = source[key];
-      if (candidate !== undefined && candidate !== null) {
-        if (typeof candidate === 'string' && candidate.trim() === '') {
-          continue;
-        }
-        return candidate;
-      }
-    }
-    return undefined;
-  };
-
-  const analytics = metricDefinitions
-    .map((definition) => {
-      const value = getMetricValue(stats, definition.keys);
-      if (value === undefined) return null;
-
-      const formatter = definition.format || formatCount;
-      const rawTrend = getMetricValue(stats, definition.trendKeys);
-      const trendFormatter = definition.trendFormat || ((val) => {
-        if (val === undefined || val === null || val === '') return null;
-        if (typeof val === 'number') {
-          const signed = val > 0 ? '+' : '';
-          return `${signed}${val.toFixed(1)}`;
-        }
-        return String(val);
-      });
-
-      return {
-        title: definition.title,
-        value: formatter(value),
-        icon: definition.icon,
-        description: typeof definition.description === 'function' ? definition.description(value) : definition.description,
-        trend: rawTrend === undefined ? null : trendFormatter(rawTrend)
-      };
-    })
-    .filter(Boolean);
-
-  DashboardState.analyticsWidgets = analytics;
-  container.innerHTML = analytics
-    .map((item) => {
-      const trendBadge = item.trend
-        ? `<span class="badge badge-success">${escapeHTML(item.trend)}</span>`
-        : '';
-      const description = item.description ? `<span>${escapeHTML(item.description)}</span>` : '';
-
-      return `
-      <article class="glass-muted rounded-3xl p-5 shadow-lg">
-        <div class="flex items-center justify-between">
-          <div>
-            <p class="text-xs font-semibold uppercase tracking-wide text-slate-400">${escapeHTML(item.title)}</p>
-            <p class="mt-2 text-2xl font-semibold text-slate-800">${escapeHTML(item.value)}</p>
-          </div>
-          <span class="rounded-2xl bg-sky-500/10 p-3 text-sky-500"><i data-lucide="${item.icon}"></i></span>
-        </div>
-        <div class="mt-4 flex flex-wrap items-center justify-between gap-2 text-xs text-slate-500">
-          ${trendBadge || ''}
-          ${description}
-        </div>
-      </article>
-    `;
-    })
-    .join('');
-
-  container.classList.toggle('hidden', analytics.length === 0);
-
-  if (emptyStateEl) {
-    emptyStateEl.classList.toggle('hidden', analytics.length > 0);
-  }
-
-  refreshIcons();
 }
 
 function updateNewItemsBadge() {

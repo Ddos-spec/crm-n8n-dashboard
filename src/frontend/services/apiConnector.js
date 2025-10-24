@@ -121,14 +121,6 @@ export class ApiConnector {
     );
   }
 
-  async getCampaignPerformance(filters = {}) {
-    return this.fetchApi(
-      this.config.apiEndpoints.campaignPerformance,
-      'POST',
-      this.buildPayload('get_campaign_performance', filters)
-    );
-  }
-
   async healthCheck() {
     try {
       await this.getQuickStats();
