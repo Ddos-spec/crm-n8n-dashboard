@@ -1,0 +1,11 @@
+{
+  "name": "crm-n8n-dashboard",
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "build": "node scripts/build-frontend.mjs"
+  },
+  "devDependencies": {
+    "esbuild": "^0.21.5"
+  }
+}
