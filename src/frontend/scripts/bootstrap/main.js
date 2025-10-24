@@ -29,6 +29,33 @@ async function initializeDashboard() {
   await refreshData();
 }
 
+function normalizeStatsResponse(rawStats) {
+  if (!rawStats || typeof rawStats !== 'object') {
+    return {};
+  }
+
+  const normalized = { ...rawStats };
+  const teamPerformance = ensureArray(rawStats.teamPerformance ?? rawStats.team_performance);
+  const hasValidTeamPerformance =
+    teamPerformance.length > 0 &&
+    teamPerformance.every(
+      (member) =>
+        member &&
+        typeof member === 'object' &&
+        (member.name || member.agent || member.team || member.owner)
+    );
+
+  if (hasValidTeamPerformance) {
+    normalized.teamPerformance = teamPerformance;
+  } else {
+    delete normalized.teamPerformance;
+  }
+
+  delete normalized.team_performance;
+
+  return normalized;
+}
+
 function setupTabs() {
   const buttons = document.querySelectorAll('.tab-button');
   const panels = document.querySelectorAll('.tab-panel');
@@ -104,7 +131,7 @@ async function refreshData() {
       apiConnector.getEscalations()
     ]);
 
-    DashboardState.stats = statsResponse.data || statsResponse;
+    DashboardState.stats = normalizeStatsResponse(statsResponse.data || statsResponse);
     DashboardState.customers = ensureArray(customersResponse.data ?? customersResponse);
     DashboardState.leads = ensureArray(leadsResponse.data ?? leadsResponse);
     DashboardState.escalations = ensureArray(escalationsResponse.data ?? escalationsResponse);
@@ -510,42 +537,81 @@ function renderStats() {
 
 function renderTeamLeaderboard() {
   const list = document.getElementById('team-leaderboard');
+  const emptyState = document.getElementById('team-leaderboard-empty');
+  const escalationMetrics = document.getElementById('team-escalation-metrics');
   if (!list) return;
 
-  const teamData = DashboardState.stats?.teamPerformance || DashboardState.stats?.team_performance || [];
-  const fallback = DashboardState.customers
-    .reduce((acc, customer) => {
-      const owner = customer.owner || customer.agent || 'Tim A';
-      acc[owner] = acc[owner] || { name: owner, handled: 0, sla: 0 };
-      acc[owner].handled += 1;
-      acc[owner].sla += customer.response_time || customer.avg_response_time || 30;
-      return acc;
-    }, {});
+  const teamData = ensureArray(DashboardState.stats?.teamPerformance);
+  const hasTeamData = teamData.length > 0;
 
-  const dataset = teamData.length
-    ? teamData
-    : Object.values(fallback).map((item) => ({
-        name: item.name,
-        handled: item.handled,
-        sla: Math.round(item.sla / item.handled)
-      }));
-
-  list.innerHTML = dataset
-    .sort((a, b) => (b.score || b.handled) - (a.score || a.handled))
-    .slice(0, 5)
-    .map((member, index) => `
-      <li class="flex items-center justify-between rounded-2xl bg-white/60 p-4 shadow-sm">
-        <div class="flex items-center gap-3">
-          <span class="flex h-10 w-10 items-center justify-center rounded-full bg-sky-500/10 text-sm font-semibold text-sky-500">#${index + 1}</span>
-          <div>
-            <p class="text-sm font-semibold text-slate-700">${escapeHTML(member.name || 'Unknown')}</p>
-            <p class="text-xs text-slate-400">${member.handled || member.total || 0} tiket ditangani • SLA ${member.sla || member.avg_sla || 25}m</p>
+  if (hasTeamData) {
+    list.innerHTML = teamData
+      .sort((a, b) => (b.score || b.handled || b.total || 0) - (a.score || a.handled || a.total || 0))
+      .slice(0, 5)
+      .map((member, index) => `
+        <li class="flex items-center justify-between rounded-2xl bg-white/60 p-4 shadow-sm">
+          <div class="flex items-center gap-3">
+            <span class="flex h-10 w-10 items-center justify-center rounded-full bg-sky-500/10 text-sm font-semibold text-sky-500">#${index + 1}</span>
+            <div>
+              <p class="text-sm font-semibold text-slate-700">${escapeHTML(member.name || member.agent || member.team || 'Unknown')}</p>
+              <p class="text-xs text-slate-400">${member.handled || member.total || 0} tiket ditangani • SLA ${member.sla || member.avg_sla || 25}m</p>
+            </div>
           </div>
-        </div>
-        <span class="text-sm font-semibold text-emerald-500">${member.score ? `${member.score}%` : '⭐️'}</span>
-      </li>
-    `)
-    .join('');
+          <span class="text-sm font-semibold text-emerald-500">${member.score ? `${member.score}%` : '⭐️'}</span>
+        </li>
+      `)
+      .join('');
+
+    list.classList.remove('hidden');
+    if (emptyState) emptyState.classList.add('hidden');
+    if (escalationMetrics) {
+      escalationMetrics.innerHTML = '';
+      escalationMetrics.classList.add('hidden');
+    }
+    return;
+  }
+
+  list.innerHTML = '';
+  list.classList.add('hidden');
+  if (emptyState) emptyState.classList.remove('hidden');
+
+  if (!escalationMetrics) {
+    return;
+  }
+
+  const escalationSummary = DashboardState.escalations.reduce((acc, escalation) => {
+    const statusKey = String(escalation.status || escalation.current_status || 'unknown').trim().toLowerCase() || 'unknown';
+    const label = capitalize(statusKey.replace(/[_-]/g, ' ') || 'Unknown');
+    if (!acc[statusKey]) {
+      acc[statusKey] = { status: statusKey, label, count: 0 };
+    }
+    acc[statusKey].count += 1;
+    return acc;
+  }, {});
+
+  const metrics = Object.values(escalationSummary).sort((a, b) => b.count - a.count);
+
+  escalationMetrics.innerHTML = metrics.length
+    ? metrics
+        .map(
+          (metric) => `
+          <li class="flex items-center justify-between rounded-2xl bg-white/60 p-4 shadow-sm">
+            <div>
+              <p class="text-sm font-semibold text-slate-700">${escapeHTML(metric.label)}</p>
+              <p class="text-xs text-slate-400">${formatNumber(metric.count)} eskalasi aktif</p>
+            </div>
+            <span class="badge ${statusToBadge(metric.status)}">${escapeHTML(metric.label)}</span>
+          </li>
+        `
+        )
+        .join('')
+    : `
+        <li class="rounded-2xl border border-dashed border-slate-200 bg-white/60 p-4 text-sm text-slate-400">
+          Belum ada data eskalasi yang dapat ditampilkan.
+        </li>
+      `;
+
+  escalationMetrics.classList.remove('hidden');
 }
 
 function renderCSAT() {
