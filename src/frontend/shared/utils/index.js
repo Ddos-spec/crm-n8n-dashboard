@@ -137,7 +137,7 @@ function expandNestedCollections(value) {
     const hasNestedObject = nestedArrays.length > 0 || numericCollections.length > 0;
 
     if (hasNestedObject) {
-      nestedArrays.forEach(({ value }) => {
+      [...nestedArrays, ...numericCollections].forEach(({ value }) => {
         for (let i = value.length - 1; i >= 0; i -= 1) {
           queue.unshift(value[i]);
         }
