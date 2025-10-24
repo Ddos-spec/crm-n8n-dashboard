@@ -133,54 +133,149 @@ function renderEscalationChart() {
   });
 }
 
-function renderFunnelChart() {
-  const ctx = document.getElementById('chart-funnel');
-  if (!ctx) return;
+function renderFunnelSummary() {
+  const section = document.getElementById('funnel-section');
+  const summaryContainer = document.getElementById('funnel-summary');
+  const tableBody = document.getElementById('funnel-summary-body');
+  const emptyState = document.getElementById('funnel-empty');
 
-  const funnelData = DashboardState.stats?.funnel || DashboardState.stats?.conversionFunnel;
-  const stages = funnelData?.stages || ['Leads', 'Qualified', 'Proposal', 'Won'];
-  const values =
-    funnelData?.values || [
-      DashboardState.leads.length,
-      Math.round(DashboardState.leads.length * 0.6),
-      Math.round(DashboardState.leads.length * 0.3),
-      Math.round(DashboardState.leads.length * 0.15)
-    ];
+  if (!section || !summaryContainer || !tableBody || !emptyState) {
+    return;
+  }
 
-  createOrUpdateChart('chart-funnel', ctx, {
-    type: 'bar',
-    data: {
-      labels: stages,
-      datasets: [
-        {
-          data: values,
-          backgroundColor: ['#38bdf8', '#22d3ee', '#a855f7', '#34d399'],
-          borderRadius: 12,
-          barPercentage: 0.6
-        }
-      ]
-    },
-    options: {
-      responsive: true,
-      maintainAspectRatio: false,
-      indexAxis: 'y',
-      plugins: { legend: { display: false } },
-      scales: {
-        x: {
-          ticks: { color: '#64748b' },
-          grid: { color: 'rgba(148, 163, 184, 0.2)' }
-        },
-        y: {
-          ticks: { color: '#64748b' },
-          grid: { display: false }
-        }
-      }
-    }
-  });
+  const funnel = DashboardState.stats?.funnel || DashboardState.stats?.conversionFunnel;
+  let rows = [];
+
+  if (Array.isArray(funnel?.stages) && Array.isArray(funnel?.values) && funnel.stages.length === funnel.values.length) {
+    rows = funnel.stages.map((stage, index) => ({
+      key: stage.toLowerCase().replace(/[^a-z0-9]+/g, '-'),
+      label: stage,
+      count: Number(funnel.values[index] ?? 0) || 0,
+      statuses: []
+    }));
+  } else {
+    rows = deriveFunnelRowsFromStatuses();
+  }
+
+  const hasData = rows.some((row) => row.count > 0);
+
+  if (!hasData) {
+    tableBody.innerHTML = '';
+    summaryContainer.classList.add('hidden');
+    emptyState.classList.remove('hidden');
+    return;
+  }
+
+  const formatter = new Intl.NumberFormat('id-ID');
+  const stageColors = {
+    'lead-baru': '#38bdf8',
+    'lead-contacted': '#22d3ee',
+    'lead-qualified': '#6366f1',
+    'lead-proposal': '#a855f7',
+    'lead-won': '#34d399',
+    'lead-lost': '#f87171',
+    others: '#94a3b8'
+  };
+
+  const markup = rows
+    .filter((row) => row.count > 0)
+    .map((row) => {
+      const color = stageColors[row.key] || stageColors.others;
+      const statusBadges = row.statuses.length
+        ? `<div class="mt-2 flex flex-wrap gap-2 text-xs text-slate-500">${row.statuses
+            .map((status) => `<span class="badge badge-neutral">${formatStageStatusLabel(status)}</span>`)
+            .join('')}</div>`
+        : '';
+
+      return `
+        <tr>
+          <td>
+            <div class="flex flex-col gap-1">
+              <div class="flex items-center gap-3">
+                <span class="status-indicator" style="background:${color}"></span>
+                <span class="font-semibold">${row.label}</span>
+              </div>
+              ${statusBadges}
+            </div>
+          </td>
+          <td class="text-right text-lg font-semibold">${formatter.format(row.count)}</td>
+        </tr>
+      `;
+    })
+    .join('');
+
+  tableBody.innerHTML = markup;
+  emptyState.classList.add('hidden');
+  summaryContainer.classList.remove('hidden');
 }
 
 export function renderOverviewCharts() {
   renderLineChart();
   renderEscalationChart();
-  renderFunnelChart();
+  renderFunnelSummary();
+}
+
+function deriveFunnelRowsFromStatuses() {
+  const businesses = ensureArray(DashboardState.stats?.businesses);
+  const leads = ensureArray(DashboardState.leads);
+  const source = businesses.length ? businesses : leads;
+
+  if (!source.length) {
+    return [];
+  }
+
+  const stageDefinitions = [
+    { key: 'lead-baru', label: 'Lead Baru', statuses: ['new', 'baru', 'open', 'incoming', 'new_lead'] },
+    { key: 'lead-contacted', label: 'Sudah Dihubungi', statuses: ['contacted', 'dihubungi', 'follow_up', 'in_progress', 'replied'] },
+    { key: 'lead-qualified', label: 'Terkualifikasi', statuses: ['qualified', 'opportunity', 'qualified_lead', 'demo_scheduled', 'assessment'] },
+    { key: 'lead-proposal', label: 'Proposal / Negosiasi', statuses: ['proposal', 'proposal_sent', 'negotiation', 'contract', 'contract_sent'] },
+    { key: 'lead-won', label: 'Menang', statuses: ['won', 'closed_won', 'converted', 'deal_won'] },
+    { key: 'lead-lost', label: 'Kalah', statuses: ['lost', 'closed_lost', 'unqualified', 'deal_lost', 'rejected'] }
+  ];
+
+  const stageMap = stageDefinitions.reduce((acc, stage) => {
+    acc[stage.key] = { key: stage.key, label: stage.label, count: 0, statuses: new Set() };
+    return acc;
+  }, {});
+
+  const others = { key: 'others', label: 'Status Lainnya', count: 0, statuses: new Set() };
+
+  source.forEach((item) => {
+    const rawStatus =
+      item?.status || item?.stage || item?.pipeline_status || item?.current_status || item?.lead_status || '';
+    const normalized = String(rawStatus).trim().toLowerCase();
+    if (!normalized) return;
+
+    const matchingStage = stageDefinitions.find((stage) => stage.statuses.includes(normalized));
+    const target = matchingStage ? stageMap[matchingStage.key] : others;
+    target.count += 1;
+    target.statuses.add(normalized);
+  });
+
+  return [
+    ...stageDefinitions.map((stage) => ({
+      key: stage.key,
+      label: stage.label,
+      count: stageMap[stage.key].count,
+      statuses: Array.from(stageMap[stage.key].statuses)
+    })),
+    ...(others.count > 0
+      ? [
+          {
+            key: others.key,
+            label: others.label,
+            count: others.count,
+            statuses: Array.from(others.statuses)
+          }
+        ]
+      : [])
+  ];
+}
+
+function formatStageStatusLabel(status) {
+  return status
+    .split(/[_\s-]+/)
+    .filter(Boolean)
+    .map((segment) => segment.charAt(0).toUpperCase() + segment.slice(1))
+    .join(' ');
 }
