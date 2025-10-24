@@ -188,6 +188,43 @@
             animation: pulse 1.5s ease-in-out infinite;
         }
 
+        .empty-state {
+            display: none;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            gap: 0.5rem;
+            background: var(--surface-muted);
+            border: 1px dashed var(--border-subtle);
+            color: var(--text-secondary);
+            padding: 1.25rem;
+        }
+
+        .empty-state:not(.hidden) {
+            display: flex;
+        }
+
+        .empty-state--compact {
+            min-height: 4rem;
+            border-radius: 0.75rem;
+        }
+
+        .empty-state--tall {
+            min-height: 18rem;
+            border-radius: 1.5rem;
+        }
+
+        .empty-state__primary {
+            font-weight: 600;
+            color: var(--text-secondary);
+        }
+
+        .empty-state__secondary {
+            color: var(--text-secondary);
+            opacity: 0.75;
+            font-size: 0.75rem;
+        }
+
         @keyframes pulse {
             0% { background-position: 200% 0; }
             100% { background-position: -200% 0; }
@@ -327,6 +364,9 @@
                                     <i data-lucide="users" class="h-6 w-6"></i>
                                 </div>
                             </div>
+                            <div id="sparkline-customers-empty" class="empty-state empty-state--compact mt-4 hidden">
+                                <span class="empty-state__primary" data-empty-primary>Belum ada data</span>
+                            </div>
                             <canvas id="sparkline-customers" class="mt-4 h-16"></canvas>
                         </article>
                         <article class="stat-card glass-muted rounded-3xl p-6 shadow-lg">
@@ -342,6 +382,9 @@
                                 <div class="rounded-2xl bg-cyan-500/10 p-3 text-cyan-500">
                                     <i data-lucide="radar" class="h-6 w-6"></i>
                                 </div>
+                            </div>
+                            <div id="sparkline-leads-empty" class="empty-state empty-state--compact mt-4 hidden">
+                                <span class="empty-state__primary" data-empty-primary>Belum ada data</span>
                             </div>
                             <canvas id="sparkline-leads" class="mt-4 h-16"></canvas>
                         </article>
@@ -359,6 +402,9 @@
                                     <i data-lucide="alert-triangle" class="h-6 w-6"></i>
                                 </div>
                             </div>
+                            <div id="sparkline-escalations-empty" class="empty-state empty-state--compact mt-4 hidden">
+                                <span class="empty-state__primary" data-empty-primary>Belum ada data</span>
+                            </div>
                             <canvas id="sparkline-escalations" class="mt-4 h-16"></canvas>
                         </article>
                         <article class="stat-card glass-muted rounded-3xl p-6 shadow-lg">
@@ -374,6 +420,9 @@
                                 <div class="rounded-2xl bg-emerald-500/10 p-3 text-emerald-500">
                                     <i data-lucide="message-circle" class="h-6 w-6"></i>
                                 </div>
+                            </div>
+                            <div id="sparkline-response-empty" class="empty-state empty-state--compact mt-4 hidden">
+                                <span class="empty-state__primary" data-empty-primary>Belum ada data</span>
                             </div>
                             <canvas id="sparkline-response" class="mt-4 h-16"></canvas>
                         </article>
@@ -393,7 +442,15 @@
                                     </span>
                                 </div>
                             </header>
-                            <canvas id="chart-response-time" class="mt-6 h-72"></canvas>
+                            <div class="mt-6">
+                                <div id="chart-response-time-empty" class="empty-state empty-state--tall hidden">
+                                    <div>
+                                        <p class="empty-state__primary" data-empty-primary>Belum ada data</p>
+                                        <p class="empty-state__secondary" data-empty-secondary>Data response time akan muncul setelah ada aktivitas terbaru.</p>
+                                    </div>
+                                </div>
+                                <canvas id="chart-response-time" class="h-72"></canvas>
+                            </div>
                         </section>
                         <section class="glass-muted rounded-3xl p-6 shadow-lg">
                             <header class="flex items-center justify-between">

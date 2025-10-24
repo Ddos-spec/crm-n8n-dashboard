@@ -13,6 +13,7 @@ export const DashboardState = {
   charts: {},
   tableManagers: {},
   analyticsWidgets: [],
+  emptyStateMessage: 'Belum ada data',
   theme: 'light'
 };
 
