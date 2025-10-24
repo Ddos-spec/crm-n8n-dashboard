@@ -71,6 +71,17 @@
             backdrop-filter: blur(10px);
         }
 
+        .analytics-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: 1.5rem;
+        }
+
+        .analytics-empty {
+            background: var(--surface-muted);
+            border: 1px dashed rgba(56, 189, 248, 0.4);
+        }
+
         .tab-button {
             transition: all 0.3s ease;
         }
@@ -436,16 +447,16 @@
                             <div class="mt-6 flex flex-col gap-6">
                                 <div>
                                     <div class="flex items-center gap-2 text-3xl font-semibold">
-                                        <span id="csat-score">4.7</span>
+                                        <span id="csat-score">—</span>
                                         <div class="flex items-center gap-1 text-amber-400" id="csat-stars"></div>
                                     </div>
-                                    <p class="mt-2 text-sm text-slate-500" id="csat-summary">Mayoritas pelanggan memberikan rating sangat baik.</p>
+                                    <p class="mt-2 text-sm text-slate-500" id="csat-summary">Tambahkan data via n8n untuk mulai melacak CSAT.</p>
                                 </div>
-                                <div class="flex items-center gap-3 text-xs text-slate-500">
-                                    <span class="badge badge-success">+5% MoM</span>
-                                    <span class="inline-flex items-center gap-1 text-emerald-500">
+                                <div id="csat-meta" class="hidden flex items-center gap-3 text-xs text-slate-500">
+                                    <span id="csat-trend" class="badge badge-success hidden"></span>
+                                    <span id="csat-sentiment" class="hidden inline-flex items-center gap-1 text-emerald-500">
                                         <i data-lucide="smile"></i>
-                                        87% sentiment positif
+                                        <span id="csat-sentiment-text"></span>
                                     </span>
                                 </div>
                             </div>
@@ -683,7 +694,10 @@
                                     <button id="analytics-export" class="rounded-full bg-slate-900/5 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-sky-500">Export CSV</button>
                                 </div>
                             </header>
-                            <div class="mt-6 grid gap-6 md:grid-cols-2 xl:grid-cols-3" id="analytics-widgets"></div>
+                            <div class="mt-6 analytics-grid" id="analytics-widgets"></div>
+                            <div id="analytics-empty-state" class="analytics-empty mt-6 hidden rounded-3xl p-6 text-center text-sm text-slate-500">
+                                Tambahkan data via n8n untuk menampilkan metrik analitik.
+                            </div>
                         </div>
                     </section>
                 </div>

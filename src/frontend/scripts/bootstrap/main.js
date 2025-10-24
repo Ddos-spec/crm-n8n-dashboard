@@ -549,19 +549,80 @@ function renderCSAT() {
   const scoreEl = document.getElementById('csat-score');
   const starsEl = document.getElementById('csat-stars');
   const summaryEl = document.getElementById('csat-summary');
+  const metaEl = document.getElementById('csat-meta');
+  const trendEl = document.getElementById('csat-trend');
+  const sentimentWrapper = document.getElementById('csat-sentiment');
+  const sentimentTextEl = document.getElementById('csat-sentiment-text');
   if (!scoreEl || !starsEl || !summaryEl) return;
 
-  const csat = DashboardState.stats?.csat || { score: 4.7, trend: 5, summary: 'Mayoritas pelanggan memberikan rating sangat baik.' };
-  const score = csat.score || 4.6;
+  const csat = DashboardState.stats?.csat;
+  const hasScore = csat && Number.isFinite(Number(csat.score));
 
+  if (!hasScore) {
+    scoreEl.textContent = '—';
+    starsEl.innerHTML = '';
+    summaryEl.textContent = 'Tambahkan data via n8n untuk mulai melacak CSAT.';
+    if (metaEl) {
+      metaEl.classList.add('hidden');
+    }
+    if (trendEl) {
+      trendEl.classList.add('hidden');
+      trendEl.textContent = '';
+    }
+    if (sentimentWrapper) {
+      sentimentWrapper.classList.add('hidden');
+    }
+    if (sentimentTextEl) {
+      sentimentTextEl.textContent = '';
+    }
+    return;
+  }
+
+  const score = Number(csat.score);
   scoreEl.textContent = score.toFixed(1);
-  summaryEl.textContent = csat.summary || 'Mayoritas pelanggan memberikan rating sangat baik.';
-  const stars = Math.round(score);
+  summaryEl.textContent = csat.summary || '—';
+
+  const stars = Math.max(0, Math.min(5, Math.round(score)));
   starsEl.innerHTML = new Array(5)
     .fill(null)
     .map((_, idx) => `<i data-lucide="${idx < stars ? 'star' : 'star-off'}" class="h-5 w-5"></i>`)
     .join('');
   refreshIcons();
+
+  if (metaEl) {
+    metaEl.classList.remove('hidden');
+  }
+
+  if (trendEl) {
+    const trendValue = csat.trend ?? csat.delta ?? csat.change ?? csat.trendPercentage ?? csat.trend_percentage;
+    if (trendValue === undefined || trendValue === null || trendValue === '') {
+      trendEl.classList.add('hidden');
+      trendEl.textContent = '';
+    } else {
+      const numericTrend = Number(trendValue);
+      const formattedTrend = Number.isFinite(numericTrend)
+        ? `${numericTrend > 0 ? '+' : ''}${numericTrend.toFixed(1)}%`
+        : String(trendValue);
+      trendEl.textContent = formattedTrend;
+      trendEl.classList.remove('hidden');
+    }
+  }
+
+  if (sentimentWrapper && sentimentTextEl) {
+    const sentimentValue = csat.sentimentPositive ?? csat.sentiment_positive ?? csat.sentiment;
+    if (sentimentValue === undefined || sentimentValue === null || sentimentValue === '') {
+      sentimentWrapper.classList.add('hidden');
+      sentimentTextEl.textContent = '';
+    } else {
+      const numericSentiment = Number(sentimentValue);
+      const formattedSentiment = Number.isFinite(numericSentiment)
+        ? `${numericSentiment.toFixed(0)}% sentiment positif`
+        : String(sentimentValue);
+      sentimentTextEl.textContent = formattedSentiment;
+      sentimentWrapper.classList.remove('hidden');
+      refreshIcons();
+    }
+  }
 }
 
 function populateLeadOwners() {
@@ -778,58 +839,137 @@ async function handleResolveEscalation(id, notes = '') {
 
 function renderAnalyticsWidgets() {
   const container = document.getElementById('analytics-widgets');
+  const emptyStateEl = document.getElementById('analytics-empty-state');
   if (!container) return;
 
   const range = Number(document.getElementById('analytics-range').value || 7);
   const stats = DashboardState.stats || {};
-  const analytics = [
+  const formatSignedPercentage = (trend) => {
+    const numericTrend = Number(trend);
+    if (!Number.isFinite(numericTrend)) {
+      return trend === undefined || trend === null || trend === '' ? null : String(trend);
+    }
+    const prefix = numericTrend > 0 ? '+' : '';
+    return `${prefix}${numericTrend.toFixed(1)}%`;
+  };
+
+  const formatCount = (value) => {
+    if (value === undefined || value === null || value === '') {
+      return '—';
+    }
+    const numeric = Number(value);
+    return Number.isFinite(numeric) ? formatNumber(numeric) : String(value);
+  };
+
+  const metricDefinitions = [
     {
+      keys: ['conversionRate', 'conversion_rate'],
       title: 'Conversion Rate',
-      value: `${((stats.conversionRate || stats.conversion_rate || 0) * 100).toFixed(1)}%`,
-      trend: stats.conversionTrend || '+2.4%',
-      description: `Performa ${range} hari terakhir`,
-      icon: 'trending-up'
+      icon: 'trending-up',
+      description: () => `Konversi periode ${range} hari`,
+      format: (value) => {
+        const numeric = Number(value);
+        return Number.isFinite(numeric) ? `${(numeric * 100).toFixed(1)}%` : String(value);
+      },
+      trendKeys: ['conversionTrend', 'conversion_trend'],
+      trendFormat: formatSignedPercentage
     },
     {
+      keys: ['avgResponseTime', 'avg_response_time'],
       title: 'Average Response Time',
-      value: `${stats.avgResponseTime || stats.avg_response_time || 28}m`,
-      trend: stats.responseDelta ? `${stats.responseDelta.toFixed(1)}%` : '-1.8%',
-      description: 'Waktu rata-rata agent menanggapi tiket',
-      icon: 'timer'
+      icon: 'timer',
+      description: () => 'Waktu rata-rata agent menanggapi tiket',
+      format: (value) => {
+        const numeric = Number(value);
+        return Number.isFinite(numeric) ? `${formatNumber(numeric)}m` : String(value);
+      },
+      trendKeys: ['responseDelta', 'response_delta'],
+      trendFormat: formatSignedPercentage
     },
     {
+      keys: ['resolvedTickets', 'resolved_tickets'],
       title: 'Tickets Resolved',
-      value: formatNumber(stats.resolvedTickets || stats.resolved_tickets || DashboardState.escalations.filter((item) => (item.status || '').toLowerCase() === 'resolved').length),
-      trend: stats.resolvedDelta ? `${stats.resolvedDelta.toFixed(1)}%` : '+4.1%',
-      description: 'Jumlah tiket closed periode ini',
-      icon: 'shield-check'
+      icon: 'shield-check',
+      description: () => 'Jumlah tiket closed periode ini',
+      format: formatCount,
+      trendKeys: ['resolvedDelta', 'resolved_delta'],
+      trendFormat: formatSignedPercentage
     },
     {
-      title: 'Net Promoter Score',
-      value: stats.nps || 62,
-      trend: stats.npsTrend || '+3 pts',
-      description: 'Skor kepuasan pelanggan',
-      icon: 'smile'
+      keys: ['totalLeads', 'total_leads'],
+      title: 'Total Leads',
+      icon: 'user-plus',
+      description: () => 'Lead yang masuk dari seluruh channel',
+      format: formatCount,
+      trendKeys: ['totalLeadsTrend', 'total_leads_trend']
     },
     {
-      title: 'Revenue Impact',
-      value: `Rp ${formatNumber(stats.pipelineValue || stats.pipeline_value || 0)}`,
-      trend: stats.pipelineTrend || '+8.2%',
-      description: 'Estimasi nilai pipeline aktif',
-      icon: 'coins'
+      keys: ['totalCustomers', 'total_customers'],
+      title: 'Total Customers',
+      icon: 'users',
+      description: () => 'Customer aktif dalam periode yang dipilih',
+      format: formatCount,
+      trendKeys: ['totalCustomersTrend', 'total_customers_trend']
     },
     {
-      title: 'Active Campaigns',
-      value: stats.activeCampaigns || stats.active_campaigns || DashboardState.leads.length,
-      trend: stats.campaignTrend || '+1 kampanye',
-      description: 'Marketing channel yang berjalan',
-      icon: 'megaphone'
+      keys: ['openEscalations', 'open_escalations', 'escalationsOpen', 'escalations_open'],
+      title: 'Open Escalations',
+      icon: 'alert-triangle',
+      description: () => 'Eskalasi yang membutuhkan tindakan',
+      format: formatCount,
+      trendKeys: ['openEscalationsTrend', 'open_escalations_trend']
     }
   ];
 
+  const getMetricValue = (source, keys = []) => {
+    if (!source || !keys?.length) return undefined;
+    for (const key of keys) {
+      const candidate = source[key];
+      if (candidate !== undefined && candidate !== null) {
+        if (typeof candidate === 'string' && candidate.trim() === '') {
+          continue;
+        }
+        return candidate;
+      }
+    }
+    return undefined;
+  };
+
+  const analytics = metricDefinitions
+    .map((definition) => {
+      const value = getMetricValue(stats, definition.keys);
+      if (value === undefined) return null;
+
+      const formatter = definition.format || formatCount;
+      const rawTrend = getMetricValue(stats, definition.trendKeys);
+      const trendFormatter = definition.trendFormat || ((val) => {
+        if (val === undefined || val === null || val === '') return null;
+        if (typeof val === 'number') {
+          const signed = val > 0 ? '+' : '';
+          return `${signed}${val.toFixed(1)}`;
+        }
+        return String(val);
+      });
+
+      return {
+        title: definition.title,
+        value: formatter(value),
+        icon: definition.icon,
+        description: typeof definition.description === 'function' ? definition.description(value) : definition.description,
+        trend: rawTrend === undefined ? null : trendFormatter(rawTrend)
+      };
+    })
+    .filter(Boolean);
+
   DashboardState.analyticsWidgets = analytics;
   container.innerHTML = analytics
-    .map((item) => `
+    .map((item) => {
+      const trendBadge = item.trend
+        ? `<span class="badge badge-success">${escapeHTML(item.trend)}</span>`
+        : '';
+      const description = item.description ? `<span>${escapeHTML(item.description)}</span>` : '';
+
+      return `
       <article class="glass-muted rounded-3xl p-5 shadow-lg">
         <div class="flex items-center justify-between">
           <div>
@@ -838,13 +978,21 @@ function renderAnalyticsWidgets() {
           </div>
           <span class="rounded-2xl bg-sky-500/10 p-3 text-sky-500"><i data-lucide="${item.icon}"></i></span>
         </div>
-        <div class="mt-4 flex items-center justify-between text-xs text-slate-500">
-          <span class="badge badge-success">${escapeHTML(item.trend)}</span>
-          <span>${escapeHTML(item.description)}</span>
+        <div class="mt-4 flex flex-wrap items-center justify-between gap-2 text-xs text-slate-500">
+          ${trendBadge || ''}
+          ${description}
         </div>
       </article>
-    `)
+    `;
+    })
     .join('');
+
+  container.classList.toggle('hidden', analytics.length === 0);
+
+  if (emptyStateEl) {
+    emptyStateEl.classList.toggle('hidden', analytics.length > 0);
+  }
+
   refreshIcons();
 }
 
