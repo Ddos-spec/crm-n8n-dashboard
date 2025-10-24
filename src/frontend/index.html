@@ -408,14 +408,27 @@
                     </div>
 
                     <div class="mt-6 grid gap-6 lg:grid-cols-3">
-                        <section class="glass-muted rounded-3xl p-6 shadow-lg">
+                        <section class="glass-muted rounded-3xl p-6 shadow-lg" id="funnel-section">
                             <header class="flex items-center justify-between">
                                 <div>
                                     <h3 class="text-lg font-semibold">Funnel Konversi</h3>
                                     <p class="text-sm text-slate-500">Perjalanan lead menjadi pelanggan.</p>
                                 </div>
                             </header>
-                            <canvas id="chart-funnel" class="mt-6 h-72"></canvas>
+                            <div id="funnel-summary" class="mt-6 hidden">
+                                <div class="overflow-hidden rounded-2xl border border-slate-800/10">
+                                    <table>
+                                        <thead>
+                                            <tr>
+                                                <th class="text-left">Stage</th>
+                                                <th class="text-right">Lead</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="funnel-summary-body"></tbody>
+                                    </table>
+                                </div>
+                            </div>
+                            <p id="funnel-empty" class="mt-6 hidden text-sm text-slate-500">Data funnel belum tersedia atau tidak lengkap.</p>
                         </section>
                         <section class="glass-muted rounded-3xl p-6 shadow-lg">
                             <header class="flex items-center justify-between">
