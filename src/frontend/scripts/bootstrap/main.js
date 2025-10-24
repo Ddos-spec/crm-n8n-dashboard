@@ -6,7 +6,7 @@ import { showToast } from '../ui/toast.js';
 import { escapeHTML, refreshIcons, showLoadingOverlay, hideLoadingOverlay, updateConnectionStatus, formatDateCell } from '../ui/dom.js';
 import { statusToBadge, priorityToBadge, updateDeltaBadge } from '../ui/badges.js';
 import { renderAssignLeadForm, renderResolveEscalationForm, renderSendMessageForm, setupModal, openModal, closeModal, openQuickActionModal } from '../ui/modal.js';
-import { ensureArray, formatNumber, capitalize, extractUnique } from '../../shared/utils/index.js';
+import { ensureArray, formatNumber, capitalize, extractUnique, normalizeRecords } from '../../shared/utils/index.js';
 import { apiConnector } from '../../services/apiConnector.js';
 import { webhookApiConnector } from '../../services/webhookHandler.js';
 import { CONFIG } from '../../shared/config.js';
@@ -31,6 +31,34 @@ function normalizeStatsResponse(rawStats) {
   }
 
   const normalized = { ...rawStats };
+
+  const numericFields = [
+    { canonical: 'totalCustomers', aliases: ['total_customers'] },
+    { canonical: 'totalLeads', aliases: ['total_leads'] },
+    { canonical: 'totalEscalations', aliases: ['total_escalations'] },
+    { canonical: 'responseRate', aliases: ['response_rate'] }
+  ];
+
+  numericFields.forEach(({ canonical, aliases }) => {
+    const keys = [canonical, ...aliases];
+    for (const key of keys) {
+      if (normalized[key] === undefined || normalized[key] === null || normalized[key] === '') {
+        continue;
+      }
+      const parsed = Number(normalized[key]);
+      if (!Number.isNaN(parsed)) {
+        normalized[canonical] = parsed;
+        break;
+      }
+    }
+
+    aliases.forEach((alias) => {
+      if (alias !== canonical) {
+        delete normalized[alias];
+      }
+    });
+  });
+
   const teamPerformance = ensureArray(rawStats.teamPerformance ?? rawStats.team_performance);
   const hasValidTeamPerformance =
     teamPerformance.length > 0 &&
@@ -126,10 +154,13 @@ async function refreshData() {
       apiConnector.getEscalations()
     ]);
 
-    DashboardState.stats = normalizeStatsResponse(statsResponse.data || statsResponse);
-    DashboardState.customers = ensureArray(customersResponse.data ?? customersResponse);
-    DashboardState.leads = ensureArray(leadsResponse.data ?? leadsResponse);
-    DashboardState.escalations = ensureArray(escalationsResponse.data ?? escalationsResponse);
+    const statsCandidates = normalizeRecords(statsResponse);
+    const primaryStats = statsCandidates[0] || (statsResponse && typeof statsResponse === 'object' ? statsResponse.data || statsResponse : {});
+
+    DashboardState.stats = normalizeStatsResponse(primaryStats || {});
+    DashboardState.customers = normalizeRecords(customersResponse);
+    DashboardState.leads = normalizeRecords(leadsResponse);
+    DashboardState.escalations = normalizeRecords(escalationsResponse);
 
     DashboardState.activities = deriveActivities(DashboardState);
     DashboardState.notifications = deriveNotifications(DashboardState);
