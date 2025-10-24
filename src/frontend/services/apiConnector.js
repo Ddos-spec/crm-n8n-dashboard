@@ -66,7 +66,11 @@ export class ApiConnector {
   }
 
   async getBusinessLeads() {
-    return this.fetchApi(this.config.apiEndpoints.leadsList, 'POST');
+    return this.fetchApi(
+      this.config.apiEndpoints.leadsList,
+      'POST',
+      this.buildPayload('get_leads')
+    );
   }
 
   async getQuickStats() {
@@ -114,14 +118,6 @@ export class ApiConnector {
       this.config.apiEndpoints.resolveEscalation,
       'POST',
       this.buildPayload('resolve_escalation', { escalation_id: escalationId, notes })
-    );
-  }
-
-  async getCampaignPerformance(filters = {}) {
-    return this.fetchApi(
-      this.config.apiEndpoints.campaignPerformance,
-      'POST',
-      this.buildPayload('get_campaign_performance', filters)
     );
   }
 

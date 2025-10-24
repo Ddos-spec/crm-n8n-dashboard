@@ -3,7 +3,6 @@ export const DashboardState = {
   customers: [],
   leads: [],
   escalations: [],
-  campaignPerformance: [],
   activities: [],
   notifications: [],
   lastRefresh: null,
@@ -13,7 +12,6 @@ export const DashboardState = {
   previousEscalationIds: new Set(),
   charts: {},
   tableManagers: {},
-  analyticsWidgets: [],
   emptyStateMessage: 'Belum ada data',
   theme: 'light'
 };
