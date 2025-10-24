@@ -1,468 +1,15 @@
-const DashboardState = {
-  stats: null,
-  customers: [],
-  leads: [],
-  escalations: [],
-  activities: [],
-  notifications: [],
-  lastRefresh: null,
-  refreshInterval: 0,
-  countdownTimer: null,
-  countdownValue: 0,
-  previousEscalationIds: new Set(),
-  charts: {},
-  tableManagers: {},
-  analyticsWidgets: [],
-  theme: 'light'
-};
-
-function ensureArray(value) {
-  if (Array.isArray(value)) return value;
-  if (!value || typeof value !== 'object') return [];
-
-  if (Array.isArray(value.data)) return value.data;
-  if (Array.isArray(value.items)) return value.items;
-  if (Array.isArray(value.results)) return value.results;
-  if (Array.isArray(value.records)) return value.records;
-
-  return Object.values(value).reduce((acc, item) => {
-    if (Array.isArray(item)) {
-      acc.push(...item);
-    } else if (item && typeof item === 'object') {
-      acc.push(item);
-    }
-    return acc;
-  }, []);
-}
-
-function parseNumeric(value) {
-  if (typeof value === 'number') {
-    return Number.isFinite(value) ? value : null;
-  }
-  if (typeof value === 'string') {
-    const parsed = parseFloat(value);
-    return Number.isNaN(parsed) ? null : parsed;
-  }
-  return null;
-}
-
-function readCanvasHeight(canvas) {
-  if (!canvas) return null;
-
-  const clientHeight = parseNumeric(canvas.clientHeight);
-  if (clientHeight) return clientHeight;
-
-  const inlineHeight = parseNumeric(canvas.style?.height);
-  if (inlineHeight) return inlineHeight;
-
-  const attrHeight = parseNumeric(canvas.getAttribute?.('height'));
-  if (attrHeight) return attrHeight;
-
-  if (typeof window !== 'undefined' && window.getComputedStyle) {
-    const computedHeight = parseNumeric(window.getComputedStyle(canvas)?.height);
-    if (computedHeight) return computedHeight;
-  }
-
-  return null;
-}
-
-function readInnerHeight(element) {
-  if (!element) return null;
-
-  let height = parseNumeric(element.clientHeight);
-  if (height && typeof window !== 'undefined' && window.getComputedStyle) {
-    const styles = window.getComputedStyle(element);
-    const paddingTop = parseNumeric(styles?.paddingTop) || 0;
-    const paddingBottom = parseNumeric(styles?.paddingBottom) || 0;
-    height -= paddingTop + paddingBottom;
-  }
-
-  if (height && height > 0) {
-    return height;
-  }
-
-  if (typeof window !== 'undefined' && window.getComputedStyle) {
-    const styles = window.getComputedStyle(element);
-    const computedHeight = parseNumeric(styles?.height);
-    if (computedHeight) {
-      const paddingTop = parseNumeric(styles?.paddingTop) || 0;
-      const paddingBottom = parseNumeric(styles?.paddingBottom) || 0;
-      const innerHeight = computedHeight - paddingTop - paddingBottom;
-      return innerHeight > 0 ? innerHeight : null;
-    }
-  }
-
-  return null;
-}
-
-function ensureChartWrapper(canvas) {
-  if (!canvas) return null;
-
-  const currentParent = canvas.parentElement;
-  if (!currentParent) return null;
-
-  if (currentParent.dataset?.chartWrapper === 'true') {
-    return currentParent;
-  }
-
-  const wrapper = document.createElement('div');
-  wrapper.dataset.chartWrapper = 'true';
-  wrapper.style.display = 'block';
-  wrapper.style.position = 'relative';
-  wrapper.style.width = '100%';
-
-  currentParent.insertBefore(wrapper, canvas);
-  wrapper.appendChild(canvas);
-
-  return wrapper;
-}
-
-function lockChartArea(canvas, fallbackHeight) {
-  if (!canvas) {
-    return { container: null, height: fallbackHeight };
-  }
-
-  const wrapper = ensureChartWrapper(canvas);
-  const container = wrapper || canvas.parentElement || null;
-
-  const baseFallback = fallbackHeight || 0;
-  let height = parseNumeric(canvas.dataset?.fixedHeight)
-    ?? readCanvasHeight(canvas)
-    ?? readInnerHeight(container)
-    ?? baseFallback;
-
-  if (!height || height <= 0) {
-    height = baseFallback || 256;
-  }
-
-  canvas.dataset.fixedHeight = `${height}px`;
-
-  if (container) {
-    if (!container.dataset.fixedHeight) {
-      let containerHeight = readInnerHeight(container);
-      if (!containerHeight || containerHeight <= 0) {
-        containerHeight = height;
-      }
-      container.dataset.fixedHeight = `${containerHeight}px`;
-    }
-
-    const lockedContainerHeight = parseNumeric(container.dataset.fixedHeight) || height;
-    const containerHeightPx = `${lockedContainerHeight}px`;
-    container.style.height = containerHeightPx;
-    container.style.maxHeight = containerHeightPx;
-  }
-
-  const heightPx = `${height}px`;
-  canvas.style.height = heightPx;
-  canvas.style.maxHeight = heightPx;
-  canvas.style.width = '100%';
-
-  const numericHeight = parseNumeric(height);
-  if (numericHeight && numericHeight > 0) {
-    canvas.setAttribute('height', Math.max(Math.round(numericHeight), 1));
-  }
-
-  return { container, height };
-}
-
-class TableManager {
-  constructor({
-    tableId,
-    searchInputId,
-    filterId = null,
-    filterCallback = null,
-    paginationId,
-    summaryId,
-    exportButtonId = null,
-    pageSizeOptions = [10, 25, 50],
-    columns
-  }) {
-    this.table = document.querySelector(`#${tableId} tbody`);
-    this.tableElement = document.getElementById(tableId);
-    this.searchInput = searchInputId ? document.getElementById(searchInputId) : null;
-    this.filterElement = filterId ? document.getElementById(filterId) : null;
-    this.filterCallback = filterCallback;
-    this.paginationEl = document.getElementById(paginationId);
-    this.summaryEl = summaryId ? document.getElementById(summaryId) : null;
-    this.exportButton = exportButtonId ? document.getElementById(exportButtonId) : null;
-    this.pageSizeOptions = pageSizeOptions;
-    this.columns = columns;
-    this.currentPage = 1;
-    this.pageSize = pageSizeOptions[0];
-    this.data = [];
-    this.filtered = [];
-    this.sortKey = null;
-    this.sortDirection = 'asc';
-
-    this.setupEvents();
-  }
-
-  setupEvents() {
-    if (this.searchInput) {
-      this.searchInput.addEventListener('input', () => {
-        this.currentPage = 1;
-        this.applyFilters();
-      });
-    }
-
-    if (this.filterElement && this.filterCallback) {
-      this.filterElement.addEventListener('change', () => {
-        this.currentPage = 1;
-        this.applyFilters();
-      });
-    }
-
-    if (this.tableElement) {
-      const headers = this.tableElement.querySelectorAll('thead th[data-sort]');
-      headers.forEach((header) => {
-        header.addEventListener('click', () => {
-          const key = header.dataset.sort;
-          this.toggleSort(key);
-        });
-      });
-    }
-
-    if (this.exportButton) {
-      this.exportButton.addEventListener('click', () => {
-        this.exportCSV();
-      });
-    }
-  }
-
-  setData(data) {
-    this.data = Array.isArray(data) ? data : [];
-    this.applyFilters();
-  }
-
-  applyFilters() {
-    const searchTerm = this.searchInput ? this.searchInput.value.toLowerCase().trim() : '';
-    const filterValue = this.filterElement ? this.filterElement.value : 'all';
-
-    this.filtered = this.data.filter((item) => {
-      const matchesSearch = !searchTerm || this.columns.some((col) => {
-        if (col.excludeFromSearch) return false;
-        const value = typeof col.accessor === 'function' ? col.accessor(item) : item[col.key];
-        return value && value.toString().toLowerCase().includes(searchTerm);
-      });
-
-      const matchesFilter = this.filterCallback ? this.filterCallback(item, filterValue) : true;
-      return matchesSearch && matchesFilter;
-    });
-
-    if (this.sortKey) {
-      this.filtered.sort((a, b) => this.compareValues(a, b));
-    }
-
-    this.render();
-  }
-
-  toggleSort(key) {
-    if (this.sortKey === key) {
-      this.sortDirection = this.sortDirection === 'asc' ? 'desc' : 'asc';
-    } else {
-      this.sortKey = key;
-      this.sortDirection = 'asc';
-    }
-
-    this.applyFilters();
-  }
-
-  compareValues(a, b) {
-    const column = this.columns.find((col) => col.key === this.sortKey);
-    if (!column) return 0;
-
-    const valueA = typeof column.accessor === 'function' ? column.accessor(a) : a[column.key];
-    const valueB = typeof column.accessor === 'function' ? column.accessor(b) : b[column.key];
-
-    if (valueA === valueB) return 0;
-    if (valueA === undefined || valueA === null) return this.sortDirection === 'asc' ? -1 : 1;
-    if (valueB === undefined || valueB === null) return this.sortDirection === 'asc' ? 1 : -1;
-
-    if (typeof valueA === 'string' && typeof valueB === 'string') {
-      return this.sortDirection === 'asc'
-        ? valueA.localeCompare(valueB, 'id')
-        : valueB.localeCompare(valueA, 'id');
-    }
-
-    return this.sortDirection === 'asc' ? valueA - valueB : valueB - valueA;
-  }
-
-  render() {
-    if (!this.table) return;
-
-    const totalPages = Math.max(1, Math.ceil(this.filtered.length / this.pageSize));
-    if (this.currentPage > totalPages) {
-      this.currentPage = totalPages;
-    }
-
-    const start = (this.currentPage - 1) * this.pageSize;
-    const pageData = this.filtered.slice(start, start + this.pageSize);
-
-    const rows = pageData.map((item) => {
-      const cells = this.columns
-        .map((col) => {
-          const content = col.render
-            ? col.render(item)
-            : escapeHTML(
-                typeof col.accessor === 'function'
-                  ? col.accessor(item) ?? ''
-                  : item[col.key] ?? ''
-              );
-          const label = escapeHTML(col.label ?? col.key);
-          return `<td data-label="${label}">${content}</td>`;
-        })
-        .join('');
-      return `<tr>${cells}</tr>`;
-    });
-
-    this.table.innerHTML = rows.join('') ||
-      '<tr><td colspan="100%" class="py-10 text-center text-sm text-slate-400">Tidak ada data untuk ditampilkan.</td></tr>';
-
-    this.renderPagination(totalPages);
-    this.renderSummary(pageData.length);
-    refreshIcons();
-  }
-
-  renderPagination(totalPages) {
-    if (!this.paginationEl) return;
-
-    const controls = [];
-    controls.push(`
-      <button class="rounded-full px-3 py-1 text-xs font-semibold ${this.currentPage === 1 ? 'text-slate-400' : 'text-sky-500'}"
-        ${this.currentPage === 1 ? 'disabled' : ''} data-page="prev">Prev</button>
-    `);
-
-    controls.push(`<span class="text-xs text-slate-400">Halaman ${this.currentPage} dari ${totalPages}</span>`);
-
-    controls.push(`
-      <button class="rounded-full px-3 py-1 text-xs font-semibold ${this.currentPage === totalPages ? 'text-slate-400' : 'text-sky-500'}"
-        ${this.currentPage === totalPages ? 'disabled' : ''} data-page="next">Next</button>
-    `);
-
-    controls.push(`
-      <label class="flex items-center gap-2 rounded-full bg-slate-900/5 px-3 py-1">
-        <span class="text-xs text-slate-400">Show</span>
-        <select class="rounded-full border-none bg-transparent text-xs focus:ring-0" data-page="size">
-          ${this.pageSizeOptions
-            .map((size) => `<option value="${size}" ${size === this.pageSize ? 'selected' : ''}>${size}</option>`)
-            .join('')}
-        </select>
-      </label>
-    `);
-
-    this.paginationEl.innerHTML = controls.join('');
-
-    this.paginationEl.querySelectorAll('button[data-page]').forEach((btn) => {
-      btn.addEventListener('click', () => {
-        const type = btn.dataset.page;
-        if (type === 'prev' && this.currentPage > 1) {
-          this.currentPage -= 1;
-        }
-        if (type === 'next' && this.currentPage < totalPages) {
-          this.currentPage += 1;
-        }
-        this.render();
-      });
-    });
-
-    const select = this.paginationEl.querySelector('select[data-page="size"]');
-    if (select) {
-      select.addEventListener('change', () => {
-        this.pageSize = Number(select.value);
-        this.currentPage = 1;
-        this.render();
-      });
-    }
-  }
-
-  renderSummary(currentCount) {
-    if (!this.summaryEl) return;
-    const total = this.filtered.length;
-    const start = total === 0 ? 0 : (this.currentPage - 1) * this.pageSize + 1;
-    const end = (this.currentPage - 1) * this.pageSize + currentCount;
-    this.summaryEl.textContent = `Menampilkan ${start}-${end} dari ${total} entri`;
-  }
-
-  exportCSV() {
-    const headers = this.columns
-      .filter((col) => !col.excludeFromExport)
-      .map((col) => '"' + (col.label ?? col.key) + '"');
-
-    const rows = this.filtered.map((item) => {
-      return this.columns
-        .filter((col) => !col.excludeFromExport)
-        .map((col) => {
-          const value = col.exportAccessor
-            ? col.exportAccessor(item)
-            : typeof col.accessor === 'function'
-              ? col.accessor(item)
-              : item[col.key];
-          return '"' + (value ?? '').toString().replace(/"/g, '""') + '"';
-        })
-        .join(',');
-    });
-
-    const csvContent = [headers.join(','), ...rows].join('\n');
-    downloadFile(csvContent, `${this.tableElement.id}-${Date.now()}.csv`, 'text/csv;charset=utf-8;');
-  }
-}
-
-function escapeHTML(value) {
-  if (value === null || value === undefined) return '';
-  return value
-    .toString()
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#039;');
-}
-
-function downloadFile(content, filename, mimeType) {
-  const blob = new Blob([content], { type: mimeType });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = filename;
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  URL.revokeObjectURL(url);
-}
-
-function refreshIcons() {
-  if (window.lucide) {
-    window.lucide.createIcons();
-  }
-}
-
-function showLoadingOverlay() {
-  const overlay = document.getElementById('loading-overlay');
-  if (overlay) overlay.classList.remove('hidden');
-}
-
-function hideLoadingOverlay() {
-  const overlay = document.getElementById('loading-overlay');
-  if (overlay) overlay.classList.add('hidden');
-}
-
-function updateConnectionStatus(status) {
-  const indicator = document.getElementById('connection-indicator');
-  const text = document.getElementById('connection-status');
-  if (!indicator || !text) return;
-
-  indicator.classList.remove('bg-emerald-400', 'bg-amber-400', 'bg-rose-500');
-  if (status === 'connected') {
-    indicator.classList.add('bg-emerald-400');
-    text.textContent = 'Terhubung dengan n8n';
-  } else if (status === 'connecting') {
-    indicator.classList.add('bg-amber-400');
-    text.textContent = 'Menghubungkan...';
-  } else {
-    indicator.classList.add('bg-rose-500');
-    text.textContent = 'Terputus - cek proxy Cloudflare';
-  }
-}
+import { DashboardState, setupAutoRefresh, restartCountdown, updateRefreshState } from '../state/dashboardState.js';
+import { TableManager } from '../tables/tableManager.js';
+import { renderSparklineCharts } from '../charts/sparklineCharts.js';
+import { renderOverviewCharts } from '../charts/overviewCharts.js';
+import { showToast } from '../ui/toast.js';
+import { escapeHTML, refreshIcons, showLoadingOverlay, hideLoadingOverlay, updateConnectionStatus, formatDateCell, downloadFile } from '../ui/dom.js';
+import { statusToBadge, priorityToBadge, updateDeltaBadge } from '../ui/badges.js';
+import { renderAssignLeadForm, renderResolveEscalationForm, renderSendMessageForm, setupModal, openModal, closeModal, openQuickActionModal } from '../ui/modal.js';
+import { ensureArray, formatNumber, capitalize, extractUnique } from '../../../shared/utils/index.js';
+import { apiConnector } from '../../../services/apiConnector.js';
+import { webhookApiConnector } from '../../../services/webhookHandler.js';
+import { CONFIG } from '../../../shared/config.js';
 
 async function initializeDashboard() {
   moment.locale(CONFIG.ui.language || 'id');
@@ -470,7 +17,7 @@ async function initializeDashboard() {
   setupTabs();
   setupQuickActions();
   setupModal();
-  setupAutoRefresh();
+  setupAutoRefresh(refreshData);
   initializeTables();
   bindExportButtons();
   document.getElementById('refresh-data').addEventListener('click', handleManualRefresh);
@@ -511,171 +58,32 @@ function setupQuickActions() {
     button.addEventListener('click', () => {
       const action = button.dataset.action;
       if (action === 'assign-lead') {
-        openQuickActionModal('Assign Lead', 'Distribusikan lead baru ke anggota tim.', renderAssignLeadForm());
+        openQuickActionModal({
+          title: 'Assign Lead',
+          subtitle: 'Distribusikan lead baru ke anggota tim.',
+          content: renderAssignLeadForm(),
+          onSubmit: () => {
+            showToast('Lead assigned ke anggota tim', 'success');
+            closeModal();
+          }
+        });
       } else if (action === 'resolve-escalation') {
-        openQuickActionModal('Resolve Escalation', 'Tandai tiket kritikal sebagai selesai.', renderResolveEscalationForm());
+        openQuickActionModal({
+          title: 'Resolve Escalation',
+          subtitle: 'Tandai tiket kritikal sebagai selesai.',
+          content: renderResolveEscalationForm(),
+          onSubmit: (formData) => handleResolveEscalation(formData.get('escalation'), formData.get('notes'))
+        });
       } else if (action === 'send-message') {
-        openQuickActionModal('Send Message', 'Kirim pesan ke pelanggan prioritas tinggi.', renderSendMessageForm());
+        openQuickActionModal({
+          title: 'Send Message',
+          subtitle: 'Kirim pesan ke pelanggan prioritas tinggi.',
+          content: renderSendMessageForm(),
+          onSubmit: (formData) => handleSendMessage(formData.get('customer'), formData.get('message'))
+        });
       }
     });
   });
-}
-
-function renderAssignLeadForm() {
-  const owners = extractUnique(DashboardState.leads, 'owner');
-  return `
-    <form id="assign-lead-form" class="space-y-4">
-      <div>
-        <label class="text-sm font-medium text-slate-500">Pilih Lead</label>
-        <select name="lead" class="mt-1 w-full rounded-2xl border border-slate-200 px-3 py-2">
-          ${DashboardState.leads
-            .map((lead) => `<option value="${escapeHTML(lead.id ?? lead.phone ?? lead.name)}">${escapeHTML(lead.name || 'Tanpa nama')} • ${escapeHTML(lead.status || 'unknown')}</option>`)
-            .join('')}
-        </select>
-      </div>
-      <div>
-        <label class="text-sm font-medium text-slate-500">Assign ke</label>
-        <select name="owner" class="mt-1 w-full rounded-2xl border border-slate-200 px-3 py-2">
-          ${owners.map((owner) => `<option value="${escapeHTML(owner)}">${escapeHTML(owner)}</option>`).join('')}
-        </select>
-      </div>
-      <div>
-        <label class="text-sm font-medium text-slate-500">Catatan</label>
-        <textarea name="notes" rows="3" class="mt-1 w-full rounded-2xl border border-slate-200 px-3 py-2" placeholder="Instruksi singkat"></textarea>
-      </div>
-      <button type="submit" class="w-full rounded-2xl bg-gradient-to-r from-sky-500 to-cyan-400 px-4 py-2 text-sm font-semibold text-white">Assign Sekarang</button>
-    </form>
-  `;
-}
-
-function renderResolveEscalationForm() {
-  const openEscalations = DashboardState.escalations.filter((item) => (item.status || '').toLowerCase() !== 'resolved');
-  return `
-    <form id="resolve-escalation-form" class="space-y-4">
-      <div>
-        <label class="text-sm font-medium text-slate-500">Pilih Escalation</label>
-        <select name="escalation" class="mt-1 w-full rounded-2xl border border-slate-200 px-3 py-2">
-          ${openEscalations
-            .map((item) => `<option value="${escapeHTML(item.id ?? item.escalation_id ?? item.customer_name)}">${escapeHTML(item.customer_name || 'Unknown')} • ${escapeHTML(item.priority)}</option>`)
-            .join('')}
-        </select>
-      </div>
-      <div>
-        <label class="text-sm font-medium text-slate-500">Catatan penyelesaian</label>
-        <textarea name="notes" rows="3" class="mt-1 w-full rounded-2xl border border-slate-200 px-3 py-2" placeholder="Langkah penyelesaian"></textarea>
-      </div>
-      <button type="submit" class="w-full rounded-2xl bg-gradient-to-r from-emerald-500 to-green-400 px-4 py-2 text-sm font-semibold text-white">Tandai Selesai</button>
-    </form>
-  `;
-}
-
-function renderSendMessageForm() {
-  const highPriorityCustomers = DashboardState.customers.filter((cust) => (cust.priority || cust.customer_priority || '').toLowerCase() === 'high');
-  return `
-    <form id="send-message-form" class="space-y-4">
-      <div>
-        <label class="text-sm font-medium text-slate-500">Pilih Customer</label>
-        <select name="customer" class="mt-1 w-full rounded-2xl border border-slate-200 px-3 py-2">
-          ${highPriorityCustomers
-            .map((cust) => `<option value="${escapeHTML(cust.phone || cust.customer_id || cust.id)}">${escapeHTML(cust.name || cust.customer_name || 'Unknown')} • ${escapeHTML(cust.phone || '')}</option>`)
-            .join('')}
-        </select>
-      </div>
-      <div>
-        <label class="text-sm font-medium text-slate-500">Pesan</label>
-        <textarea name="message" rows="3" class="mt-1 w-full rounded-2xl border border-slate-200 px-3 py-2" placeholder="Masukkan pesan follow-up"></textarea>
-      </div>
-      <button type="submit" class="w-full rounded-2xl bg-gradient-to-r from-violet-500 to-purple-400 px-4 py-2 text-sm font-semibold text-white">Kirim Pesan</button>
-    </form>
-  `;
-}
-
-function openQuickActionModal(title, subtitle, content) {
-  openModal({ title, subtitle, content });
-
-  const form = document.querySelector('#modal-content form');
-  if (!form) return;
-
-  form.addEventListener('submit', async (event) => {
-    event.preventDefault();
-    const formData = new FormData(form);
-    if (form.id === 'assign-lead-form') {
-      showToast('Lead assigned ke anggota tim', 'success');
-      closeModal();
-    } else if (form.id === 'resolve-escalation-form') {
-      await handleResolveEscalation(formData.get('escalation'), formData.get('notes'));
-    } else if (form.id === 'send-message-form') {
-      await handleSendMessage(formData.get('customer'), formData.get('message'));
-    }
-  });
-}
-
-function setupModal() {
-  const overlay = document.getElementById('modal-overlay');
-  const closeBtn = document.getElementById('modal-close');
-  if (!overlay || !closeBtn) return;
-
-  closeBtn.addEventListener('click', () => closeModal());
-  overlay.addEventListener('click', (event) => {
-    if (event.target === overlay) {
-      closeModal();
-    }
-  });
-}
-
-function openModal({ title, subtitle, content }) {
-  const overlay = document.getElementById('modal-overlay');
-  if (!overlay) return;
-
-  document.getElementById('modal-title').textContent = title;
-  document.getElementById('modal-subtitle').textContent = subtitle || '';
-  document.getElementById('modal-content').innerHTML = content || '';
-
-  overlay.classList.remove('hidden');
-  setTimeout(() => overlay.classList.add('flex'), 10);
-  refreshIcons();
-}
-
-function closeModal() {
-  const overlay = document.getElementById('modal-overlay');
-  if (!overlay) return;
-  overlay.classList.remove('flex');
-  overlay.classList.add('hidden');
-}
-
-function setupAutoRefresh() {
-  const select = document.getElementById('refresh-interval');
-  if (!select) return;
-
-  DashboardState.refreshInterval = Number(select.value) || 0;
-  select.addEventListener('change', () => {
-    DashboardState.refreshInterval = Number(select.value) || 0;
-    restartCountdown();
-  });
-}
-
-function restartCountdown() {
-  clearInterval(DashboardState.countdownTimer);
-  const countdownEl = document.getElementById('refresh-countdown');
-
-  if (!DashboardState.refreshInterval) {
-    DashboardState.countdownTimer = null;
-    if (countdownEl) countdownEl.textContent = '';
-    return;
-  }
-
-  DashboardState.countdownValue = DashboardState.refreshInterval / 1000;
-  if (countdownEl) countdownEl.textContent = `(${DashboardState.countdownValue}s)`;
-
-  DashboardState.countdownTimer = setInterval(async () => {
-    DashboardState.countdownValue -= 1;
-    if (countdownEl) countdownEl.textContent = `(${DashboardState.countdownValue}s)`;
-
-    if (DashboardState.countdownValue <= 0) {
-      clearInterval(DashboardState.countdownTimer);
-      await refreshData();
-    }
-  }, 1000);
 }
 
 async function handleManualRefresh() {
@@ -995,37 +403,6 @@ function prepareLeadRows(leads) {
   });
 }
 
-function formatDateCell(dateValue) {
-  if (!dateValue) return '<span class="text-xs text-slate-400">No data</span>';
-  const date = moment(dateValue);
-  if (!date.isValid()) return `<span class="text-xs text-slate-400">${escapeHTML(dateValue)}</span>`;
-  return `<div class="flex flex-col">
-      <span class="text-sm text-slate-600">${date.fromNow()}</span>
-      <span class="text-xs text-slate-400">${date.format('DD MMM YYYY, HH:mm')}</span>
-    </div>`;
-}
-
-function statusToBadge(status) {
-  const value = (status || '').toLowerCase();
-  if (value.includes('resolved') || value.includes('won') || value.includes('active')) return 'badge-success';
-  if (value.includes('pending') || value.includes('open') || value.includes('new')) return 'badge-warning';
-  if (value.includes('escalated') || value.includes('lost')) return 'badge-danger';
-  return 'badge-neutral';
-}
-
-function priorityToBadge(priority) {
-  const value = (priority || '').toLowerCase();
-  if (value === 'high' || value === 'urgent') return 'badge-danger';
-  if (value === 'medium') return 'badge-warning';
-  if (value === 'low') return 'badge-success';
-  return 'badge-neutral';
-}
-
-function capitalize(value) {
-  if (!value) return '';
-  return value.charAt(0).toUpperCase() + value.slice(1);
-}
-
 function deriveActivities(state) {
   const items = [];
   (Array.isArray(state.customers) ? state.customers : []).slice(0, 5).forEach((customer) => {
@@ -1128,276 +505,6 @@ function renderStats() {
   document.getElementById('response-period').textContent = stats.responsePeriod || 'SLA realtime';
 }
 
-function updateDeltaBadge(elementId, deltaValue, inverted = false) {
-  const badge = document.getElementById(elementId);
-  if (!badge) return;
-
-  let value = Number(deltaValue);
-  if (isNaN(value)) value = 0;
-  badge.textContent = `${value > 0 ? '+' : ''}${value.toFixed(1)}%`;
-  badge.classList.remove('badge-success', 'badge-warning', 'badge-danger', 'badge-info');
-
-  if (value === 0) {
-    badge.classList.add('badge-info');
-  } else if ((value > 0 && !inverted) || (value < 0 && inverted)) {
-    badge.classList.add('badge-success');
-  } else if (Math.abs(value) > 10) {
-    badge.classList.add('badge-danger');
-  } else {
-    badge.classList.add('badge-warning');
-  }
-}
-
-function formatNumber(value) {
-  return new Intl.NumberFormat('id-ID').format(value || 0);
-}
-
-function renderSparklineCharts() {
-  const sparklineData = extractSparklineData(DashboardState.stats);
-  createSparkline('sparkline-customers', sparklineData.customers);
-  createSparkline('sparkline-leads', sparklineData.leads);
-  createSparkline('sparkline-escalations', sparklineData.escalations);
-  createSparkline('sparkline-response', sparklineData.responseRate);
-}
-
-function extractSparklineData(stats) {
-  const fallback = Array.from({ length: 8 }).map((_, idx) => ({
-    label: moment().subtract(7 - idx, 'days').format('DD MMM'),
-    value: Math.round(Math.random() * 100)
-  }));
-
-  const safeArray = (arr) => (Array.isArray(arr) && arr.length ? arr : fallback);
-
-  return {
-    customers: safeArray(stats?.customerTrend || stats?.customer_trend),
-    leads: safeArray(stats?.leadTrend || stats?.lead_trend),
-    escalations: safeArray(stats?.escalationTrend || stats?.escalation_trend),
-    responseRate: safeArray(stats?.responseTrend || stats?.response_trend)
-  };
-}
-
-function createSparkline(elementId, dataset) {
-  const ctx = document.getElementById(elementId);
-  if (!ctx) return;
-
-  const sizing = lockChartArea(ctx, 64);
-
-  const labels = dataset.map((item) => item.label || moment(item.date).format('DD MMM'));
-  const data = dataset.map((item) => Number(item.value || item.total || 0));
-
-  if (DashboardState.charts[elementId]) {
-    DashboardState.charts[elementId].data.labels = labels;
-    DashboardState.charts[elementId].data.datasets[0].data = data;
-    DashboardState.charts[elementId].update();
-    lockChartArea(ctx, sizing.height || 64);
-    return;
-  }
-
-  DashboardState.charts[elementId] = new Chart(ctx, {
-    type: 'line',
-    data: {
-      labels,
-      datasets: [
-        {
-          data,
-          fill: true,
-          tension: 0.4,
-          borderColor: 'rgba(56, 189, 248, 0.9)',
-          backgroundColor: 'rgba(56, 189, 248, 0.2)',
-          pointRadius: 0,
-          pointHoverRadius: 3,
-          borderWidth: 2
-        }
-      ]
-    },
-    options: {
-      responsive: true,
-      maintainAspectRatio: false,
-      plugins: { legend: { display: false }, tooltip: { enabled: true } },
-      scales: { x: { display: false }, y: { display: false } }
-    }
-  });
-
-  lockChartArea(ctx, sizing.height || 64);
-}
-
-function renderOverviewCharts() {
-  renderLineChart();
-  renderEscalationChart();
-  renderFunnelChart();
-}
-
-function renderLineChart() {
-  const ctx = document.getElementById('chart-response-time');
-  if (!ctx) return;
-
-  const dataPoints = (DashboardState.stats?.responseTimeTrend || DashboardState.stats?.response_time_trend || []).map((item) => ({
-    date: item.date || item.label,
-    value: item.value || item.avg || item.average
-  }));
-
-  const dataset = dataPoints.length
-    ? dataPoints
-    : Array.from({ length: 7 }).map((_, idx) => ({
-        date: moment().subtract(6 - idx, 'days').format('DD MMM'),
-        value: 30 + Math.round(Math.random() * 20)
-      }));
-
-  const labels = dataset.map((item) => item.date);
-  const values = dataset.map((item) => Number(item.value));
-
-  createOrUpdateChart('chart-response-time', ctx, {
-    type: 'line',
-    data: {
-      labels,
-      datasets: [
-        {
-          label: 'Average Response Time (minutes)',
-          data: values,
-          borderColor: 'rgba(14, 165, 233, 0.9)',
-          backgroundColor: 'rgba(14, 165, 233, 0.2)',
-          fill: true,
-          tension: 0.35,
-          pointRadius: 4,
-          pointBackgroundColor: '#0ea5e9',
-          borderWidth: 2
-        },
-        {
-          label: 'SLA Target',
-          data: new Array(values.length).fill(20),
-          borderColor: 'rgba(16, 185, 129, 0.8)',
-          borderDash: [6, 6],
-          fill: false,
-          pointRadius: 0,
-          borderWidth: 1.5
-        }
-      ]
-    },
-    options: {
-      responsive: true,
-      maintainAspectRatio: false,
-      scales: {
-        y: {
-          beginAtZero: true,
-          ticks: { color: '#64748b' },
-          grid: { color: 'rgba(148, 163, 184, 0.2)' }
-        },
-        x: {
-          ticks: { color: '#94a3b8' },
-          grid: { display: false }
-        }
-      },
-      plugins: {
-        legend: { labels: { color: '#64748b' } },
-        tooltip: {
-          callbacks: {
-            label: (context) => `${context.parsed.y} menit`
-          }
-        }
-      }
-    }
-  });
-}
-
-function renderEscalationChart() {
-  const ctx = document.getElementById('chart-escalations');
-  if (!ctx) return;
-
-  const escalations = ensureArray(DashboardState.escalations);
-
-  const statusGroups = escalations.reduce(
-    (acc, item) => {
-      const status = (item.status || 'Open').toLowerCase();
-      if (status.includes('resolved')) acc.resolved += 1;
-      else if (status.includes('pending')) acc.pending += 1;
-      else acc.open += 1;
-      return acc;
-    },
-    { open: 0, pending: 0, resolved: 0 }
-  );
-
-  createOrUpdateChart('chart-escalations', ctx, {
-    type: 'doughnut',
-    data: {
-      labels: ['Open', 'Pending', 'Resolved'],
-      datasets: [
-        {
-          data: [statusGroups.open, statusGroups.pending, statusGroups.resolved],
-          backgroundColor: ['#f97316', '#facc15', '#34d399'],
-          borderWidth: 1
-        }
-      ]
-    },
-    options: {
-      responsive: true,
-      maintainAspectRatio: false,
-      plugins: {
-        legend: {
-          position: 'bottom',
-          labels: { color: '#64748b' }
-        }
-      }
-    }
-  });
-}
-
-function renderFunnelChart() {
-  const ctx = document.getElementById('chart-funnel');
-  if (!ctx) return;
-
-  const funnelData = DashboardState.stats?.funnel || DashboardState.stats?.conversionFunnel;
-  const stages = funnelData?.stages || ['Leads', 'Qualified', 'Proposal', 'Won'];
-  const values = funnelData?.values || [DashboardState.leads.length, Math.round(DashboardState.leads.length * 0.6), Math.round(DashboardState.leads.length * 0.3), Math.round(DashboardState.leads.length * 0.15)];
-
-  createOrUpdateChart('chart-funnel', ctx, {
-    type: 'bar',
-    data: {
-      labels: stages,
-      datasets: [
-        {
-          data: values,
-          backgroundColor: ['#38bdf8', '#22d3ee', '#a855f7', '#34d399'],
-          borderRadius: 12,
-          barPercentage: 0.6
-        }
-      ]
-    },
-    options: {
-      responsive: true,
-      maintainAspectRatio: false,
-      indexAxis: 'y',
-      plugins: { legend: { display: false } },
-      scales: {
-        x: {
-          ticks: { color: '#64748b' },
-          grid: { color: 'rgba(148, 163, 184, 0.2)' }
-        },
-        y: {
-          ticks: { color: '#64748b' },
-          grid: { display: false }
-        }
-      }
-    }
-  });
-}
-
-function createOrUpdateChart(id, ctx, config) {
-  const canvas = ctx instanceof HTMLCanvasElement ? ctx : document.getElementById(id);
-  if (!canvas) return;
-
-  const sizing = lockChartArea(canvas, 256);
-
-  if (DashboardState.charts[id]) {
-    DashboardState.charts[id].destroy();
-  }
-
-  lockChartArea(canvas, sizing.height || 256);
-
-  DashboardState.charts[id] = new Chart(canvas, config);
-
-  lockChartArea(canvas, sizing.height || 256);
-}
-
 function renderTeamLeaderboard() {
   const list = document.getElementById('team-leaderboard');
   if (!list) return;
@@ -1473,15 +580,6 @@ function populateLeadOwners() {
     };
     DashboardState.tableManagers.leads.applyFilters();
   });
-}
-
-function extractUnique(collection, key) {
-  const values = new Set();
-  collection.forEach((item) => {
-    const value = (item[key] || item[key]?.name || '').toString().trim();
-    if (value) values.add(value);
-  });
-  return Array.from(values);
 }
 
 async function openCustomerDetail(id) {
@@ -1642,7 +740,14 @@ async function handleSendMessage(target, message) {
     closeModal();
   } catch (error) {
     console.error('Send message error', error);
-    showToast('Gagal mengirim pesan: ' + error.message, 'error');
+    try {
+      await webhookApiConnector.sendWhatsAppMessage(target, message);
+      showToast('Pesan dikirim via webhook fallback', 'success');
+      closeModal();
+    } catch (fallbackError) {
+      console.error('Webhook fallback error', fallbackError);
+      showToast('Gagal mengirim pesan: ' + fallbackError.message, 'error');
+    }
   }
 }
 
@@ -1659,7 +764,15 @@ async function handleResolveEscalation(id, notes = '') {
     await refreshData();
   } catch (error) {
     console.error('Resolve escalation error', error);
-    showToast('Gagal menyelesaikan escalation: ' + error.message, 'error');
+    try {
+      await webhookApiConnector.resolveEscalation(id);
+      showToast('Escalation diselesaikan via webhook fallback', 'success');
+      closeModal();
+      await refreshData();
+    } catch (fallbackError) {
+      console.error('Webhook resolve escalation error', fallbackError);
+      showToast('Gagal menyelesaikan escalation: ' + fallbackError.message, 'error');
+    }
   }
 }
 
@@ -1735,14 +848,6 @@ function renderAnalyticsWidgets() {
   refreshIcons();
 }
 
-function updateRefreshState() {
-  DashboardState.lastRefresh = new Date();
-  const lastUpdatedEl = document.getElementById('last-updated');
-  if (lastUpdatedEl) {
-    lastUpdatedEl.textContent = moment(DashboardState.lastRefresh).format('DD MMM YYYY HH:mm:ss');
-  }
-}
-
 function updateNewItemsBadge() {
   const badge = document.getElementById('new-items-count');
   const realtime = document.getElementById('realtime-status');
@@ -1790,39 +895,6 @@ function filterByDateRange(type) {
       rangeLabel.textContent = 'Semua waktu';
     }
   }
-}
-
-function showToast(message, type = 'info') {
-  const container = document.getElementById('toast-container');
-  if (!container) return;
-
-  const colors = {
-    success: 'from-emerald-500 to-green-400',
-    error: 'from-rose-500 to-pink-500',
-    info: 'from-sky-500 to-cyan-400'
-  };
-
-  const icon = {
-    success: 'check-circle',
-    error: 'alert-triangle',
-    info: 'info'
-  }[type] || 'bell';
-
-  const toast = document.createElement('div');
-  toast.className = `pointer-events-auto rounded-2xl bg-gradient-to-r ${colors[type] || colors.info} px-4 py-3 text-white shadow-lg shadow-slate-900/20 transition`;
-  toast.innerHTML = `
-    <div class="flex items-center gap-3">
-      <i data-lucide="${icon}" class="h-4 w-4"></i>
-      <span class="text-sm font-medium">${escapeHTML(message)}</span>
-    </div>
-  `;
-  container.appendChild(toast);
-  refreshIcons();
-
-  setTimeout(() => {
-    toast.classList.add('opacity-0', 'translate-y-2');
-    setTimeout(() => toast.remove(), 300);
-  }, 2500);
 }
 
 async function testConnection() {
