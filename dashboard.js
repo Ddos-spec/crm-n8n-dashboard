@@ -16,6 +16,155 @@ const DashboardState = {
   theme: 'light'
 };
 
+function ensureArray(value) {
+  if (Array.isArray(value)) return value;
+  if (!value || typeof value !== 'object') return [];
+
+  if (Array.isArray(value.data)) return value.data;
+  if (Array.isArray(value.items)) return value.items;
+  if (Array.isArray(value.results)) return value.results;
+  if (Array.isArray(value.records)) return value.records;
+
+  return Object.values(value).reduce((acc, item) => {
+    if (Array.isArray(item)) {
+      acc.push(...item);
+    } else if (item && typeof item === 'object') {
+      acc.push(item);
+    }
+    return acc;
+  }, []);
+}
+
+function parseNumeric(value) {
+  if (typeof value === 'number') {
+    return Number.isFinite(value) ? value : null;
+  }
+  if (typeof value === 'string') {
+    const parsed = parseFloat(value);
+    return Number.isNaN(parsed) ? null : parsed;
+  }
+  return null;
+}
+
+function readCanvasHeight(canvas) {
+  if (!canvas) return null;
+
+  const clientHeight = parseNumeric(canvas.clientHeight);
+  if (clientHeight) return clientHeight;
+
+  const inlineHeight = parseNumeric(canvas.style?.height);
+  if (inlineHeight) return inlineHeight;
+
+  const attrHeight = parseNumeric(canvas.getAttribute?.('height'));
+  if (attrHeight) return attrHeight;
+
+  if (typeof window !== 'undefined' && window.getComputedStyle) {
+    const computedHeight = parseNumeric(window.getComputedStyle(canvas)?.height);
+    if (computedHeight) return computedHeight;
+  }
+
+  return null;
+}
+
+function readInnerHeight(element) {
+  if (!element) return null;
+
+  let height = parseNumeric(element.clientHeight);
+  if (height && typeof window !== 'undefined' && window.getComputedStyle) {
+    const styles = window.getComputedStyle(element);
+    const paddingTop = parseNumeric(styles?.paddingTop) || 0;
+    const paddingBottom = parseNumeric(styles?.paddingBottom) || 0;
+    height -= paddingTop + paddingBottom;
+  }
+
+  if (height && height > 0) {
+    return height;
+  }
+
+  if (typeof window !== 'undefined' && window.getComputedStyle) {
+    const styles = window.getComputedStyle(element);
+    const computedHeight = parseNumeric(styles?.height);
+    if (computedHeight) {
+      const paddingTop = parseNumeric(styles?.paddingTop) || 0;
+      const paddingBottom = parseNumeric(styles?.paddingBottom) || 0;
+      const innerHeight = computedHeight - paddingTop - paddingBottom;
+      return innerHeight > 0 ? innerHeight : null;
+    }
+  }
+
+  return null;
+}
+
+function ensureChartWrapper(canvas) {
+  if (!canvas) return null;
+
+  const currentParent = canvas.parentElement;
+  if (!currentParent) return null;
+
+  if (currentParent.dataset?.chartWrapper === 'true') {
+    return currentParent;
+  }
+
+  const wrapper = document.createElement('div');
+  wrapper.dataset.chartWrapper = 'true';
+  wrapper.style.display = 'block';
+  wrapper.style.position = 'relative';
+  wrapper.style.width = '100%';
+
+  currentParent.insertBefore(wrapper, canvas);
+  wrapper.appendChild(canvas);
+
+  return wrapper;
+}
+
+function lockChartArea(canvas, fallbackHeight) {
+  if (!canvas) {
+    return { container: null, height: fallbackHeight };
+  }
+
+  const wrapper = ensureChartWrapper(canvas);
+  const container = wrapper || canvas.parentElement || null;
+
+  const baseFallback = fallbackHeight || 0;
+  let height = parseNumeric(canvas.dataset?.fixedHeight)
+    ?? readCanvasHeight(canvas)
+    ?? readInnerHeight(container)
+    ?? baseFallback;
+
+  if (!height || height <= 0) {
+    height = baseFallback || 256;
+  }
+
+  canvas.dataset.fixedHeight = `${height}px`;
+
+  if (container) {
+    if (!container.dataset.fixedHeight) {
+      let containerHeight = readInnerHeight(container);
+      if (!containerHeight || containerHeight <= 0) {
+        containerHeight = height;
+      }
+      container.dataset.fixedHeight = `${containerHeight}px`;
+    }
+
+    const lockedContainerHeight = parseNumeric(container.dataset.fixedHeight) || height;
+    const containerHeightPx = `${lockedContainerHeight}px`;
+    container.style.height = containerHeightPx;
+    container.style.maxHeight = containerHeightPx;
+  }
+
+  const heightPx = `${height}px`;
+  canvas.style.height = heightPx;
+  canvas.style.maxHeight = heightPx;
+  canvas.style.width = '100%';
+
+  const numericHeight = parseNumeric(height);
+  if (numericHeight && numericHeight > 0) {
+    canvas.setAttribute('height', Math.max(Math.round(numericHeight), 1));
+  }
+
+  return { container, height };
+}
+
 class TableManager {
   constructor({
     tableId,
@@ -546,9 +695,9 @@ async function refreshData() {
     ]);
 
     DashboardState.stats = statsResponse.data || statsResponse;
-    DashboardState.customers = customersResponse.data || [];
-    DashboardState.leads = leadsResponse.data || [];
-    DashboardState.escalations = escalationsResponse.data || [];
+    DashboardState.customers = ensureArray(customersResponse.data ?? customersResponse);
+    DashboardState.leads = ensureArray(leadsResponse.data ?? leadsResponse);
+    DashboardState.escalations = ensureArray(escalationsResponse.data ?? escalationsResponse);
 
     DashboardState.activities = deriveActivities(DashboardState);
     DashboardState.notifications = deriveNotifications(DashboardState);
@@ -1031,6 +1180,8 @@ function createSparkline(elementId, dataset) {
   const ctx = document.getElementById(elementId);
   if (!ctx) return;
 
+  const sizing = lockChartArea(ctx, 64);
+
   const labels = dataset.map((item) => item.label || moment(item.date).format('DD MMM'));
   const data = dataset.map((item) => Number(item.value || item.total || 0));
 
@@ -1038,6 +1189,7 @@ function createSparkline(elementId, dataset) {
     DashboardState.charts[elementId].data.labels = labels;
     DashboardState.charts[elementId].data.datasets[0].data = data;
     DashboardState.charts[elementId].update();
+    lockChartArea(ctx, sizing.height || 64);
     return;
   }
 
@@ -1065,6 +1217,8 @@ function createSparkline(elementId, dataset) {
       scales: { x: { display: false }, y: { display: false } }
     }
   });
+
+  lockChartArea(ctx, sizing.height || 64);
 }
 
 function renderOverviewCharts() {
@@ -1149,7 +1303,9 @@ function renderEscalationChart() {
   const ctx = document.getElementById('chart-escalations');
   if (!ctx) return;
 
-  const statusGroups = DashboardState.escalations.reduce(
+  const escalations = ensureArray(DashboardState.escalations);
+
+  const statusGroups = escalations.reduce(
     (acc, item) => {
       const status = (item.status || 'Open').toLowerCase();
       if (status.includes('resolved')) acc.resolved += 1;
@@ -1226,10 +1382,20 @@ function renderFunnelChart() {
 }
 
 function createOrUpdateChart(id, ctx, config) {
+  const canvas = ctx instanceof HTMLCanvasElement ? ctx : document.getElementById(id);
+  if (!canvas) return;
+
+  const sizing = lockChartArea(canvas, 256);
+
   if (DashboardState.charts[id]) {
     DashboardState.charts[id].destroy();
   }
-  DashboardState.charts[id] = new Chart(ctx, config);
+
+  lockChartArea(canvas, sizing.height || 256);
+
+  DashboardState.charts[id] = new Chart(canvas, config);
+
+  lockChartArea(canvas, sizing.height || 256);
 }
 
 function renderTeamLeaderboard() {
