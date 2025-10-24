@@ -1250,22 +1250,61 @@ function createOrUpdateChart(id, ctx, config) {
   const canvas = ctx instanceof HTMLCanvasElement ? ctx : document.getElementById(id);
   if (!canvas) return;
 
-  if (!canvas.dataset.fixedHeight) {
-    let measuredHeight = canvas.clientHeight;
-    if (!measuredHeight) {
-      const inlineHeight = canvas.style.height || canvas.getAttribute('height');
-      if (inlineHeight && !Number.isNaN(parseFloat(inlineHeight))) {
-        measuredHeight = parseFloat(inlineHeight);
-      } else if (typeof window !== 'undefined' && window.getComputedStyle) {
-        const computedHeight = window.getComputedStyle(canvas).height;
-        measuredHeight = parseFloat(computedHeight);
-      }
-    }
-    canvas.dataset.fixedHeight = `${measuredHeight || 256}px`;
-  }
+  const container = canvas.parentElement;
 
-  const fixedHeight = canvas.dataset.fixedHeight;
+  const ensureFixedHeight = () => {
+    if (container && !container.dataset.fixedHeight) {
+      let measuredHeight = container.clientHeight;
+      if (typeof window !== 'undefined' && window.getComputedStyle) {
+        const computed = window.getComputedStyle(container);
+        if (computed) {
+          const paddingTop = parseFloat(computed.paddingTop) || 0;
+          const paddingBottom = parseFloat(computed.paddingBottom) || 0;
+          measuredHeight = Math.max(measuredHeight - (paddingTop + paddingBottom), 0);
+        }
+      }
+
+      if (!measuredHeight) {
+        measuredHeight = canvas.clientHeight;
+      }
+
+      if (!measuredHeight) {
+        const inlineHeight = canvas.style.height || canvas.getAttribute('height');
+        if (inlineHeight && !Number.isNaN(parseFloat(inlineHeight))) {
+          measuredHeight = parseFloat(inlineHeight);
+        } else if (typeof window !== 'undefined' && window.getComputedStyle) {
+          const computedHeight = window.getComputedStyle(canvas).height;
+          measuredHeight = parseFloat(computedHeight);
+        }
+      }
+
+      const normalizedHeight = `${measuredHeight || 256}px`;
+      container.dataset.fixedHeight = normalizedHeight;
+      canvas.dataset.fixedHeight = normalizedHeight;
+    } else if (!canvas.dataset.fixedHeight) {
+      let measuredHeight = canvas.clientHeight;
+      if (!measuredHeight) {
+        const inlineHeight = canvas.style.height || canvas.getAttribute('height');
+        if (inlineHeight && !Number.isNaN(parseFloat(inlineHeight))) {
+          measuredHeight = parseFloat(inlineHeight);
+        } else if (typeof window !== 'undefined' && window.getComputedStyle) {
+          const computedHeight = window.getComputedStyle(canvas).height;
+          measuredHeight = parseFloat(computedHeight);
+        }
+      }
+      canvas.dataset.fixedHeight = `${measuredHeight || 256}px`;
+    }
+  };
+
+  ensureFixedHeight();
+
+  const fixedHeight = container?.dataset.fixedHeight || canvas.dataset.fixedHeight;
   if (fixedHeight) {
+    if (container) {
+      container.style.height = fixedHeight;
+      container.style.maxHeight = fixedHeight;
+    }
+
     canvas.style.height = fixedHeight;
     const numericHeight = parseFloat(fixedHeight);
     if (!Number.isNaN(numericHeight)) {
