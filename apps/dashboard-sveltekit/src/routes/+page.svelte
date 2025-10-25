@@ -148,7 +148,7 @@
       label: 'Nama',
       accessor: (item) => item.name,
       sortable: true,
-      class: 'font-medium text-ink'
+      class: 'font-medium text-slate-900'
     },
     {
       id: 'status',
@@ -168,7 +168,7 @@
       id: 'next_action',
       label: 'Next Action',
       accessor: (item) => item.next_action ?? '—',
-      class: 'text-ink-soft'
+      class: 'text-slate-600'
     }
   ];
 
@@ -178,14 +178,14 @@
       label: 'Nama',
       accessor: (item) => item.name,
       sortable: true,
-      class: 'font-medium text-ink'
+      class: 'font-medium text-slate-900'
     },
     {
       id: 'source',
       label: 'Sumber',
       accessor: (item) => item.source ?? '—',
       sortable: true,
-      class: 'text-ink-soft'
+      class: 'text-slate-600'
     },
     {
       id: 'phone',
@@ -741,31 +741,52 @@
   });
 </script>
 
-<section class="space-y-10 px-6 py-10">
-  {#if feedback}
-    <div
-      class={`rounded-2xl border px-4 py-3 text-sm shadow-sm ${
-        feedback.type === 'success'
-          ? 'border-emerald-100 bg-emerald-50 text-emerald-700'
-          : 'border-rose-100 bg-rose-50 text-rose-700'
-      }`}
-      role="status"
-    >
-      {feedback.message}
+<div class="min-h-screen bg-white text-slate-900">
+  <header class="flex flex-col gap-4 border-b border-slate-200 px-6 py-6 lg:flex-row lg:items-center lg:justify-between lg:px-12">
+    <div>
+      <p class="text-xs font-semibold uppercase tracking-wide text-slate-500">CRM Command Center</p>
+      <h1 class="text-2xl font-semibold text-slate-900">Dashboard</h1>
+      <p class="mt-1 text-sm text-slate-600">Pemantauan realtime pelanggan, leads, dan eskalasi.</p>
+    </div>
+    <div class="flex items-center gap-4">
+      <div class="hidden flex-col text-right text-xs text-slate-500 sm:flex">
+        <span class="text-sm font-semibold text-slate-900">Thomas Fleming</span>
+        <span>marketing@tepatlaser.id</span>
+      </div>
       <button
         type="button"
-        class="ml-4 text-xs font-semibold text-ink-soft underline hover:text-ink"
-        on:click={() => setFeedback(null)}
+        class="rounded-md border border-slate-200 px-4 py-2 text-sm font-medium text-slate-600 transition hover:border-blue-500 hover:text-blue-600"
       >
-        Tutup
+        Logout
       </button>
     </div>
-  {/if}
+  </header>
 
-  <HeroPanel
-    title="Tepat Laser Command Center"
-    subtitle="Ringkasan performa customer service & marketing dalam satu layar"
-    workflowId={config.n8n.workflowId}
+  <main class="space-y-10 px-6 py-8 lg:px-12">
+    {#if feedback}
+      <div
+        class={`rounded-md border px-4 py-3 text-sm shadow-sm ${
+          feedback.type === 'success'
+            ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
+            : 'border-rose-200 bg-rose-50 text-rose-700'
+        }`}
+        role="status"
+      >
+        {feedback.message}
+        <button
+          type="button"
+          class="ml-4 text-xs font-semibold text-slate-600 underline hover:text-slate-900"
+          on:click={() => setFeedback(null)}
+        >
+          Tutup
+        </button>
+      </div>
+    {/if}
+
+    <HeroPanel
+      title="Tepat Laser Command Center"
+      subtitle="Ringkasan performa customer service & marketing dalam satu layar"
+      workflowId={config.n8n.workflowId}
     baseUrl={config.n8n.baseUrl}
     connectionStatus={connectionStatus}
     lastUpdatedLabel={lastUpdatedLabel}
@@ -779,123 +800,142 @@
     newItemsCount={newItemsCount}
     realtimeStatus={realtimeStatus}
     periodLabel={periodLabel}
-  >
-    <a
-      slot="actions"
-      href="/detail"
-      class="inline-flex items-center justify-end gap-2 text-xs font-semibold text-accent hover:text-accent/80"
     >
-      Lihat detail lengkap →
-    </a>
-  </HeroPanel>
+      <a
+        slot="actions"
+        href="/detail"
+        class="inline-flex items-center justify-end gap-2 text-xs font-semibold text-blue-600 hover:text-blue-500"
+      >
+        Lihat detail lengkap →
+      </a>
+    </HeroPanel>
 
-  <section class="rounded-2xl border border-surface-muted bg-surface p-6 shadow-sm">
-    <header class="flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
-      <div>
-        <h2 class="text-2xl font-semibold text-ink">Ringkasan KPI</h2>
-        <p class="text-sm text-ink-soft">Empat angka utama untuk memantau pelanggan, leads, eskalasi, dan respons.</p>
-      </div>
-    </header>
+    <section class="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+      <header class="flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
+        <div>
+          <h2 class="text-2xl font-semibold text-slate-900">Ringkasan KPI</h2>
+          <p class="text-sm text-slate-600">Empat angka utama untuk memantau pelanggan, leads, eskalasi, dan respons.</p>
+        </div>
+      </header>
 
-    <div class="mt-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-      {#if $statsSummary}
-        {#each $statsSummary as card (card.id)}
-          <KpiCard {...card} />
-        {/each}
-      {:else}
-        {#if $statsState.status === 'loading'}
-          {#each Array(4) as _, index (index)}
-            <article class="animate-pulse rounded-2xl border border-surface-muted bg-surface p-5" aria-hidden="true">
-              <div class="h-3 w-24 rounded bg-surface-muted"></div>
-              <div class="mt-4 h-6 w-16 rounded bg-surface-muted"></div>
-              <div class="mt-8 h-6 w-full rounded bg-surface-muted"></div>
-            </article>
+      <div class="mt-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        {#if $statsSummary}
+          {#each $statsSummary as card (card.id)}
+            <KpiCard {...card} />
           {/each}
-        {:else if $statsState.status === 'error'}
-          <article class="col-span-full rounded-2xl border border-rose-100 bg-rose-50 p-5 text-sm text-rose-700">
-            Tidak bisa memuat ringkasan: {$statsState.error}
-          </article>
+        {:else}
+          {#if $statsState.status === 'loading'}
+            {#each Array(4) as _, index (index)}
+              <article class="animate-pulse rounded-lg border border-slate-200 bg-slate-100 p-5" aria-hidden="true">
+                <div class="h-3 w-24 rounded bg-slate-200"></div>
+                <div class="mt-4 h-6 w-16 rounded bg-slate-200"></div>
+                <div class="mt-8 h-6 w-full rounded bg-slate-200"></div>
+              </article>
+            {/each}
+          {:else if $statsState.status === 'error'}
+            <article class="col-span-full rounded-lg border border-rose-200 bg-rose-50 p-5 text-sm text-rose-700">
+              Tidak bisa memuat ringkasan: {$statsState.error}
+            </article>
+          {/if}
         {/if}
-      {/if}
-    </div>
-  </section>
-
-  <section class="rounded-2xl border border-surface-muted bg-surface shadow-sm">
-    <div class="flex flex-col gap-4 border-b border-surface-muted p-6 sm:flex-row sm:items-center sm:justify-between">
-      <nav class="flex gap-2 rounded-full bg-surface-muted p-1 text-sm font-medium">
-        <button
-          class={`rounded-full px-4 py-2 transition ${activeTab === 'customers' ? 'bg-accent-muted text-accent shadow-sm' : 'bg-surface text-ink-soft'}`}
-          on:click={() => {
-            activeTab = 'customers';
-            tableResetSignal += 1;
-          }}
-          type="button"
-        >
-          Customers
-        </button>
-        <button
-          class={`rounded-full px-4 py-2 transition ${activeTab === 'leads' ? 'bg-accent-muted text-accent shadow-sm' : 'bg-surface text-ink-soft'}`}
-          on:click={() => {
-            activeTab = 'leads';
-            tableResetSignal += 1;
-          }}
-          type="button"
-        >
-          Leads
-        </button>
-      </nav>
-
-      <div class="w-full sm:w-72">
-        <label class="sr-only" for="data-search">Cari</label>
-        <input
-          id="data-search"
-          type="search"
-          placeholder={activeTab === 'customers' ? 'Cari pelanggan…' : 'Cari leads…'}
-          class="w-full rounded-lg border border-surface-muted bg-surface px-3 py-2 text-sm focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/30"
-          value={activeTab === 'customers' ? $customerFilter : $leadFilter}
-          on:input={handleSearch}
-        />
       </div>
-    </div>
+    </section>
 
-    <div class="p-6">
-      {#if activeTab === 'customers'}
-        <DataTable
-          items={$customerRows}
-          columns={customerColumns}
-          keyField="id"
-          loading={$customersState.status === 'loading'}
-          error={$customersState.status === 'error' ? $customersState.error : null}
-          emptyMessage="Belum ada data pelanggan."
-          summaryLabel="pelanggan"
-          exportFilename="customers.csv"
-          showActionsColumn
-          resetSignal={tableResetSignal}
-          on:select={(event) => handleSelectAction('customers', event)}
-        />
-      {:else}
-        <DataTable
-          items={$leadRows}
-          columns={leadColumns}
-          keyField="id"
-          loading={$leadsState.status === 'loading'}
-          error={$leadsState.status === 'error' ? $leadsState.error : null}
-          emptyMessage="Belum ada data leads."
-          summaryLabel="leads"
-          exportFilename="leads.csv"
-          showActionsColumn
-          resetSignal={tableResetSignal}
-          on:select={(event) => handleSelectAction('leads', event)}
-        />
+    <section class="rounded-xl border border-slate-200 bg-white shadow-sm">
+      <div class="flex flex-col gap-4 border-b border-slate-200 px-6 py-6 sm:flex-row sm:items-center sm:justify-between">
+        <nav class="flex gap-2 rounded-lg bg-slate-100 p-1 text-sm font-semibold text-slate-600">
+          <button
+            class={`rounded-md px-4 py-2 transition ${
+              activeTab === 'customers'
+                ? 'bg-blue-600 text-white shadow-sm'
+                : 'bg-transparent text-slate-600 hover:text-blue-600'
+            }`}
+            on:click={() => {
+              activeTab = 'customers';
+              tableResetSignal += 1;
+            }}
+            type="button"
+          >
+            Customers
+          </button>
+          <button
+            class={`rounded-md px-4 py-2 transition ${
+              activeTab === 'leads'
+                ? 'bg-blue-600 text-white shadow-sm'
+                : 'bg-transparent text-slate-600 hover:text-blue-600'
+            }`}
+            on:click={() => {
+              activeTab = 'leads';
+              tableResetSignal += 1;
+            }}
+            type="button"
+          >
+            Leads
+          </button>
+        </nav>
+
+        <div class="flex w-full flex-col gap-3 sm:w-auto sm:flex-row sm:items-center">
+          <label class="sr-only" for="data-search">Cari</label>
+          <input
+            id="data-search"
+            type="search"
+            placeholder={activeTab === 'customers' ? 'Cari pelanggan…' : 'Cari leads…'}
+            class="w-full rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-700 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200 sm:w-72"
+            value={activeTab === 'customers' ? $customerFilter : $leadFilter}
+            on:input={handleSearch}
+          />
+          <button
+            type="button"
+            class="inline-flex items-center justify-center rounded-md border border-slate-200 px-4 py-2 text-sm font-medium text-slate-600 transition hover:border-blue-500 hover:text-blue-600"
+            on:click={() => {
+              customersStore.filterTerm.set('');
+              leadsStore.filterTerm.set('');
+              tableResetSignal += 1;
+            }}
+          >
+            Reset filter
+          </button>
+        </div>
+      </div>
+
+      <div class="px-6 pb-6">
+        {#if activeTab === 'customers'}
+          <DataTable
+            items={$customerRows}
+            columns={customerColumns}
+            keyField="id"
+            loading={$customersState.status === 'loading'}
+            error={$customersState.status === 'error' ? $customersState.error : null}
+            emptyMessage="Belum ada data pelanggan."
+            summaryLabel="pelanggan"
+            exportFilename="customers.csv"
+            showActionsColumn
+            resetSignal={tableResetSignal}
+            on:select={(event) => handleSelectAction('customers', event)}
+          />
+        {:else}
+          <DataTable
+            items={$leadRows}
+            columns={leadColumns}
+            keyField="id"
+            loading={$leadsState.status === 'loading'}
+            error={$leadsState.status === 'error' ? $leadsState.error : null}
+            emptyMessage="Belum ada data leads."
+            summaryLabel="leads"
+            exportFilename="leads.csv"
+            showActionsColumn
+            resetSignal={tableResetSignal}
+            on:select={(event) => handleSelectAction('leads', event)}
+          />
+        {/if}
+      </div>
+    </section>
+    <p class="sr-only" aria-live="polite">
+      {#if pendingAction}
+        Aksi {pendingAction.action} dipilih untuk {pendingAction.dataset === 'customers' ? 'pelanggan' : 'lead'}{' '}
+        {pendingAction.record.name}.
       {/if}
-    </div>
-  </section>
-  <p class="sr-only" aria-live="polite">
-    {#if pendingAction}
-      Aksi {pendingAction.action} dipilih untuk {pendingAction.dataset === 'customers' ? 'pelanggan' : 'lead'}{' '}
-      {pendingAction.record.name}.
-    {/if}
-  </p>
+    </p>
 
   <Modal
     open={detailModal.open}
@@ -905,40 +945,40 @@
     on:close={closeDetailModal}
   >
     {#if detailModal.loading}
-      <p class="text-sm text-ink-soft">Memuat detail…</p>
+      <p class="text-sm text-slate-600">Memuat detail…</p>
     {:else if detailModal.error}
       <p class="text-sm text-rose-600">{detailModal.error}</p>
     {:else if detailModal.dataset === 'customers'}
       {#if detailModal.customerDetail}
         <div class="space-y-6">
-          <section class="rounded-2xl border border-surface-muted bg-surface px-4 py-4">
-            <h3 class="text-sm font-semibold uppercase tracking-wide text-ink-soft">Profil Pelanggan</h3>
+          <section class="rounded-xl border border-slate-200 bg-white px-4 py-4 shadow-sm">
+            <h3 class="text-sm font-semibold uppercase tracking-wide text-slate-500">Profil Pelanggan</h3>
             <dl class="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
               <div>
-                <dt class="text-xs text-ink-soft">Nama</dt>
-                <dd class="text-sm font-medium text-ink">{detailModal.customerDetail.name ?? '—'}</dd>
+                <dt class="text-xs text-slate-500">Nama</dt>
+                <dd class="text-sm font-medium text-slate-900">{detailModal.customerDetail.name ?? '—'}</dd>
               </div>
               <div>
-                <dt class="text-xs text-ink-soft">Telepon</dt>
-                <dd class="text-sm font-medium text-ink">{detailModal.customerDetail.phone ?? '—'}</dd>
+                <dt class="text-xs text-slate-500">Telepon</dt>
+                <dd class="text-sm font-medium text-slate-900">{detailModal.customerDetail.phone ?? '—'}</dd>
               </div>
               <div>
-                <dt class="text-xs text-ink-soft">Lokasi</dt>
-                <dd class="text-sm text-ink-soft">{detailModal.customerDetail.location ?? '—'}</dd>
+                <dt class="text-xs text-slate-500">Lokasi</dt>
+                <dd class="text-sm text-slate-600">{detailModal.customerDetail.location ?? '—'}</dd>
               </div>
               <div>
-                <dt class="text-xs text-ink-soft">Prioritas</dt>
-                <dd class="text-sm font-medium text-ink">
+                <dt class="text-xs text-slate-500">Prioritas</dt>
+                <dd class="text-sm font-medium text-slate-900">
                   {detailModal.customerDetail.customer_priority ?? detailModal.customerDetail.priority ?? '—'}
                 </dd>
               </div>
               <div>
-                <dt class="text-xs text-ink-soft">PIC</dt>
-                <dd class="text-sm text-ink-soft">{detailModal.customerDetail.assigned_to ?? '—'}</dd>
+                <dt class="text-xs text-slate-500">PIC</dt>
+                <dd class="text-sm text-slate-600">{detailModal.customerDetail.assigned_to ?? '—'}</dd>
               </div>
               <div>
-                <dt class="text-xs text-ink-soft">Tags</dt>
-                <dd class="text-sm text-ink-soft">
+                <dt class="text-xs text-slate-500">Tags</dt>
+                <dd class="text-sm text-slate-600">
                   {#if Array.isArray(detailModal.customerDetail.tags) && detailModal.customerDetail.tags.length > 0}
                     {detailModal.customerDetail.tags.join(', ')}
                   {:else}
@@ -948,108 +988,108 @@
               </div>
             </dl>
           </section>
-          <section class="rounded-2xl border border-surface-muted bg-surface px-4 py-4">
-            <h3 class="text-sm font-semibold uppercase tracking-wide text-ink-soft">Riwayat Kontak</h3>
+          <section class="rounded-xl border border-slate-200 bg-white px-4 py-4 shadow-sm">
+            <h3 class="text-sm font-semibold uppercase tracking-wide text-slate-500">Riwayat Kontak</h3>
             {#if normalizeContactHistory(detailModal.customerDetail).length > 0}
               <ol class="mt-4 space-y-3">
                 {#each normalizeContactHistory(detailModal.customerDetail) as item, index (index)}
-                  <li class="rounded-xl border border-surface-muted bg-surface px-4 py-3">
-                    <p class="text-sm font-semibold text-ink">{item.channel ?? 'Interaksi'}</p>
-                    <p class="text-xs text-ink-soft">{formatDateTime(item.time ?? item.timestamp)}</p>
-                    <p class="mt-2 text-sm text-ink-soft">{item.summary ?? item.notes ?? 'Tidak ada catatan.'}</p>
+                  <li class="rounded-lg border border-slate-200 bg-white px-4 py-3 shadow-sm">
+                    <p class="text-sm font-semibold text-slate-900">{item.channel ?? 'Interaksi'}</p>
+                    <p class="text-xs text-slate-500">{formatDateTime(item.time ?? item.timestamp)}</p>
+                    <p class="mt-2 text-sm text-slate-600">{item.summary ?? item.notes ?? 'Tidak ada catatan.'}</p>
                   </li>
                 {/each}
               </ol>
             {:else}
-              <p class="mt-4 text-sm text-ink-soft">Belum ada riwayat kontak.</p>
+              <p class="mt-4 text-sm text-slate-600">Belum ada riwayat kontak.</p>
             {/if}
           </section>
         </div>
       {:else}
-        <p class="text-sm text-ink-soft">Detail pelanggan tidak tersedia.</p>
+        <p class="text-sm text-slate-600">Detail pelanggan tidak tersedia.</p>
       {/if}
     {:else if detailModal.dataset === 'leads'}
       {#if detailModal.leadDetail}
         <div class="space-y-6">
-          <section class="rounded-2xl border border-surface-muted bg-surface px-4 py-4">
-            <h3 class="text-sm font-semibold uppercase tracking-wide text-ink-soft">Informasi Lead</h3>
+          <section class="rounded-xl border border-slate-200 bg-white px-4 py-4 shadow-sm">
+            <h3 class="text-sm font-semibold uppercase tracking-wide text-slate-500">Informasi Lead</h3>
             <dl class="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
               <div>
-                <dt class="text-xs text-ink-soft">Nama</dt>
-                <dd class="text-sm font-medium text-ink">{detailModal.leadDetail.name ?? '—'}</dd>
+                <dt class="text-xs text-slate-500">Nama</dt>
+                <dd class="text-sm font-medium text-slate-900">{detailModal.leadDetail.name ?? '—'}</dd>
               </div>
               <div>
-                <dt class="text-xs text-ink-soft">Kontak</dt>
-                <dd class="text-sm font-medium text-ink">{leadContactDisplay(detailModal.leadDetail)}</dd>
+                <dt class="text-xs text-slate-500">Kontak</dt>
+                <dd class="text-sm font-medium text-slate-900">{leadContactDisplay(detailModal.leadDetail)}</dd>
               </div>
               <div>
-                <dt class="text-xs text-ink-soft">Sumber</dt>
-                <dd class="text-sm text-ink-soft">{detailModal.leadDetail.source ?? '—'}</dd>
+                <dt class="text-xs text-slate-500">Sumber</dt>
+                <dd class="text-sm text-slate-600">{detailModal.leadDetail.source ?? '—'}</dd>
               </div>
               <div>
-                <dt class="text-xs text-ink-soft">Status</dt>
-                <dd class="text-sm font-medium text-ink">{detailModal.leadDetail.status ?? '—'}</dd>
+                <dt class="text-xs text-slate-500">Status</dt>
+                <dd class="text-sm font-medium text-slate-900">{detailModal.leadDetail.status ?? '—'}</dd>
               </div>
               <div>
-                <dt class="text-xs text-ink-soft">Score</dt>
-                <dd class="text-sm font-medium text-ink">{leadScoreDisplay(detailModal.leadDetail)}</dd>
+                <dt class="text-xs text-slate-500">Score</dt>
+                <dd class="text-sm font-medium text-slate-900">{leadScoreDisplay(detailModal.leadDetail)}</dd>
               </div>
               <div>
-                <dt class="text-xs text-ink-soft">PIC</dt>
-                <dd class="text-sm text-ink-soft">{leadOwnerDisplay(detailModal.leadDetail)}</dd>
+                <dt class="text-xs text-slate-500">PIC</dt>
+                <dd class="text-sm text-slate-600">{leadOwnerDisplay(detailModal.leadDetail)}</dd>
               </div>
             </dl>
           </section>
-          <section class="rounded-2xl border border-surface-muted bg-surface px-4 py-4">
-            <h3 class="text-sm font-semibold uppercase tracking-wide text-ink-soft">Timeline Interaksi</h3>
+          <section class="rounded-xl border border-slate-200 bg-white px-4 py-4 shadow-sm">
+            <h3 class="text-sm font-semibold uppercase tracking-wide text-slate-500">Timeline Interaksi</h3>
             {#if normalizeLeadTimeline(detailModal.leadDetail).length > 0}
               <ol class="mt-4 space-y-3">
                 {#each normalizeLeadTimeline(detailModal.leadDetail) as item, index (index)}
-                  <li class="rounded-xl border border-surface-muted bg-surface px-4 py-3">
-                    <p class="text-sm font-semibold text-ink">{item.channel ?? 'Aktivitas'}</p>
-                    <p class="text-xs text-ink-soft">{formatDateTime(item.time ?? item.timestamp)}</p>
-                    <p class="mt-2 text-sm text-ink-soft">{item.notes ?? item.summary ?? 'Tidak ada catatan.'}</p>
+                  <li class="rounded-lg border border-slate-200 bg-white px-4 py-3 shadow-sm">
+                    <p class="text-sm font-semibold text-slate-900">{item.channel ?? 'Aktivitas'}</p>
+                    <p class="text-xs text-slate-500">{formatDateTime(item.time ?? item.timestamp)}</p>
+                    <p class="mt-2 text-sm text-slate-600">{item.notes ?? item.summary ?? 'Tidak ada catatan.'}</p>
                   </li>
                 {/each}
               </ol>
             {:else}
-              <p class="mt-4 text-sm text-ink-soft">Belum ada interaksi.</p>
+              <p class="mt-4 text-sm text-slate-600">Belum ada interaksi.</p>
             {/if}
           </section>
         </div>
       {:else}
-        <p class="text-sm text-ink-soft">Detail lead tidak tersedia.</p>
+        <p class="text-sm text-slate-600">Detail lead tidak tersedia.</p>
       {/if}
-    {:else}
-      <p class="text-sm text-ink-soft">Pilih entri untuk melihat detail.</p>
+  {:else}
+    <p class="text-sm text-slate-600">Pilih entri untuk melihat detail.</p>
     {/if}
   </Modal>
 
   <Modal open={chatModal.open} title={`Percakapan • ${chatModalTitle()}`} subtitle={extractIdentifiers(chatModal.record).phone} size="lg" on:close={closeChatModal}>
     {#if chatModal.loading}
-      <p class="text-sm text-ink-soft">Memuat riwayat chat…</p>
+      <p class="text-sm text-slate-600">Memuat riwayat chat…</p>
     {:else if chatModal.error}
       <div class="space-y-4">
         <p class="text-sm text-rose-600">{chatModal.error}</p>
-          <button
-            type="button"
-            class="rounded-lg border border-surface-muted bg-surface px-3 py-2 text-sm font-medium text-ink-soft transition hover:border-accent hover:text-accent"
-            on:click={retryChatHistory}
-          >
-            Coba lagi
-          </button>
+      <button
+        type="button"
+        class="rounded-md border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-600 transition hover:border-blue-500 hover:text-blue-600"
+        on:click={retryChatHistory}
+      >
+        Coba lagi
+      </button>
       </div>
     {:else if chatModal.messages.length === 0}
-      <p class="text-sm text-ink-soft">Belum ada percakapan.</p>
+      <p class="text-sm text-slate-600">Belum ada percakapan.</p>
     {:else}
       <ol class="space-y-3">
         {#each chatModal.messages as message, index (index)}
-          <li class="rounded-xl border border-surface-muted bg-surface px-4 py-3">
+          <li class="rounded-lg border border-slate-200 bg-white px-4 py-3 shadow-sm">
             <div class="flex items-center justify-between gap-2">
-              <p class="text-sm font-semibold text-ink">{message.sender ?? message.from ?? 'Agent'}</p>
-              <span class="text-xs text-ink-soft">{formatDateTime(message.time ?? message.timestamp ?? message.created_at)}</span>
+              <p class="text-sm font-semibold text-slate-900">{message.sender ?? message.from ?? 'Agent'}</p>
+              <span class="text-xs text-slate-500">{formatDateTime(message.time ?? message.timestamp ?? message.created_at)}</span>
             </div>
-            <p class="mt-2 text-sm text-ink-soft">{message.text ?? message.body ?? message.message ?? '—'}</p>
+            <p class="mt-2 text-sm text-slate-600">{message.text ?? message.body ?? message.message ?? '—'}</p>
           </li>
         {/each}
       </ol>
@@ -1065,20 +1105,20 @@
   >
     <form id="whatsapp-form" class="space-y-4" on:submit|preventDefault={submitMessage}>
       <div>
-        <label class="text-xs font-semibold uppercase tracking-wide text-ink-soft" for="whatsapp-phone">Nomor</label>
+        <label class="text-xs font-semibold uppercase tracking-wide text-slate-500" for="whatsapp-phone">Nomor</label>
         <input
           id="whatsapp-phone"
           type="tel"
-          class="mt-1 w-full rounded-lg border border-surface-muted px-3 py-2 text-sm focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/30"
+          class="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-700 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200"
           bind:value={messageModal.phone}
           required
         />
       </div>
       <div>
-        <label class="text-xs font-semibold uppercase tracking-wide text-ink-soft" for="whatsapp-message">Pesan</label>
+        <label class="text-xs font-semibold uppercase tracking-wide text-slate-500" for="whatsapp-message">Pesan</label>
         <textarea
           id="whatsapp-message"
-          class="mt-1 h-32 w-full rounded-lg border border-surface-muted px-3 py-2 text-sm focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/30"
+          class="mt-1 h-32 w-full rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-700 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200"
           bind:value={messageModal.message}
           required
         />
@@ -1090,7 +1130,7 @@
     <div class="flex items-center justify-end gap-3" slot="footer">
       <button
         type="button"
-        class="rounded-lg border border-surface-muted px-3 py-2 text-sm font-medium text-ink-soft transition hover:border-accent hover:text-accent"
+        class="rounded-md border border-slate-200 px-3 py-2 text-sm font-medium text-slate-600 transition hover:border-blue-500 hover:text-blue-600"
         on:click={closeMessageModal}
       >
         Batal
@@ -1098,7 +1138,7 @@
       <button
         type="submit"
         form="whatsapp-form"
-        class="inline-flex items-center justify-center rounded-lg bg-accent px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-accent/90 disabled:opacity-50"
+        class="inline-flex items-center justify-center rounded-md bg-blue-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-500 disabled:opacity-60"
         disabled={messageModal.sending}
       >
         {messageModal.sending ? 'Mengirim…' : 'Kirim Pesan'}
@@ -1114,16 +1154,16 @@
     on:close={closeResolveModal}
   >
     <form id="resolve-form" class="space-y-4" on:submit|preventDefault={submitResolve}>
-      <p class="text-sm text-ink-soft">
+      <p class="text-sm text-slate-600">
         Konfirmasi penyelesaian eskalasi untuk{' '}
-        <strong>{resolveModalTargetName()}</strong>.
+        <strong class="text-slate-900">{resolveModalTargetName()}</strong>.
         Tambahkan catatan bila diperlukan.
       </p>
       <div>
-        <label class="text-xs font-semibold uppercase tracking-wide text-ink-soft" for="resolve-notes">Catatan</label>
+        <label class="text-xs font-semibold uppercase tracking-wide text-slate-500" for="resolve-notes">Catatan</label>
         <textarea
           id="resolve-notes"
-          class="mt-1 h-28 w-full rounded-lg border border-surface-muted px-3 py-2 text-sm focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/30"
+          class="mt-1 h-28 w-full rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-700 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200"
           placeholder="Opsional"
           bind:value={resolveModal.notes}
         />
@@ -1135,7 +1175,7 @@
     <div class="flex items-center justify-end gap-3" slot="footer">
       <button
         type="button"
-        class="rounded-lg border border-surface-muted px-3 py-2 text-sm font-medium text-ink-soft transition hover:border-accent hover:text-accent"
+        class="rounded-md border border-slate-200 px-3 py-2 text-sm font-medium text-slate-600 transition hover:border-blue-500 hover:text-blue-600"
         on:click={closeResolveModal}
       >
         Batal
@@ -1143,11 +1183,12 @@
       <button
         type="submit"
         form="resolve-form"
-        class="inline-flex items-center justify-center rounded-lg bg-accent px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-accent/90 disabled:opacity-50"
+        class="inline-flex items-center justify-center rounded-md bg-blue-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-500 disabled:opacity-60"
         disabled={resolveModal.sending}
       >
         {resolveModal.sending ? 'Memproses…' : 'Selesaikan'}
       </button>
     </div>
   </Modal>
-</section>
+  </main>
+</div>
