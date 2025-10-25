@@ -1,2 +1,4 @@
 node_modules/
 dist/
+apps/**/node_modules/
+apps/dashboard-sveltekit/build/
