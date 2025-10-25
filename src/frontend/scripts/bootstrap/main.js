@@ -3,7 +3,14 @@ import { TableManager } from '../tables/tableManager.js';
 import { renderSparklineCharts } from '../charts/sparklineCharts.js';
 import { renderOverviewCharts } from '../charts/overviewCharts.js';
 import { showToast } from '../ui/toast.js';
-import { escapeHTML, refreshIcons, showLoadingOverlay, hideLoadingOverlay, updateConnectionStatus, formatDateCell } from '../ui/dom.js';
+import {
+  escapeHTML,
+  refreshIcons,
+  showLoadingOverlay,
+  hideLoadingOverlay,
+  updateConnectionStatus,
+  formatDateCell
+} from '../ui/dom.js';
 import { statusToBadge, priorityToBadge, updateDeltaBadge } from '../ui/badges.js';
 import { renderAssignLeadForm, renderResolveEscalationForm, renderSendMessageForm, setupModal, openModal, closeModal, openQuickActionModal } from '../ui/modal.js';
 import { ensureArray, formatNumber, capitalize, extractUnique, normalizeRecords } from '../../shared/utils/index.js';
@@ -952,6 +959,562 @@ function updateNewItemsBadge() {
   DashboardState.previousEscalationIds = currentIds;
 }
 
+const BUSINESS_STATUS_BADGES = {
+  OPERATIONAL: 'badge-success',
+  CLOSED_TEMPORARILY: 'badge-warning',
+  CLOSED_PERMANENTLY: 'badge-danger'
+};
+
+const BUSINESS_STATUS_ORDER = {
+  OPERATIONAL: 1,
+  CLOSED_TEMPORARILY: 2,
+  CLOSED_PERMANENTLY: 3,
+  UNKNOWN: 4
+};
+
+const businessesTableState = {
+  raw: [],
+  filtered: [],
+  sort: { key: 'name', direction: 'asc' },
+  filters: { status: 'all', rating: 'all', search: '' },
+  pagination: { page: 1, perPage: 10 }
+};
+
+let businessesControlsInitialized = false;
+
+function setupBusinessesControls() {
+  if (businessesControlsInitialized) {
+    return;
+  }
+
+  const searchInput = document.getElementById('businesses-search');
+  const statusFilter = document.getElementById('businesses-status-filter');
+  const ratingFilter = document.getElementById('businesses-rating-filter');
+  const prevButton = document.getElementById('businesses-prev');
+  const nextButton = document.getElementById('businesses-next');
+
+  if (!searchInput || !statusFilter || !ratingFilter || !prevButton || !nextButton) {
+    return;
+  }
+
+  businessesControlsInitialized = true;
+
+  searchInput.addEventListener('input', (event) => {
+    businessesTableState.filters.search = String(event.target.value || '').toLowerCase();
+    businessesTableState.pagination.page = 1;
+    applyBusinessFilters();
+    renderBusinessesTable();
+  });
+
+  statusFilter.addEventListener('change', (event) => {
+    businessesTableState.filters.status = event.target.value || 'all';
+    businessesTableState.pagination.page = 1;
+    applyBusinessFilters();
+    renderBusinessesTable();
+  });
+
+  ratingFilter.addEventListener('change', (event) => {
+    businessesTableState.filters.rating = event.target.value || 'all';
+    businessesTableState.pagination.page = 1;
+    applyBusinessFilters();
+    renderBusinessesTable();
+  });
+
+  document.querySelectorAll('[data-businesses-sort]').forEach((button) => {
+    button.addEventListener('click', () => {
+      const sortKey = button.dataset.businessesSort;
+      if (!sortKey) return;
+      if (businessesTableState.sort.key === sortKey) {
+        businessesTableState.sort.direction = businessesTableState.sort.direction === 'asc' ? 'desc' : 'asc';
+      } else {
+        businessesTableState.sort.key = sortKey;
+        businessesTableState.sort.direction = sortKey === 'rating' ? 'desc' : 'asc';
+      }
+      businessesTableState.pagination.page = 1;
+      applyBusinessFilters();
+      renderBusinessesTable();
+    });
+  });
+
+  prevButton.addEventListener('click', () => {
+    changeBusinessesPage(-1);
+  });
+
+  nextButton.addEventListener('click', () => {
+    changeBusinessesPage(1);
+  });
+}
+
+function changeBusinessesPage(delta) {
+  const totalPages = Math.max(1, Math.ceil(businessesTableState.filtered.length / businessesTableState.pagination.perPage));
+  const nextPage = Math.min(Math.max(1, businessesTableState.pagination.page + delta), totalPages);
+  if (nextPage !== businessesTableState.pagination.page) {
+    businessesTableState.pagination.page = nextPage;
+    renderBusinessesTable();
+  }
+}
+
+function parseBusinessTypes(value) {
+  if (!value) {
+    return [];
+  }
+
+  if (Array.isArray(value)) {
+    return value
+      .map((item) => (typeof item === 'string' ? item.trim() : String(item || '').trim()))
+      .filter(Boolean);
+  }
+
+  if (typeof value === 'string') {
+    const trimmed = value.trim();
+    if (!trimmed) {
+      return [];
+    }
+
+    try {
+      const parsed = JSON.parse(trimmed);
+      if (Array.isArray(parsed)) {
+        return parsed
+          .map((item) => (typeof item === 'string' ? item.trim() : String(item || '').trim()))
+          .filter(Boolean);
+      }
+    } catch (error) {
+      // ignore json parse errors, fallback to comma split
+    }
+
+    return trimmed
+      .split(',')
+      .map((item) => item.trim())
+      .filter(Boolean);
+  }
+
+  return [];
+}
+
+function truncateText(value, limit = 50) {
+  if (typeof value !== 'string') {
+    return '';
+  }
+  if (value.length <= limit) {
+    return value;
+  }
+  return `${value.slice(0, limit - 1).trim()}…`;
+}
+
+function normalizePhone(record) {
+  const candidates = [
+    record.formatted_phone_number,
+    record.formattedPhoneNumber,
+    record.phone,
+    record.phone_number,
+    record.telephone
+  ];
+
+  for (const candidate of candidates) {
+    if (candidate && typeof candidate === 'string') {
+      const normalized = candidate.trim();
+      if (normalized) {
+        return normalized;
+      }
+    }
+  }
+
+  return '';
+}
+
+function normalizeWebsite(value) {
+  if (!value || typeof value !== 'string') {
+    return '';
+  }
+
+  const trimmed = value.trim();
+  if (!trimmed) {
+    return '';
+  }
+
+  const candidate = /^https?:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`;
+  try {
+    const url = new URL(candidate);
+    return url.href;
+  } catch (error) {
+    return '';
+  }
+}
+
+function getWebsiteLabel(url) {
+  if (!url) {
+    return '';
+  }
+  try {
+    const { hostname } = new URL(url);
+    return hostname.replace(/^www\./i, '');
+  } catch (error) {
+    return url.replace(/^https?:\/\//i, '');
+  }
+}
+
+function formatStatusLabel(status) {
+  if (!status) {
+    return 'Unknown';
+  }
+  return status
+    .split('_')
+    .filter(Boolean)
+    .map((part) => capitalize(part))
+    .join(' ');
+}
+
+function formatTypeLabel(value) {
+  if (!value) {
+    return '';
+  }
+
+  return String(value)
+    .replace(/[_-]+/g, ' ')
+    .split(' ')
+    .filter(Boolean)
+    .map((part) => capitalize(part))
+    .join(' ');
+}
+
+function mapBusinessRecord(raw) {
+  if (!raw || typeof raw !== 'object') {
+    return null;
+  }
+
+  const id = raw.id ?? raw.business_id ?? raw.businessId ?? null;
+  const name = raw.name ?? raw.business_name ?? raw.title ?? '-';
+  const address = raw.address ?? raw.formatted_address ?? raw.vicinity ?? '';
+  const website = normalizeWebsite(raw.website ?? raw.website_url ?? raw.url ?? '');
+  const ratingValue = Number.parseFloat(raw.rating ?? raw.average_rating ?? raw.rating_value);
+  const rating = Number.isFinite(ratingValue) ? ratingValue : null;
+  const ratingsTotalValue = Number.parseInt(raw.user_ratings_total ?? raw.userRatingsTotal ?? raw.reviews_total, 10);
+  const ratingsTotal = Number.isFinite(ratingsTotalValue) ? ratingsTotalValue : null;
+  const rawStatus = raw.business_status ?? raw.status ?? raw.current_status ?? '';
+  const statusNormalized = rawStatus ? String(rawStatus).toUpperCase() : 'UNKNOWN';
+  const types = parseBusinessTypes(raw.business_types ?? raw.businessTypes ?? raw.types);
+  const phone = normalizePhone(raw);
+
+  const searchComponents = [name, address].filter(Boolean).map((value) => String(value).toLowerCase());
+
+  return {
+    id: id ? String(id) : '-',
+    name: name ? String(name) : '-',
+    phone,
+    address: address ? String(address) : '',
+    website,
+    rating,
+    ratingsTotal,
+    status: statusNormalized || 'UNKNOWN',
+    statusLabel: formatStatusLabel(statusNormalized || 'UNKNOWN'),
+    types,
+    searchIndex: searchComponents.join(' ')
+  };
+}
+
+function renderBusinessStatusBadge(status, label) {
+  const normalized = status && typeof status === 'string' ? status.toUpperCase() : 'UNKNOWN';
+  const badgeClass = BUSINESS_STATUS_BADGES[normalized] ?? 'badge-neutral';
+  const resolvedLabel = label || formatStatusLabel(normalized);
+  return `<span class="badge ${badgeClass}">${escapeHTML(resolvedLabel || 'Unknown')}</span>`;
+}
+
+function renderBusinessTypes(types) {
+  if (!Array.isArray(types) || types.length === 0) {
+    return '<span class="text-sm text-slate-500">-</span>';
+  }
+
+  const limited = types.slice(0, 3);
+  const chips = limited
+    .map((type) => `<span class="badge badge-neutral">${escapeHTML(formatTypeLabel(type))}</span>`)
+    .join('');
+
+  if (types.length > 3) {
+    const remaining = types.length - 3;
+    return `<div class="flex flex-wrap items-center gap-2">${chips}<span class="badge badge-neutral">+${remaining}</span></div>`;
+  }
+
+  return `<div class="flex flex-wrap items-center gap-2">${chips}</div>`;
+}
+
+function renderRatingCell(rating, total) {
+  if (!Number.isFinite(rating) || rating <= 0) {
+    return '<span class="text-sm text-slate-500">-</span>';
+  }
+
+  const rounded = Math.max(0, Math.min(5, rating));
+  const activeStars = Math.round(rounded);
+  const stars = Array.from({ length: 5 }, (_, index) => {
+    const starIndex = index + 1;
+    const isActive = starIndex <= activeStars;
+    const classes = isActive ? 'text-amber-400 fill-current' : 'text-slate-300';
+    return `<i data-lucide="star" class="h-4 w-4 ${classes}"></i>`;
+  }).join('');
+
+  const ratingLabel = Number.isFinite(rating) ? rating.toFixed(1) : '-';
+  const totalLabel = Number.isFinite(total) ? formatNumber(total) : '0';
+
+  return `
+    <div class="flex items-center gap-2">
+      <span class="flex items-center gap-1">${stars}</span>
+      <span class="text-sm font-semibold text-slate-700">${ratingLabel}</span>
+      <span class="text-xs text-slate-500">(${totalLabel})</span>
+    </div>
+  `;
+}
+
+function renderWebsiteCell(website) {
+  if (!website) {
+    return '<span class="text-sm text-slate-500">-</span>';
+  }
+
+  const label = getWebsiteLabel(website);
+  return `
+    <a href="${escapeHTML(website)}" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-1 text-sky-500 hover:text-sky-600">
+      ${escapeHTML(label)}
+      <i data-lucide="external-link" class="h-4 w-4"></i>
+    </a>
+  `;
+}
+
+function renderBusinessRow(business) {
+  const idCell = business.id ? `<strong>${escapeHTML(business.id)}</strong>` : '<span class="text-sm text-slate-500">-</span>';
+  const nameCell = business.name ? escapeHTML(business.name) : '-';
+  const phoneCell = business.phone ? escapeHTML(business.phone) : '<span class="text-sm text-slate-500">-</span>';
+  const addressFull = business.address || '';
+  const truncatedAddress = addressFull ? truncateText(addressFull, 50) : '-';
+  const addressCell = addressFull
+    ? `<span class="block max-w-[280px] truncate text-sm text-slate-600" title="${escapeHTML(addressFull)}">${escapeHTML(truncatedAddress)}</span>`
+    : '<span class="text-sm text-slate-500">-</span>';
+
+  return `
+    <tr class="align-top transition-colors hover:bg-slate-900/5">
+      <td class="whitespace-nowrap py-3 pr-4 text-sm font-semibold text-slate-700">${idCell}</td>
+      <td class="py-3 pr-4">
+        <span class="text-sm font-semibold text-slate-700">${nameCell}</span>
+      </td>
+      <td class="whitespace-nowrap py-3 pr-4 text-sm text-slate-600">${phoneCell}</td>
+      <td class="py-3 pr-4">${addressCell}</td>
+      <td class="whitespace-nowrap py-3 pr-4">${renderWebsiteCell(business.website)}</td>
+      <td class="py-3 pr-4">${renderRatingCell(business.rating, business.ratingsTotal)}</td>
+      <td class="py-3 pr-4">${renderBusinessStatusBadge(business.status, business.statusLabel)}</td>
+      <td class="py-3 pr-4">${renderBusinessTypes(business.types)}</td>
+    </tr>
+  `;
+}
+
+function renderBusinessesSkeleton(tbody) {
+  const columns = 8;
+  const skeletonRow = Array.from({ length: columns }, (_, index) => {
+    const width = index === 0 ? 'w-16' : index === 1 ? 'w-40' : 'w-full';
+    return `<td class="py-3 pr-4"><div class="skeleton h-4 ${width} rounded-full"></div></td>`;
+  }).join('');
+
+  const rows = Array.from({ length: 5 })
+    .map(() => `<tr class="animate-pulse">${skeletonRow}</tr>`)
+    .join('');
+
+  tbody.innerHTML = rows;
+}
+
+function sortBusinesses(records) {
+  const { key, direction } = businessesTableState.sort;
+  if (!key) {
+    return [...records];
+  }
+
+  const sorted = [...records].sort((a, b) => {
+    if (key === 'name') {
+      return a.name.localeCompare(b.name, 'id', { sensitivity: 'base' });
+    }
+    if (key === 'rating') {
+      const aRating = Number.isFinite(a.rating) ? a.rating : -Infinity;
+      const bRating = Number.isFinite(b.rating) ? b.rating : -Infinity;
+      return aRating - bRating;
+    }
+    if (key === 'status') {
+      const aOrder = BUSINESS_STATUS_ORDER[a.status] ?? BUSINESS_STATUS_ORDER.UNKNOWN;
+      const bOrder = BUSINESS_STATUS_ORDER[b.status] ?? BUSINESS_STATUS_ORDER.UNKNOWN;
+      return aOrder - bOrder;
+    }
+    return 0;
+  });
+
+  if (direction === 'desc') {
+    sorted.reverse();
+  }
+
+  return sorted;
+}
+
+function applyBusinessFilters() {
+  const { filters } = businessesTableState;
+  const searchTerm = filters.search.trim().toLowerCase();
+
+  let result = businessesTableState.raw.filter(Boolean);
+
+  if (filters.status !== 'all') {
+    result = result.filter((business) => business.status === filters.status);
+  }
+
+  if (filters.rating === 'gte4') {
+    result = result.filter((business) => Number.isFinite(business.rating) && business.rating >= 4);
+  } else if (filters.rating === 'gte3') {
+    result = result.filter((business) => Number.isFinite(business.rating) && business.rating >= 3);
+  } else if (filters.rating === 'lt3') {
+    result = result.filter((business) => Number.isFinite(business.rating) && business.rating > 0 && business.rating < 3);
+  }
+
+  if (searchTerm) {
+    result = result.filter((business) => business.searchIndex.includes(searchTerm));
+  }
+
+  businessesTableState.filtered = sortBusinesses(result);
+}
+
+function updateSortIndicators() {
+  const { key, direction } = businessesTableState.sort;
+  document.querySelectorAll('[data-sort-indicator]').forEach((icon) => {
+    const indicatorKey = icon.dataset.sortIndicator;
+    if (!indicatorKey) {
+      return;
+    }
+
+    if (indicatorKey === key) {
+      icon.setAttribute('data-lucide', direction === 'asc' ? 'arrow-up' : 'arrow-down');
+      icon.classList.remove('text-slate-400');
+      icon.classList.add('text-sky-500');
+    } else {
+      icon.setAttribute('data-lucide', 'arrow-up-down');
+      icon.classList.remove('text-sky-500');
+      icon.classList.add('text-slate-400');
+    }
+  });
+
+  document.querySelectorAll('[data-businesses-sort]').forEach((button) => {
+    const sortKey = button.dataset.businessesSort;
+    const th = button.closest('th');
+    const isActive = sortKey === key;
+    button.classList.toggle('text-sky-500', isActive);
+    button.classList.toggle('text-slate-600', !isActive);
+    if (th) {
+      th.setAttribute('aria-sort', isActive ? (direction === 'asc' ? 'ascending' : 'descending') : 'none');
+    }
+  });
+}
+
+function renderBusinessesTable() {
+  const tbody = document.getElementById('businesses-tbody');
+  const rowCount = document.getElementById('businesses-row-count');
+  const paginationSummary = document.getElementById('businesses-pagination-summary');
+  const paginationContainer = document.getElementById('businesses-pagination');
+  const currentPageEl = document.getElementById('businesses-current-page');
+
+  if (!tbody || !rowCount || !paginationSummary || !paginationContainer || !currentPageEl) {
+    return;
+  }
+
+  const total = businessesTableState.filtered.length;
+  const { perPage } = businessesTableState.pagination;
+  const totalPages = Math.max(1, Math.ceil(Math.max(total, 1) / perPage));
+  if (businessesTableState.pagination.page > totalPages) {
+    businessesTableState.pagination.page = totalPages;
+  }
+
+  const page = businessesTableState.pagination.page;
+  const startIndex = total === 0 ? 0 : (page - 1) * perPage;
+  const endIndex = total === 0 ? 0 : Math.min(startIndex + perPage, total);
+  const visible = total === 0 ? [] : businessesTableState.filtered.slice(startIndex, startIndex + perPage);
+
+  if (total === 0) {
+    tbody.innerHTML =
+      '<tr><td colspan="8" class="py-10 text-center text-sm text-slate-500">Tidak ada businesses yang cocok dengan filter saat ini.</td></tr>';
+  } else {
+    tbody.innerHTML = visible.map((business) => renderBusinessRow(business)).join('');
+  }
+
+  rowCount.textContent = `Total: ${total} businesses`;
+  if (total === 0) {
+    paginationSummary.textContent = 'Tidak ada data businesses untuk ditampilkan';
+  } else {
+    paginationSummary.textContent = `Menampilkan ${startIndex + 1}–${endIndex} dari ${total} businesses`;
+  }
+
+  paginationContainer.classList.toggle('hidden', total <= perPage);
+  const prevButton = document.getElementById('businesses-prev');
+  const nextButton = document.getElementById('businesses-next');
+  if (prevButton && nextButton) {
+    prevButton.disabled = page <= 1;
+    nextButton.disabled = page >= totalPages;
+  }
+
+  currentPageEl.textContent = `${Math.min(page, totalPages)} / ${totalPages}`;
+
+  updateSortIndicators();
+  refreshIcons();
+}
+
+async function loadBusinessesData() {
+  const tbody = document.getElementById('businesses-tbody');
+  if (!tbody) {
+    return;
+  }
+
+  setupBusinessesControls();
+  renderBusinessesSkeleton(tbody);
+
+  const rowCount = document.getElementById('businesses-row-count');
+  const paginationSummary = document.getElementById('businesses-pagination-summary');
+  const paginationContainer = document.getElementById('businesses-pagination');
+  const currentPageEl = document.getElementById('businesses-current-page');
+
+  if (rowCount) {
+    rowCount.textContent = 'Memuat businesses…';
+  }
+  if (paginationSummary) {
+    paginationSummary.textContent = 'Mengambil data businesses dari server…';
+  }
+  if (paginationContainer) {
+    paginationContainer.classList.add('hidden');
+  }
+  if (currentPageEl) {
+    currentPageEl.textContent = '1 / 1';
+  }
+
+  try {
+    const response = await apiConnector.getBusinesses();
+    const records = normalizeRecords(response)
+      .map((item) => mapBusinessRecord(item))
+      .filter(Boolean);
+
+    businessesTableState.raw = records;
+    businessesTableState.pagination.page = 1;
+    applyBusinessFilters();
+    renderBusinessesTable();
+  } catch (error) {
+    console.error('Error loading businesses:', error);
+    businessesTableState.raw = [];
+    businessesTableState.filtered = [];
+    tbody.innerHTML =
+      '<tr><td colspan="8" class="py-10 text-center text-sm text-rose-500">Terjadi kesalahan saat memuat data businesses.</td></tr>';
+    if (rowCount) {
+      rowCount.textContent = 'Total: 0 businesses';
+    }
+    if (paginationSummary) {
+      paginationSummary.textContent = 'Gagal memuat data businesses';
+    }
+    if (paginationContainer) {
+      paginationContainer.classList.add('hidden');
+    }
+    if (currentPageEl) {
+      currentPageEl.textContent = '1 / 1';
+    }
+    refreshIcons();
+  }
+}
+
+window.loadBusinessesData = loadBusinessesData;
+
 function filterByDateRange(type) {
   if (type !== 'customer') return;
   const from = document.getElementById('customer-date-from').value;
@@ -993,5 +1556,6 @@ async function testConnection() {
 document.addEventListener('DOMContentLoaded', async () => {
   await testConnection();
   await initializeDashboard();
+  await loadBusinessesData();
 });
 
