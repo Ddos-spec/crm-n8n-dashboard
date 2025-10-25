@@ -3,10 +3,17 @@
   import { get } from 'svelte/store';
   import HeroPanel, { type ConnectionStatus } from '$lib/components/dashboard/HeroPanel.svelte';
   import KpiCard from '$lib/components/dashboard/KpiCard.svelte';
+  import DataTable, {
+    type ColumnDefinition,
+    type RowActionDetail
+  } from '$lib/components/dashboard/DataTable.svelte';
+  import CustomerStatusCell from '$lib/components/dashboard/CustomerStatusCell.svelte';
+  import LeadStatusCell from '$lib/components/dashboard/LeadStatusCell.svelte';
   import { statsStore } from '$stores/statsStore';
   import { customersStore } from '$stores/customersStore';
   import { leadsStore } from '$stores/leadsStore';
   import { config } from '$config';
+  import type { CustomerRecord, LeadRecord } from '$lib/types/api';
 
   const statsState = statsStore;
   const statsSummary = statsStore.summary;
@@ -22,6 +29,77 @@
 
   type ActiveTab = 'customers' | 'leads';
   let activeTab: ActiveTab = 'customers';
+  let tableResetSignal = 0;
+  type PipelineRecord = CustomerRecord | LeadRecord;
+
+  let pendingAction:
+    | {
+        dataset: ActiveTab;
+        action: string;
+        record: PipelineRecord;
+      }
+    | null = null;
+
+  const customerColumns: ColumnDefinition<CustomerRecord>[] = [
+    {
+      id: 'name',
+      label: 'Nama',
+      accessor: (item) => item.name,
+      sortable: true,
+      class: 'font-medium text-ink'
+    },
+    {
+      id: 'status',
+      label: 'Status',
+      accessor: (item) => item.status,
+      sortAccessor: (item) => item.status,
+      sortable: true,
+      cell: CustomerStatusCell
+    },
+    {
+      id: 'phone',
+      label: 'No. HP',
+      accessor: (item) => item.phone,
+      sortable: true
+    },
+    {
+      id: 'next_action',
+      label: 'Next Action',
+      accessor: (item) => item.next_action ?? '—',
+      class: 'text-ink-soft'
+    }
+  ];
+
+  const leadColumns: ColumnDefinition<LeadRecord>[] = [
+    {
+      id: 'name',
+      label: 'Nama',
+      accessor: (item) => item.name,
+      sortable: true,
+      class: 'font-medium text-ink'
+    },
+    {
+      id: 'source',
+      label: 'Sumber',
+      accessor: (item) => item.source ?? '—',
+      sortable: true,
+      class: 'text-ink-soft'
+    },
+    {
+      id: 'phone',
+      label: 'No. HP',
+      accessor: (item) => item.phone,
+      sortable: true
+    },
+    {
+      id: 'status',
+      label: 'Status',
+      accessor: (item) => item.status,
+      sortAccessor: (item) => item.status,
+      sortable: true,
+      cell: LeadStatusCell
+    }
+  ];
 
   const defaultIntervals = [0, 30000, 60000, 300000];
   const uniqueIntervals = Array.from(new Set([...defaultIntervals, config.ui.refreshInterval]));
@@ -157,6 +235,18 @@
     } else {
       leadsStore.filterTerm.set(value);
     }
+    tableResetSignal += 1;
+  }
+
+  function handleSelectAction(
+    dataset: ActiveTab,
+    event: CustomEvent<RowActionDetail>
+  ) {
+    pendingAction = {
+      dataset,
+      action: event.detail.action,
+      record: event.detail.item as PipelineRecord
+    };
   }
 
   onMount(() => {
@@ -223,14 +313,20 @@
       <nav class="flex gap-2 rounded-full bg-surface-muted p-1 text-sm font-medium">
         <button
           class={`rounded-full px-4 py-2 transition ${activeTab === 'customers' ? 'bg-accent-muted text-accent shadow-sm' : 'bg-surface text-ink-soft'}`}
-          on:click={() => (activeTab = 'customers')}
+          on:click={() => {
+            activeTab = 'customers';
+            tableResetSignal += 1;
+          }}
           type="button"
         >
           Customers
         </button>
         <button
           class={`rounded-full px-4 py-2 transition ${activeTab === 'leads' ? 'bg-accent-muted text-accent shadow-sm' : 'bg-surface text-ink-soft'}`}
-          on:click={() => (activeTab = 'leads')}
+          on:click={() => {
+            activeTab = 'leads';
+            tableResetSignal += 1;
+          }}
           type="button"
         >
           Leads
@@ -252,80 +348,40 @@
 
     <div class="p-6">
       {#if activeTab === 'customers'}
-        {#if $customersState.status === 'loading'}
-          <p class="text-sm text-ink-soft">Memuat data pelanggan…</p>
-        {:else if $customersState.status === 'error'}
-          <p class="text-sm text-rose-600">Gagal memuat pelanggan: {$customersState.error}</p>
-        {:else}
-          <table class="min-w-full text-left text-sm">
-            <thead class="text-xs uppercase tracking-wide text-ink-soft">
-              <tr>
-                <th class="pb-3 pr-4">Nama</th>
-                <th class="pb-3 pr-4">Status</th>
-                <th class="pb-3 pr-4">No. HP</th>
-                <th class="pb-3 pr-4">Next Action</th>
-              </tr>
-            </thead>
-            <tbody class="divide-y divide-surface-muted text-ink">
-              {#if $customerRows.length === 0}
-                <tr>
-                  <td class="py-6 text-center text-sm text-ink-soft" colspan="4">Belum ada data pelanggan.</td>
-                </tr>
-              {:else}
-                {#each $customerRows as customer (customer.id)}
-                  <tr class="hover:bg-surface-muted/70">
-                    <td class="py-3 pr-4 font-medium">{customer.name}</td>
-                    <td class="py-3 pr-4">
-                      <span class="inline-flex items-center rounded-full bg-accent-muted px-2.5 py-1 text-xs font-semibold text-accent">
-                        {customer.status}
-                      </span>
-                    </td>
-                    <td class="py-3 pr-4">{customer.phone}</td>
-                    <td class="py-3 pr-4 text-ink-soft">{customer.next_action ?? '—'}</td>
-                  </tr>
-                {/each}
-              {/if}
-            </tbody>
-          </table>
-        {/if}
+        <DataTable
+          items={$customerRows}
+          columns={customerColumns}
+          keyField="id"
+          loading={$customersState.status === 'loading'}
+          error={$customersState.status === 'error' ? $customersState.error : null}
+          emptyMessage="Belum ada data pelanggan."
+          summaryLabel="pelanggan"
+          exportFilename="customers.csv"
+          showActionsColumn
+          resetSignal={tableResetSignal}
+          on:select={(event) => handleSelectAction('customers', event)}
+        />
       {:else}
-        {#if $leadsState.status === 'loading'}
-          <p class="text-sm text-ink-soft">Memuat data leads…</p>
-        {:else if $leadsState.status === 'error'}
-          <p class="text-sm text-rose-600">Gagal memuat leads: {$leadsState.error}</p>
-        {:else}
-          <table class="min-w-full text-left text-sm">
-            <thead class="text-xs uppercase tracking-wide text-ink-soft">
-              <tr>
-                <th class="pb-3 pr-4">Nama</th>
-                <th class="pb-3 pr-4">Sumber</th>
-                <th class="pb-3 pr-4">No. HP</th>
-                <th class="pb-3 pr-4">Status</th>
-              </tr>
-            </thead>
-            <tbody class="divide-y divide-surface-muted text-ink">
-              {#if $leadRows.length === 0}
-                <tr>
-                  <td class="py-6 text-center text-sm text-ink-soft" colspan="4">Belum ada data leads.</td>
-                </tr>
-              {:else}
-                {#each $leadRows as lead (lead.id)}
-                  <tr class="hover:bg-surface-muted/70">
-                    <td class="py-3 pr-4 font-medium">{lead.name}</td>
-                    <td class="py-3 pr-4 text-ink-soft">{lead.source ?? '—'}</td>
-                    <td class="py-3 pr-4">{lead.phone}</td>
-                    <td class="py-3 pr-4">
-                      <span class="inline-flex items-center rounded-full bg-accent-muted px-2.5 py-1 text-xs font-semibold text-accent">
-                        {lead.status}
-                      </span>
-                    </td>
-                  </tr>
-                {/each}
-              {/if}
-            </tbody>
-          </table>
-        {/if}
+        <DataTable
+          items={$leadRows}
+          columns={leadColumns}
+          keyField="id"
+          loading={$leadsState.status === 'loading'}
+          error={$leadsState.status === 'error' ? $leadsState.error : null}
+          emptyMessage="Belum ada data leads."
+          summaryLabel="leads"
+          exportFilename="leads.csv"
+          showActionsColumn
+          resetSignal={tableResetSignal}
+          on:select={(event) => handleSelectAction('leads', event)}
+        />
       {/if}
     </div>
   </section>
+  <p class="sr-only" aria-live="polite">
+    {#if pendingAction}
+      Aksi {pendingAction.action} dipilih untuk {pendingAction.dataset === 'customers' ? 'pelanggan' : 'lead'}{' '}
+      {pendingAction.record.name}.
+    {/if}
+  </p>
 </section>
