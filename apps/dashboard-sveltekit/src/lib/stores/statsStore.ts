@@ -16,6 +16,25 @@ export interface StatSummaryCard {
 
 const numberFormatter = new Intl.NumberFormat('id-ID');
 
+function parseNumber(value: unknown, fallback = 0): number {
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    return value;
+  }
+
+  if (typeof value === 'string') {
+    const trimmed = value.trim();
+    if (trimmed.length > 0) {
+      const sanitized = trimmed.replace(/[\s,%]+/g, '').replace(',', '.');
+      const parsed = Number.parseFloat(sanitized);
+      if (Number.isFinite(parsed)) {
+        return parsed;
+      }
+    }
+  }
+
+  return fallback;
+}
+
 function parseDelta(value: unknown): number | null {
   if (typeof value === 'number' && Number.isFinite(value)) {
     return value;
@@ -35,13 +54,11 @@ function parsePeriod(value: unknown, fallback: string): string {
 }
 
 function normalizeResponseRate(value: unknown): number {
-  if (typeof value !== 'number' || Number.isNaN(value)) {
-    return 0;
+  const numeric = parseNumber(value, 0);
+  if (numeric <= 1) {
+    return numeric * 100;
   }
-  if (value <= 1) {
-    return value * 100;
-  }
-  return value;
+  return numeric;
 }
 
 const rawStatsStore = createQueryStore(async () => {
@@ -63,31 +80,39 @@ export const statsStore = {
     }
 
     const stats = $state.data;
-    const responseRate = normalizeResponseRate(stats.response_rate);
+    const statsRecord = stats as Record<string, unknown>;
+
+    const totalCustomers = parseNumber(stats.total_customers ?? statsRecord.totalCustomers ?? null, 0);
+    const totalLeads = parseNumber(stats.total_leads ?? statsRecord.totalLeads ?? null, 0);
+    const openEscalations = parseNumber(
+      stats.open_escalations ?? statsRecord.openEscalations ?? statsRecord.pendingEscalations ?? null,
+      0
+    );
+    const responseRate = normalizeResponseRate(stats.response_rate ?? statsRecord.responseRate ?? null);
 
     return [
       {
         id: 'totalCustomers',
         label: 'Total Customers',
-        value: numberFormatter.format(stats.total_customers ?? 0),
-        delta: parseDelta((stats as Record<string, unknown>).customers_delta ?? (stats as Record<string, unknown>).customersDelta),
-        period: parsePeriod((stats as Record<string, unknown>).customers_period ?? (stats as Record<string, unknown>).customersPeriod ?? null, 'vs minggu lalu'),
+        value: numberFormatter.format(totalCustomers),
+        delta: parseDelta(statsRecord.customers_delta ?? statsRecord.customersDelta),
+        period: parsePeriod(statsRecord.customers_period ?? statsRecord.customersPeriod ?? null, 'vs minggu lalu'),
         accent: 'sky'
       },
       {
         id: 'totalLeads',
         label: 'Total Leads',
-        value: numberFormatter.format(stats.total_leads ?? 0),
-        delta: parseDelta((stats as Record<string, unknown>).leads_delta ?? (stats as Record<string, unknown>).leadsDelta),
-        period: parsePeriod((stats as Record<string, unknown>).leads_period ?? (stats as Record<string, unknown>).leadsPeriod ?? null, 'vs minggu lalu'),
+        value: numberFormatter.format(totalLeads),
+        delta: parseDelta(statsRecord.leads_delta ?? statsRecord.leadsDelta),
+        period: parsePeriod(statsRecord.leads_period ?? statsRecord.leadsPeriod ?? null, 'vs minggu lalu'),
         accent: 'cyan'
       },
       {
         id: 'openEscalations',
         label: 'Open Escalations',
-        value: numberFormatter.format(stats.open_escalations ?? 0),
-        delta: parseDelta((stats as Record<string, unknown>).escalations_delta ?? (stats as Record<string, unknown>).escalationsDelta),
-        period: parsePeriod((stats as Record<string, unknown>).escalations_period ?? (stats as Record<string, unknown>).escalationsPeriod ?? null, 'vs minggu lalu'),
+        value: numberFormatter.format(openEscalations),
+        delta: parseDelta(statsRecord.escalations_delta ?? statsRecord.escalationsDelta),
+        period: parsePeriod(statsRecord.escalations_period ?? statsRecord.escalationsPeriod ?? null, 'vs minggu lalu'),
         accent: 'amber',
         inverse: true
       },
@@ -95,8 +120,8 @@ export const statsStore = {
         id: 'responseRate',
         label: 'Response Rate',
         value: `${responseRate.toFixed(1)}%`,
-        delta: parseDelta((stats as Record<string, unknown>).response_delta ?? (stats as Record<string, unknown>).responseDelta),
-        period: parsePeriod((stats as Record<string, unknown>).response_period ?? (stats as Record<string, unknown>).responsePeriod ?? null, 'SLA realtime'),
+        delta: parseDelta(statsRecord.response_delta ?? statsRecord.responseDelta),
+        period: parsePeriod(statsRecord.response_period ?? statsRecord.responsePeriod ?? null, 'SLA realtime'),
         accent: 'emerald'
       }
     ];
