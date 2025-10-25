@@ -55,3 +55,53 @@ export interface EscalationRecord {
   created_at: string;
   assigned_to?: string;
 }
+
+export interface CustomerContactHistoryItem {
+  channel?: string;
+  time?: string;
+  timestamp?: string;
+  summary?: string;
+  notes?: string;
+}
+
+export interface CustomerDetail {
+  id?: string;
+  name?: string;
+  phone?: string;
+  location?: string;
+  customer_priority?: string;
+  priority?: string;
+  assigned_to?: string;
+  tags?: string[];
+  contact_history?: CustomerContactHistoryItem[];
+  contactHistory?: CustomerContactHistoryItem[];
+  [key: string]: unknown;
+}
+
+export interface ChatMessage {
+  id?: string;
+  sender?: string;
+  from?: string;
+  direction?: 'inbound' | 'outbound';
+  text?: string;
+  body?: string;
+  message?: string;
+  channel?: string;
+  time?: string;
+  timestamp?: string;
+  created_at?: string;
+  [key: string]: unknown;
+}
+
+export interface ChatHistoryResponse {
+  messages?: ChatMessage[];
+  data?: { messages?: ChatMessage[] };
+  [key: string]: unknown;
+}
+
+export interface ActionResponse {
+  success?: boolean;
+  message?: string;
+  error?: string;
+  [key: string]: unknown;
+}
