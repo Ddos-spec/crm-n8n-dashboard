@@ -8,32 +8,32 @@
   export let accent: KpiAccent = 'sky';
   export let inverse = false;
 
-  const accentStyles: Record<KpiAccent, string> = {
-    sky: 'border-sky-100 bg-sky-50/60',
-    cyan: 'border-cyan-100 bg-cyan-50/60',
-    amber: 'border-amber-100 bg-amber-50/60',
-    emerald: 'border-emerald-100 bg-emerald-50/60'
-  };
+const accentBorders: Record<KpiAccent, string> = {
+  sky: 'border-l-4 border-l-sky-500',
+  cyan: 'border-l-4 border-l-cyan-500',
+  amber: 'border-l-4 border-l-amber-500',
+  emerald: 'border-l-4 border-l-emerald-500'
+};
 
-  const accentText: Record<KpiAccent, string> = {
-    sky: 'text-sky-700',
-    cyan: 'text-cyan-700',
-    amber: 'text-amber-700',
-    emerald: 'text-emerald-700'
-  };
+const accentHighlights: Record<KpiAccent, string> = {
+  sky: 'text-sky-600',
+  cyan: 'text-cyan-600',
+  amber: 'text-amber-600',
+  emerald: 'text-emerald-600'
+};
 
-  const deltaTone = (value: number | null, inverted: boolean) => {
-    if (value === null) return 'bg-slate-100 text-ink-soft';
-    if (value === 0) return 'bg-slate-100 text-ink-soft';
-    const isPositive = value > 0;
-    if ((isPositive && !inverted) || (!isPositive && inverted)) {
-      return 'bg-emerald-100 text-emerald-700';
-    }
-    if (Math.abs(value) > 10) {
-      return 'bg-rose-100 text-rose-700';
-    }
-    return 'bg-amber-100 text-amber-700';
-  };
+const deltaTone = (value: number | null, inverted: boolean) => {
+  if (value === null) return 'bg-slate-100 text-slate-600';
+  if (value === 0) return 'bg-slate-100 text-slate-600';
+  const isPositive = value > 0;
+  if ((isPositive && !inverted) || (!isPositive && inverted)) {
+    return 'bg-emerald-100 text-emerald-700';
+  }
+  if (Math.abs(value) > 10) {
+    return 'bg-rose-100 text-rose-700';
+  }
+  return 'bg-amber-100 text-amber-700';
+};
 
   const deltaLabel = (value: number | null) => {
     if (value === null) return null;
@@ -42,15 +42,15 @@
   };
 </script>
 
-<article class={`rounded-2xl border p-5 shadow-sm transition hover:shadow-md ${accentStyles[accent]}`}>
-  <p class="text-xs font-semibold uppercase tracking-wide text-ink-soft/70">{label}</p>
-  <p class={`mt-3 text-3xl font-semibold text-ink ${accentText[accent]}`}>{value}</p>
+<article class={`flex flex-col gap-3 rounded-xl border border-slate-200 bg-white p-5 shadow-sm transition hover:shadow-md ${accentBorders[accent]}`}>
+  <p class="text-xs font-semibold uppercase tracking-wide text-slate-500">{label}</p>
+  <p class={`text-3xl font-semibold text-slate-900 ${accentHighlights[accent]}`}>{value}</p>
   {#if delta !== null}
-    <span class={`mt-4 inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold ${deltaTone(delta, inverse)}`}>
+    <span class={`inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold ${deltaTone(delta, inverse)}`}>
       {deltaLabel(delta)}
     </span>
   {/if}
   {#if period}
-    <p class="mt-2 text-xs text-ink-soft/80">{period}</p>
+    <p class="text-xs text-slate-500">{period}</p>
   {/if}
 </article>

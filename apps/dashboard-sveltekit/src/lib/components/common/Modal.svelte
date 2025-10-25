@@ -99,13 +99,13 @@
 
 {#if open}
   <div
-    class="fixed inset-0 z-50 flex items-center justify-center bg-ink/40 px-4 py-8"
+    class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 px-4 py-8"
     on:click={handleBackdropClick}
     role="presentation"
     transition:fade
   >
     <div
-      class={`max-h-full overflow-hidden rounded-3xl border border-surface-muted bg-surface shadow-xl ${dialogSizeClass}`}
+      class={`max-h-full overflow-hidden rounded-xl border border-slate-200 bg-white shadow-xl ${dialogSizeClass}`}
       role="dialog"
       aria-modal="true"
       aria-labelledby={title ? 'modal-title' : undefined}
@@ -113,29 +113,29 @@
       tabindex="-1"
       bind:this={dialogRef}
     >
-      <header class="flex items-start justify-between gap-4 border-b border-surface-muted px-6 py-5">
+      <header class="flex items-start justify-between gap-4 border-b border-slate-200 px-6 py-5">
         <div class="space-y-1">
           {#if title}
-            <h2 id="modal-title" class="text-lg font-semibold text-ink">{title}</h2>
+            <h2 id="modal-title" class="text-lg font-semibold text-slate-900">{title}</h2>
           {/if}
           {#if subtitle}
-            <p id="modal-subtitle" class="text-sm text-ink-soft">{subtitle}</p>
+            <p id="modal-subtitle" class="text-sm text-slate-600">{subtitle}</p>
           {/if}
         </div>
         <button
           type="button"
-          class="inline-flex h-10 w-10 items-center justify-center rounded-full border border-surface-muted text-ink-soft transition hover:border-accent hover:text-accent"
+          class="inline-flex h-10 w-10 items-center justify-center rounded-full border border-slate-200 text-slate-500 transition hover:border-blue-500 hover:text-blue-600"
           on:click={close}
         >
           <span class="sr-only">Tutup</span>
           ×
         </button>
       </header>
-      <div class={`overflow-y-auto px-6 py-6 ${hasFooter ? 'pb-4' : 'pb-6'}`}>
+      <div class={`overflow-y-auto px-6 py-6 text-slate-700 ${hasFooter ? 'pb-4' : 'pb-6'}`}>
         <slot />
       </div>
       <div
-        class={`border-t border-surface-muted px-6 py-4 ${hasFooter ? 'block' : 'hidden'}`}
+        class={`border-t border-slate-200 px-6 py-4 ${hasFooter ? 'block' : 'hidden'}`}
         bind:this={footerContainer}
       >
         <slot name="footer" />
