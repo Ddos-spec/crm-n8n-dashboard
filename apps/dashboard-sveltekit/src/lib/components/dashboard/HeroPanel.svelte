@@ -69,36 +69,39 @@
           <span>{lastUpdatedLabel}</span>
         </div>
       </div>
-      <div class="flex items-center gap-3">
-        <label class="flex items-center gap-2 rounded-full border border-surface-muted bg-surface px-3 py-2 text-xs font-semibold uppercase tracking-wide text-ink-soft">
-          Auto refresh
-          <select
-            class="rounded-full border border-surface-muted bg-white px-2 py-1 text-xs font-medium text-ink focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/30"
-            on:change={handleChange}
+      <div class="flex flex-col gap-3 sm:items-end">
+        <div class="flex items-center gap-3">
+          <label class="flex items-center gap-2 rounded-full border border-surface-muted bg-surface px-3 py-2 text-xs font-semibold uppercase tracking-wide text-ink-soft">
+            Auto refresh
+            <select
+              class="rounded-full border border-surface-muted bg-white px-2 py-1 text-xs font-medium text-ink focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/30"
+              on:change={handleChange}
+              disabled={isRefreshing}
+              value={refreshInterval}
+            >
+              {#each refreshOptions as option (option.value)}
+                <option value={option.value}>{refreshLabel(option)}</option>
+              {/each}
+            </select>
+          </label>
+          <button
+            type="button"
+            class="inline-flex items-center gap-2 rounded-full bg-accent px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-accent/90 disabled:cursor-not-allowed disabled:bg-ink-soft/40"
+            on:click={() => onRefresh?.()}
             disabled={isRefreshing}
-            value={refreshInterval}
           >
-            {#each refreshOptions as option (option.value)}
-              <option value={option.value}>{refreshLabel(option)}</option>
-            {/each}
-          </select>
-        </label>
-        <button
-          type="button"
-          class="inline-flex items-center gap-2 rounded-full bg-accent px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-accent/90 disabled:cursor-not-allowed disabled:bg-ink-soft/40"
-          on:click={() => onRefresh?.()}
-          disabled={isRefreshing}
-        >
-          {#if isRefreshing}
-            <span class="h-4 w-4 animate-spin rounded-full border-2 border-white/70 border-t-transparent"></span>
-            Menyegarkan…
-          {:else}
-            Refresh data
-          {/if}
-          {#if refreshInterval > 0}
-            <span class="ml-1 text-xs font-medium text-white/80">{countdownLabel}</span>
-          {/if}
-        </button>
+            {#if isRefreshing}
+              <span class="h-4 w-4 animate-spin rounded-full border-2 border-white/70 border-t-transparent"></span>
+              Menyegarkan…
+            {:else}
+              Refresh data
+            {/if}
+            {#if refreshInterval > 0}
+              <span class="ml-1 text-xs font-medium text-white/80">{countdownLabel}</span>
+            {/if}
+          </button>
+        </div>
+        <slot name="actions" />
       </div>
     </div>
   </div>

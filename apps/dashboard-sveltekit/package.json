@@ -7,6 +7,9 @@
     "build": "vite build",
     "preview": "vite preview"
   },
+  "dependencies": {
+    "chart.js": "^4.4.6"
+  },
   "devDependencies": {
     "@sveltejs/adapter-static": "^3.0.4",
     "@sveltejs/kit": "^2.5.10",

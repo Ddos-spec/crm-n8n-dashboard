@@ -779,7 +779,15 @@
     newItemsCount={newItemsCount}
     realtimeStatus={realtimeStatus}
     periodLabel={periodLabel}
-  />
+  >
+    <a
+      slot="actions"
+      href="/detail"
+      class="inline-flex items-center justify-end gap-2 text-xs font-semibold text-accent hover:text-accent/80"
+    >
+      Lihat detail lengkap →
+    </a>
+  </HeroPanel>
 
   <section class="rounded-2xl border border-surface-muted bg-surface p-6 shadow-sm">
     <header class="flex flex-col gap-2 md:flex-row md:items-end md:justify-between">

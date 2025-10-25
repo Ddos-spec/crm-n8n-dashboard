@@ -1,3 +1,51 @@
+export interface TrendPointInput {
+  label?: string;
+  period?: string;
+  date?: string;
+  value?: number | string;
+  total?: number | string;
+  count?: number | string;
+  avg?: number | string;
+  average?: number | string;
+}
+
+export interface FunnelData {
+  stages?: Array<string | null | undefined>;
+  values?: Array<number | string | null | undefined>;
+}
+
+export interface TeamPerformanceEntry {
+  name?: string;
+  agent?: string;
+  team?: string;
+  handled?: number | string;
+  total?: number | string;
+  score?: number | string;
+  sla?: number | string;
+  avg_sla?: number | string;
+}
+
+export interface CsatSummary {
+  score?: number | string;
+  summary?: string;
+  responses?: number | string;
+  totalResponses?: number | string;
+  trend?: number | string;
+  delta?: number | string;
+  change?: number | string;
+  sentiment?: number | string;
+  sentiment_positive?: number | string;
+  sentimentPositive?: number | string;
+}
+
+export interface BusinessRecord {
+  status?: string;
+  stage?: string;
+  pipeline_status?: string;
+  current_status?: string;
+  lead_status?: string;
+}
+
 export interface QuickStatsResponse {
   total_customers: number;
   new_customers_today: number;
@@ -14,6 +62,25 @@ export interface QuickStatsResponse {
   escalations_period?: string;
   response_delta?: number | string;
   response_period?: string;
+  avg_response_time?: number | string;
+  avgResponseTime?: number | string;
+  customer_trend?: Array<number | TrendPointInput>;
+  customerTrend?: Array<number | TrendPointInput>;
+  lead_trend?: Array<number | TrendPointInput>;
+  leadTrend?: Array<number | TrendPointInput>;
+  escalation_trend?: Array<number | TrendPointInput>;
+  escalationTrend?: Array<number | TrendPointInput>;
+  response_trend?: Array<number | TrendPointInput>;
+  responseTrend?: Array<number | TrendPointInput>;
+  response_time_trend?: Array<number | TrendPointInput>;
+  responseTimeTrend?: Array<number | TrendPointInput>;
+  funnel?: FunnelData | null;
+  conversionFunnel?: FunnelData | null;
+  teamPerformance?: TeamPerformanceEntry[] | null;
+  team_performance?: TeamPerformanceEntry[] | null;
+  csat?: CsatSummary | null;
+  businesses?: BusinessRecord[] | null;
+  emptyStateMessage?: string;
 }
 
 export interface CustomerRecord {
