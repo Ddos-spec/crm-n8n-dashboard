@@ -462,6 +462,33 @@
                             </header>
                             <canvas id="chart-escalations" class="mt-6 h-64"></canvas>
                         </section>
+                        <!-- Businesses Data Section -->
+                        <div class="glass-card rounded-3xl p-6 mt-6">
+                            <header class="flex items-center justify-between">
+                                <div>
+                                    <h3 class="text-lg font-semibold">📊 Data Businesses</h3>
+                                    <p class="text-sm text-slate-500">Daftar bisnis dari database PostgreSQL</p>
+                                </div>
+                                <button onclick="loadBusinessesData()" class="text-xs font-semibold uppercase tracking-wide text-sky-500">
+                                    <i data-lucide="refresh-cw"></i> Refresh
+                                </button>
+                            </header>
+
+                            <div class="mt-6 table-wrap glass-muted">
+                                <table id="businesses-table">
+                                    <thead>
+                                        <tr>
+                                            <th>ID</th>
+                                            <th>Business Name</th>
+                                            <th>Phone</th>
+                                            <th>Last Contacted</th>
+                                            <th>Status</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="businesses-tbody"></tbody>
+                                </table>
+                            </div>
+                        </div>
                     </div>
 
                     <div class="mt-6 grid gap-6 lg:grid-cols-3">

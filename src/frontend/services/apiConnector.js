@@ -130,13 +130,13 @@ export class ApiConnector {
     }
   }
 
-    async getBusinesses() {
-        return this.fetchApi(
-            this.config.apiEndpoints.businessesList,
-            'POST',
-            this.buildPayload('get_businesses')
-        );
-    }
+  async getBusinesses() {
+    return this.fetchApi(
+      this.config.apiEndpoints.businessesList,
+      'POST',
+      this.buildPayload('get_businesses')
+    );
+  }
 }
 
 export const apiConnector = new ApiConnector();
