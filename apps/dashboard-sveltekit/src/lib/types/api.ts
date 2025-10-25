@@ -6,6 +6,14 @@ export interface QuickStatsResponse {
   resolved_escalations: number;
   response_rate: number;
   updated_at: string;
+  customers_delta?: number | string;
+  customers_period?: string;
+  leads_delta?: number | string;
+  leads_period?: string;
+  escalations_delta?: number | string;
+  escalations_period?: string;
+  response_delta?: number | string;
+  response_period?: string;
 }
 
 export interface CustomerRecord {
