@@ -3,7 +3,14 @@ import { TableManager } from '../tables/tableManager.js';
 import { renderSparklineCharts } from '../charts/sparklineCharts.js';
 import { renderOverviewCharts } from '../charts/overviewCharts.js';
 import { showToast } from '../ui/toast.js';
-import { escapeHTML, refreshIcons, showLoadingOverlay, hideLoadingOverlay, updateConnectionStatus, formatDateCell } from '../ui/dom.js';
+import {
+  escapeHTML,
+  refreshIcons,
+  showLoadingOverlay,
+  hideLoadingOverlay,
+  updateConnectionStatus,
+  formatDateCell
+} from '../ui/dom.js';
 import { statusToBadge, priorityToBadge, updateDeltaBadge } from '../ui/badges.js';
 import { renderAssignLeadForm, renderResolveEscalationForm, renderSendMessageForm, setupModal, openModal, closeModal, openQuickActionModal } from '../ui/modal.js';
 import { ensureArray, formatNumber, capitalize, extractUnique, normalizeRecords } from '../../shared/utils/index.js';
@@ -952,6 +959,64 @@ function updateNewItemsBadge() {
   DashboardState.previousEscalationIds = currentIds;
 }
 
+async function loadBusinessesData() {
+  const tbody = document.getElementById('businesses-tbody');
+  if (!tbody) {
+    return;
+  }
+
+  tbody.innerHTML = '<tr><td colspan="5" class="text-center">Loading...</td></tr>';
+
+  try {
+    const response = await apiConnector.getBusinesses();
+    const businesses = normalizeRecords(response);
+
+    if (!Array.isArray(businesses) || businesses.length === 0) {
+      tbody.innerHTML =
+        '<tr><td colspan="5" class="text-center text-slate-500">Tidak ada data businesses</td></tr>';
+      return;
+    }
+
+    const rows = businesses
+      .map((business) => {
+        const id = escapeHTML(business.id ?? business.business_id ?? '-');
+        const name = escapeHTML(business.name ?? business.business_name ?? '-');
+        const phone = escapeHTML(business.phone ?? business.phone_number ?? '-');
+        const lastContactValue = business.last_contacted ?? business.lastContacted ?? business.last_contact ?? null;
+        const lastContactedCell = lastContactValue
+          ? formatDateCell(lastContactValue)
+          : '<span class="text-sm text-slate-500">Never</span>';
+        const rawStatus = business.status ?? business.business_status ?? 'Unknown';
+        const statusLabel = escapeHTML(rawStatus || 'Unknown');
+        const statusClass = String(rawStatus).toLowerCase() === 'active' ? 'badge-success' : 'badge-neutral';
+
+        return `
+          <tr>
+            <td><strong>${id}</strong></td>
+            <td>${name || '-'}</td>
+            <td>${phone || '-'}</td>
+            <td>${lastContactedCell}</td>
+            <td>
+              <span class="badge ${statusClass}">
+                ${statusLabel}
+              </span>
+            </td>
+          </tr>
+        `;
+      })
+      .join('');
+
+    tbody.innerHTML = rows;
+    refreshIcons();
+  } catch (error) {
+    console.error('Error loading businesses:', error);
+    tbody.innerHTML =
+      '<tr><td colspan="5" class="text-center text-rose-500">Error loading data</td></tr>';
+  }
+}
+
+window.loadBusinessesData = loadBusinessesData;
+
 function filterByDateRange(type) {
   if (type !== 'customer') return;
   const from = document.getElementById('customer-date-from').value;
@@ -993,5 +1058,6 @@ async function testConnection() {
 document.addEventListener('DOMContentLoaded', async () => {
   await testConnection();
   await initializeDashboard();
+  await loadBusinessesData();
 });
 
