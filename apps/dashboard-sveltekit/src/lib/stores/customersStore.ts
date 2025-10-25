@@ -1,9 +1,13 @@
 import { writable, derived } from 'svelte/store';
 import { createQueryStore } from './queryStore';
-import { getJson } from '$lib/utils/api';
+import { postActionJson } from '$lib/utils/api';
+import { normalizeListResponse } from '$lib/utils/n8n';
 import type { CustomerRecord, ListResponse } from '$lib/types/api';
 
-const customersQuery = createQueryStore(() => getJson<ListResponse<CustomerRecord>>('customersList'));
+const customersQuery = createQueryStore(async () => {
+  const response = await postActionJson<unknown>('customersList', 'get_customers');
+  return normalizeListResponse<CustomerRecord>(response);
+});
 
 const filterTerm = writable('');
 

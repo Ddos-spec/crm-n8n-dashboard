@@ -1,6 +1,7 @@
 import { derived } from 'svelte/store';
 import { createQueryStore } from './queryStore';
-import { getJson } from '$lib/utils/api';
+import { postActionJson } from '$lib/utils/api';
+import { extractPrimaryRecord } from '$lib/utils/n8n';
 import type { QuickStatsResponse } from '$lib/types/api';
 
 export interface StatSummaryCard {
@@ -43,7 +44,16 @@ function normalizeResponseRate(value: unknown): number {
   return value;
 }
 
-const rawStatsStore = createQueryStore(() => getJson<QuickStatsResponse>('quickStats'), { immediate: false });
+const rawStatsStore = createQueryStore(async () => {
+  const response = await postActionJson<unknown>('quickStats', 'get_quick_stats');
+  const stats = extractPrimaryRecord<QuickStatsResponse>(response);
+
+  if (!stats) {
+    throw new Error('Respon statistik tidak valid.');
+  }
+
+  return stats;
+}, { immediate: false });
 
 export const statsStore = {
   ...rawStatsStore,

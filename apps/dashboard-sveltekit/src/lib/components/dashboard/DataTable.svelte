@@ -220,8 +220,8 @@
 
 <div class="space-y-4" bind:this={tableContainer}>
   <div class="overflow-x-auto">
-    <table class="min-w-full divide-y divide-surface-muted text-sm">
-      <thead class="bg-surface-muted/60 text-xs uppercase tracking-wide text-ink-soft">
+    <table class="min-w-full divide-y divide-slate-200 text-sm text-slate-900">
+      <thead class="bg-slate-100 text-xs font-semibold uppercase tracking-wide text-slate-600">
         <tr>
           {#each resolvedColumns as column (column.id)}
             <th
@@ -232,7 +232,7 @@
               {#if column.sortable}
                 <button
                   type="button"
-                  class="inline-flex items-center gap-1 text-inherit hover:text-ink"
+                  class="inline-flex items-center gap-1 text-inherit hover:text-slate-900"
                   on:click={() => toggleSort(column.id)}
                 >
                   <span>{column.label}</span>
@@ -247,16 +247,16 @@
             </th>
           {/each}
           {#if showActionsColumn}
-            <th scope="col" class="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wide text-ink-soft">
+            <th scope="col" class="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wide text-slate-600">
               {actionsLabel}
             </th>
           {/if}
         </tr>
       </thead>
-      <tbody class="divide-y divide-surface-muted bg-surface text-ink">
+      <tbody class="divide-y divide-slate-200 bg-white">
         {#if loading}
           <tr>
-            <td colspan={resolvedColumns.length + (showActionsColumn ? 1 : 0)} class="px-4 py-6 text-center text-sm text-ink-soft">
+            <td colspan={resolvedColumns.length + (showActionsColumn ? 1 : 0)} class="px-4 py-6 text-center text-sm text-slate-600">
               Memuat data…
             </td>
           </tr>
@@ -268,14 +268,14 @@
           </tr>
         {:else if totalItems === 0}
           <tr>
-            <td colspan={resolvedColumns.length + (showActionsColumn ? 1 : 0)} class="px-4 py-10 text-center text-sm text-ink-soft">
+            <td colspan={resolvedColumns.length + (showActionsColumn ? 1 : 0)} class="px-4 py-10 text-center text-sm text-slate-600">
               {emptyMessage}
             </td>
           </tr>
         {:else}
           {#each visibleItems as item, index}
             {@const rowKey = resolveRowKey(item, index)}
-            <tr class="transition hover:bg-surface-muted/80">
+            <tr class="transition hover:bg-slate-50">
               {#each resolvedColumns as column (column.id)}
                 <td class={`px-4 py-3 align-top ${getCellAlignmentClass(column.align)} ${column.class ?? ''}`}>
                   {#if column.cell}
@@ -291,7 +291,7 @@
                     <div class="relative inline-block text-left">
                       <button
                         type="button"
-                        class="inline-flex h-9 w-9 items-center justify-center rounded-full border border-surface-muted bg-surface text-ink-soft transition hover:border-accent hover:text-accent"
+                        class="inline-flex h-9 w-9 items-center justify-center rounded-md border border-slate-200 bg-white text-slate-500 transition hover:border-blue-500 hover:text-blue-600"
                         on:click={() => (openMenuKey = openMenuKey === rowKey ? null : rowKey)}
                         aria-haspopup="true"
                         aria-expanded={openMenuKey === rowKey}
@@ -300,12 +300,12 @@
                         ⋯
                       </button>
                       {#if openMenuKey === rowKey}
-                        <div class="absolute right-0 z-20 mt-2 w-44 overflow-hidden rounded-xl border border-surface-muted bg-surface shadow-lg">
-                          <ul class="py-1 text-left text-sm text-ink">
+                        <div class="absolute right-0 z-20 mt-2 w-44 overflow-hidden rounded-lg border border-slate-200 bg-white shadow-lg">
+                          <ul class="py-1 text-left text-sm text-slate-700">
                             <li>
                               <button
                                 type="button"
-                                class="flex w-full items-center gap-2 px-4 py-2 text-left hover:bg-surface-muted"
+                                class="flex w-full items-center gap-2 px-4 py-2 text-left hover:bg-slate-100"
                                 on:click={() => {
                                   handleActionSelect('detail', item);
                                   closeAllMenus();
@@ -317,7 +317,7 @@
                             <li>
                               <button
                                 type="button"
-                                class="flex w-full items-center gap-2 px-4 py-2 text-left hover:bg-surface-muted"
+                                class="flex w-full items-center gap-2 px-4 py-2 text-left hover:bg-slate-100"
                                 on:click={() => {
                                   handleActionSelect('chat', item);
                                   closeAllMenus();
@@ -329,7 +329,7 @@
                             <li>
                               <button
                                 type="button"
-                                class="flex w-full items-center gap-2 px-4 py-2 text-left hover:bg-surface-muted"
+                                class="flex w-full items-center gap-2 px-4 py-2 text-left hover:bg-slate-100"
                                 on:click={() => {
                                   handleActionSelect('resolve', item);
                                   closeAllMenus();
@@ -341,7 +341,7 @@
                             <li>
                               <button
                                 type="button"
-                                class="flex w-full items-center gap-2 px-4 py-2 text-left hover:bg-surface-muted"
+                                class="flex w-full items-center gap-2 px-4 py-2 text-left hover:bg-slate-100"
                                 on:click={() => {
                                   handleActionSelect('whatsapp', item);
                                   closeAllMenus();
@@ -364,7 +364,7 @@
     </table>
   </div>
 
-  <div class="flex flex-col gap-4 border-t border-surface-muted pt-4 text-sm text-ink-soft sm:flex-row sm:items-center sm:justify-between">
+  <div class="flex flex-col gap-4 border-t border-slate-200 pt-4 text-sm text-slate-600 sm:flex-row sm:items-center sm:justify-between">
     <div>
       {#if totalItems > 0}
         Menampilkan {pageStartIndex + 1}-{pageEndIndex} dari {totalItems} {summaryLabel}.
@@ -376,16 +376,16 @@
       {#if enableExport}
         <button
           type="button"
-          class="rounded-lg border border-surface-muted bg-surface px-3 py-2 text-sm font-medium text-ink-soft transition hover:border-accent hover:text-accent"
+          class="rounded-md border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-600 transition hover:border-blue-500 hover:text-blue-600"
           on:click={exportToCsv}
         >
           Ekspor CSV
         </button>
       {/if}
       <div class="flex items-center gap-2">
-        <span class="text-xs uppercase tracking-wide text-ink-soft">Tampilkan</span>
+        <span class="text-xs uppercase tracking-wide text-slate-500">Tampilkan</span>
         <select
-          class="rounded-lg border border-surface-muted bg-surface px-2 py-1 text-sm focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/30"
+          class="rounded-md border border-slate-300 bg-white px-2 py-1 text-sm text-slate-700 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200"
           bind:value={pageSize}
           on:change={(event) => changePageSize(Number(event.currentTarget.value))}
         >
@@ -397,18 +397,18 @@
       <nav class="flex items-center gap-2" aria-label="Pagination">
         <button
           type="button"
-          class="rounded-full border border-surface-muted px-3 py-1 text-sm text-ink-soft transition hover:border-accent hover:text-accent disabled:cursor-not-allowed disabled:opacity-40"
+          class="rounded-md border border-slate-200 px-3 py-1 text-sm text-slate-600 transition hover:border-blue-500 hover:text-blue-600 disabled:cursor-not-allowed disabled:border-slate-200 disabled:text-slate-400"
           on:click={goToPreviousPage}
           disabled={page <= 1}
         >
           Sebelumnya
         </button>
-        <span class="text-xs uppercase tracking-wide text-ink-soft">
+        <span class="text-xs uppercase tracking-wide text-slate-500">
           Halaman {totalItems === 0 ? 0 : page} dari {totalItems === 0 ? 0 : totalPages}
         </span>
         <button
           type="button"
-          class="rounded-full border border-surface-muted px-3 py-1 text-sm text-ink-soft transition hover:border-accent hover:text-accent disabled:cursor-not-allowed disabled:opacity-40"
+          class="rounded-md border border-slate-200 px-3 py-1 text-sm text-slate-600 transition hover:border-blue-500 hover:text-blue-600 disabled:cursor-not-allowed disabled:border-slate-200 disabled:text-slate-400"
           on:click={goToNextPage}
           disabled={page >= totalPages}
         >

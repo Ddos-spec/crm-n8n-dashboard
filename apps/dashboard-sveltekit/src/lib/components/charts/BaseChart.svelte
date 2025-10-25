@@ -71,10 +71,10 @@
     class="w-full"
   />
 {:else}
-  <div class="flex h-full flex-col items-center justify-center rounded-xl border border-dashed border-surface-muted bg-surface px-4 py-8 text-center text-sm text-ink-soft">
-    <p class="font-medium">{emptyMessage}</p>
+  <div class="flex h-full flex-col items-center justify-center rounded-xl border border-dashed border-slate-200 bg-white px-4 py-8 text-center text-sm text-slate-600">
+    <p class="font-medium text-slate-700">{emptyMessage}</p>
     {#if emptyDescription}
-      <p class="mt-2 text-xs text-ink-soft/80">{emptyDescription}</p>
+      <p class="mt-2 text-xs text-slate-500">{emptyDescription}</p>
     {/if}
   </div>
 {/if}

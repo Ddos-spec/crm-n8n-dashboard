@@ -1,12 +1,8 @@
 {
   "name": "crm-n8n-dashboard",
   "version": "1.0.0",
-  "type": "module",
+  "private": true,
   "scripts": {
-    "build": "node scripts/build-frontend.mjs"
-  },
-  "devDependencies": {
-    "esbuild": "^0.21.5",
-    "tailwindcss": "^3.4.18"
+    "build": "npm run build --prefix apps/dashboard-sveltekit"
   }
 }

@@ -269,20 +269,20 @@
   <title>Insight Lengkap • CRM Dashboard</title>
 </svelte:head>
 
-<section class="space-y-10 px-6 py-10">
-  <header class="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+<div class="min-h-screen bg-white text-slate-900">
+  <header class="flex flex-col gap-4 border-b border-slate-200 px-6 py-6 md:flex-row md:items-center md:justify-between lg:px-12">
     <div>
       <a
         href="/"
-        class="inline-flex items-center gap-2 text-sm font-semibold text-accent hover:text-accent/80"
+        class="inline-flex items-center gap-2 text-sm font-semibold text-blue-600 hover:text-blue-600/80"
         aria-label="Kembali ke ringkasan"
       >
         ← Kembali ke ringkasan
       </a>
-      <h1 class="mt-2 text-3xl font-semibold text-ink">Insight Lengkap</h1>
-      <p class="mt-1 text-sm text-ink-soft">
-        Semua data CRM dari workflow <span class="font-semibold text-ink">{config.n8n.workflowId}</span> di{' '}
-        <span class="font-semibold text-ink">{config.n8n.baseUrl}</span>.
+      <h1 class="mt-2 text-3xl font-semibold text-slate-900">Insight Lengkap</h1>
+      <p class="mt-1 text-sm text-slate-600">
+        Semua data CRM dari workflow <span class="font-semibold text-slate-900">{config.n8n.workflowId}</span> di{' '}
+        <span class="font-semibold text-slate-900">{config.n8n.baseUrl}</span>.
       </p>
     </div>
     <div class="flex flex-col gap-2 sm:flex-row sm:items-center">
@@ -291,7 +291,7 @@
       {/if}
       <button
         type="button"
-        class="inline-flex items-center gap-2 rounded-full bg-accent px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-accent/90 disabled:cursor-not-allowed disabled:bg-ink-soft/40"
+        class="inline-flex items-center gap-2 rounded-full bg-blue-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-600/90 disabled:cursor-not-allowed disabled:bg-blue-300"
         on:click={() => refreshAll()}
         disabled={refreshing}
       >
@@ -305,19 +305,20 @@
     </div>
   </header>
 
-  <section class="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+  <main class="space-y-10 px-6 py-8 lg:px-12">
+    <section class="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
     {#if $statsSummary}
       {#each $statsSummary as card (card.id)}
-        <article class="flex h-full flex-col justify-between rounded-3xl border border-surface-muted bg-surface p-5 shadow-sm">
+        <article class="flex h-full flex-col justify-between rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
           <div>
-            <p class="text-xs font-semibold uppercase tracking-[0.2em] text-ink-soft/70">{card.label}</p>
-            <p class="mt-2 text-3xl font-semibold text-ink">{card.value}</p>
+            <p class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-600/70">{card.label}</p>
+            <p class="mt-2 text-3xl font-semibold text-slate-900">{card.value}</p>
             {#if card.delta !== null}
               <p class={`mt-2 inline-flex items-center rounded-full px-2 py-1 text-xs font-semibold ${card.delta >= 0 ? 'bg-emerald-50 text-emerald-700' : 'bg-rose-50 text-rose-700'}`}>
                 {card.delta > 0 ? '+' : ''}{card.delta}% • {card.period ?? 'Periode tidak diketahui'}
               </p>
             {:else if card.period}
-              <p class="mt-2 text-xs text-ink-soft">{card.period}</p>
+              <p class="mt-2 text-xs text-slate-600">{card.period}</p>
             {/if}
           </div>
           <div class="mt-4 h-24">
@@ -332,21 +333,21 @@
         </article>
       {/each}
     {:else}
-      <p class="rounded-3xl border border-dashed border-surface-muted bg-surface px-4 py-10 text-center text-sm text-ink-soft">
+      <p class="rounded-xl border border-dashed border-slate-200 bg-white px-4 py-10 text-center text-sm text-slate-600">
         Menunggu data statistik dari n8n…
       </p>
     {/if}
   </section>
 
   <section class="grid gap-6 lg:grid-cols-2">
-    <article class="flex h-full flex-col gap-4 rounded-3xl border border-surface-muted bg-surface p-6 shadow-sm">
+    <article class="flex h-full flex-col gap-4 rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
       <header class="flex items-center justify-between">
         <div>
-          <h2 class="text-lg font-semibold text-ink">Response Time Trend</h2>
-          <p class="text-sm text-ink-soft">Analisis rata-rata waktu respon per periode.</p>
+          <h2 class="text-lg font-semibold text-slate-900">Response Time Trend</h2>
+          <p class="text-sm text-slate-600">Analisis rata-rata waktu respon per periode.</p>
         </div>
         {#if responseTrend.averageLabel}
-          <span class="rounded-full bg-accent-muted px-3 py-1 text-xs font-semibold text-accent">
+          <span class="rounded-full bg-blue-100 px-3 py-1 text-xs font-semibold text-blue-600">
             Rata-rata {responseTrend.averageLabel}
           </span>
         {/if}
@@ -361,13 +362,13 @@
         />
       </div>
     </article>
-    <article class="flex h-full flex-col gap-4 rounded-3xl border border-surface-muted bg-surface p-6 shadow-sm">
+    <article class="flex h-full flex-col gap-4 rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
       <header class="flex items-center justify-between">
         <div>
-          <h2 class="text-lg font-semibold text-ink">Status Eskalasi</h2>
-          <p class="text-sm text-ink-soft">Distribusi tiket eskalasi terbaru.</p>
+          <h2 class="text-lg font-semibold text-slate-900">Status Eskalasi</h2>
+          <p class="text-sm text-slate-600">Distribusi tiket eskalasi terbaru.</p>
         </div>
-        <span class="text-sm font-semibold text-ink">{numberFormatter.format(escalationBreakdown.total)} tiket</span>
+        <span class="text-sm font-semibold text-slate-900">{numberFormatter.format(escalationBreakdown.total)} tiket</span>
       </header>
       <div class="grid gap-4 md:grid-cols-2">
         <div class="h-64">
@@ -379,18 +380,18 @@
             emptyDescription="Semua tiket sudah terselesaikan atau belum diterima dari n8n."
           />
         </div>
-        <ul class="flex flex-col justify-center gap-3 text-sm text-ink-soft">
+        <ul class="flex flex-col justify-center gap-3 text-sm text-slate-600">
           <li class="flex items-center justify-between rounded-xl bg-rose-50 px-4 py-3">
             <span class="font-medium text-rose-600">Open</span>
-            <span class="text-base font-semibold text-ink">{formatNumber(escalationBreakdown.open)}</span>
+            <span class="text-base font-semibold text-slate-900">{formatNumber(escalationBreakdown.open)}</span>
           </li>
           <li class="flex items-center justify-between rounded-xl bg-amber-50 px-4 py-3">
             <span class="font-medium text-amber-600">Pending</span>
-            <span class="text-base font-semibold text-ink">{formatNumber(escalationBreakdown.pending)}</span>
+            <span class="text-base font-semibold text-slate-900">{formatNumber(escalationBreakdown.pending)}</span>
           </li>
           <li class="flex items-center justify-between rounded-xl bg-emerald-50 px-4 py-3">
             <span class="font-medium text-emerald-600">Resolved</span>
-            <span class="text-base font-semibold text-ink">{formatNumber(escalationBreakdown.resolved)}</span>
+            <span class="text-base font-semibold text-slate-900">{formatNumber(escalationBreakdown.resolved)}</span>
           </li>
         </ul>
       </div>
@@ -398,30 +399,30 @@
   </section>
 
   <section class="grid gap-6 lg:grid-cols-3">
-    <article class="rounded-3xl border border-surface-muted bg-surface p-6 shadow-sm lg:col-span-2">
+    <article class="rounded-xl border border-slate-200 bg-white p-6 shadow-sm lg:col-span-2">
       <header class="flex items-center justify-between">
         <div>
-          <h2 class="text-lg font-semibold text-ink">Funnel Konversi</h2>
-          <p class="text-sm text-ink-soft">Tahapan leads berdasarkan data n8n.</p>
+          <h2 class="text-lg font-semibold text-slate-900">Funnel Konversi</h2>
+          <p class="text-sm text-slate-600">Tahapan leads berdasarkan data n8n.</p>
         </div>
-        <span class="text-xs font-semibold uppercase tracking-wide text-ink-soft">{funnelRows.length} tahap</span>
+        <span class="text-xs font-semibold uppercase tracking-wide text-slate-600">{funnelRows.length} tahap</span>
       </header>
       {#if funnelRows.length > 0}
         <table class="mt-4 w-full border-separate border-spacing-y-3">
           <tbody>
             {#each funnelRows as row (row.key)}
-              <tr class="rounded-2xl border border-surface-muted bg-surface">
+              <tr class="rounded-lg border border-slate-200 bg-white">
                 <td class="px-4 py-3">
-                  <p class="text-sm font-semibold text-ink">{row.label}</p>
+                  <p class="text-sm font-semibold text-slate-900">{row.label}</p>
                   {#if row.statuses.length > 0}
-                    <div class="mt-2 flex flex-wrap gap-2 text-xs text-ink-soft">
+                    <div class="mt-2 flex flex-wrap gap-2 text-xs text-slate-600">
                       {#each row.statuses as status (status)}
-                        <span class="rounded-full bg-surface-muted px-2 py-1">{status}</span>
+                        <span class="rounded-full bg-slate-100 px-2 py-1">{status}</span>
                       {/each}
                     </div>
                   {/if}
                 </td>
-                <td class="px-4 py-3 text-right text-lg font-semibold text-ink">
+                <td class="px-4 py-3 text-right text-lg font-semibold text-slate-900">
                   {numberFormatter.format(row.count)}
                 </td>
               </tr>
@@ -429,41 +430,41 @@
           </tbody>
         </table>
       {:else}
-        <p class="mt-6 rounded-2xl border border-dashed border-surface-muted bg-surface px-4 py-6 text-sm text-ink-soft">
+        <p class="mt-6 rounded-lg border border-dashed border-slate-200 bg-white px-4 py-6 text-sm text-slate-600">
           Belum ada data funnel yang dapat ditampilkan.
         </p>
       {/if}
     </article>
-    <article class="flex flex-col gap-4 rounded-3xl border border-surface-muted bg-surface p-6 shadow-sm">
+    <article class="flex flex-col gap-4 rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
       <header>
-        <h2 class="text-lg font-semibold text-ink">Customer Satisfaction</h2>
-        <p class="text-sm text-ink-soft">Ikhtisar CSAT dari laporan terbaru.</p>
+        <h2 class="text-lg font-semibold text-slate-900">Customer Satisfaction</h2>
+        <p class="text-sm text-slate-600">Ikhtisar CSAT dari laporan terbaru.</p>
       </header>
       {#if csat.score}
         <div class="flex items-end justify-between">
           <div>
-            <p class="text-5xl font-semibold text-ink">{csat.score}</p>
-            <p class="text-sm text-ink-soft">Skor rata-rata</p>
+            <p class="text-5xl font-semibold text-slate-900">{csat.score}</p>
+            <p class="text-sm text-slate-600">Skor rata-rata</p>
           </div>
           {#if csat.trend}
             <span class="rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-600">{csat.trend}</span>
           {/if}
         </div>
         {#if csat.summary}
-          <p class="text-sm text-ink-soft">{csat.summary}</p>
+          <p class="text-sm text-slate-600">{csat.summary}</p>
         {/if}
         <dl class="mt-4 grid grid-cols-2 gap-4 text-sm">
           <div>
-            <dt class="text-xs uppercase tracking-wide text-ink-soft/70">Respon</dt>
-            <dd class="mt-1 font-semibold text-ink">{csat.responses ?? '—'}</dd>
+            <dt class="text-xs uppercase tracking-wide text-slate-600/70">Respon</dt>
+            <dd class="mt-1 font-semibold text-slate-900">{csat.responses ?? '—'}</dd>
           </div>
           <div>
-            <dt class="text-xs uppercase tracking-wide text-ink-soft/70">Sentimen positif</dt>
-            <dd class="mt-1 font-semibold text-ink">{csat.sentiment ?? '—'}</dd>
+            <dt class="text-xs uppercase tracking-wide text-slate-600/70">Sentimen positif</dt>
+            <dd class="mt-1 font-semibold text-slate-900">{csat.sentiment ?? '—'}</dd>
           </div>
         </dl>
       {:else}
-        <p class="rounded-2xl border border-dashed border-surface-muted bg-surface px-4 py-6 text-sm text-ink-soft">
+        <p class="rounded-lg border border-dashed border-slate-200 bg-white px-4 py-6 text-sm text-slate-600">
           Tambahkan data CSAT pada workflow n8n untuk memunculkan ringkasan ini.
         </p>
       {/if}
@@ -471,19 +472,19 @@
   </section>
 
   <section class="grid gap-6 lg:grid-cols-2">
-    <article class="rounded-3xl border border-surface-muted bg-surface p-6 shadow-sm">
+    <article class="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
       <header class="flex items-center justify-between">
-        <h2 class="text-lg font-semibold text-ink">Aktivitas Terbaru</h2>
-        <span class="text-xs font-semibold uppercase tracking-wide text-ink-soft">{activities.length} entri</span>
+        <h2 class="text-lg font-semibold text-slate-900">Aktivitas Terbaru</h2>
+        <span class="text-xs font-semibold uppercase tracking-wide text-slate-600">{activities.length} entri</span>
       </header>
       {#if activities.length > 0}
         <ol class="mt-4 space-y-3">
           {#each activities as activity, index (index)}
-            <li class="rounded-2xl border border-surface-muted bg-surface px-4 py-3">
-              <p class="text-sm font-semibold text-ink">{activity.title}</p>
-              <p class="text-xs text-ink-soft">{activity.detail}</p>
+            <li class="rounded-lg border border-slate-200 bg-white px-4 py-3">
+              <p class="text-sm font-semibold text-slate-900">{activity.title}</p>
+              <p class="text-xs text-slate-600">{activity.detail}</p>
               <p
-                class="mt-2 text-xs text-ink-soft/80"
+                class="mt-2 text-xs text-slate-500"
                 title={activity.timestamp ? dateFormatter.format(new Date(activity.timestamp)) : undefined}
               >
                 {formatRelativeTime(activity.timestamp)}
@@ -492,60 +493,61 @@
           {/each}
         </ol>
       {:else}
-        <p class="mt-6 rounded-2xl border border-dashed border-surface-muted bg-surface px-4 py-6 text-sm text-ink-soft">
+        <p class="mt-6 rounded-lg border border-dashed border-slate-200 bg-white px-4 py-6 text-sm text-slate-600">
           Belum ada aktivitas terbaru yang tercatat.
         </p>
       {/if}
     </article>
-    <article class="rounded-3xl border border-surface-muted bg-surface p-6 shadow-sm">
+    <article class="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
       <header class="flex items-center justify-between">
-        <h2 class="text-lg font-semibold text-ink">Notifikasi Eskalasi</h2>
-        <span class="text-xs font-semibold uppercase tracking-wide text-ink-soft">Prioritas</span>
+        <h2 class="text-lg font-semibold text-slate-900">Notifikasi Eskalasi</h2>
+        <span class="text-xs font-semibold uppercase tracking-wide text-slate-600">Prioritas</span>
       </header>
       {#if notifications.length > 0}
         <ul class="mt-4 space-y-3">
           {#each notifications as notification, index (index)}
-            <li class="rounded-2xl border border-surface-muted bg-surface px-4 py-3">
-              <p class="text-sm font-semibold text-ink">{notification.title}</p>
-              <p class="text-xs text-ink-soft">{notification.detail}</p>
+            <li class="rounded-lg border border-slate-200 bg-white px-4 py-3">
+              <p class="text-sm font-semibold text-slate-900">{notification.title}</p>
+              <p class="text-xs text-slate-600">{notification.detail}</p>
             </li>
           {/each}
         </ul>
       {:else}
-        <p class="mt-6 rounded-2xl border border-dashed border-surface-muted bg-surface px-4 py-6 text-sm text-ink-soft">
+        <p class="mt-6 rounded-lg border border-dashed border-slate-200 bg-white px-4 py-6 text-sm text-slate-600">
           Semua eskalasi sudah terselesaikan. Tidak ada notifikasi baru.
         </p>
       {/if}
     </article>
   </section>
 
-  <section class="rounded-3xl border border-surface-muted bg-surface p-6 shadow-sm">
-    <header class="flex items-center justify-between">
-      <div>
-        <h2 class="text-lg font-semibold text-ink">Team Performance</h2>
-        <p class="text-sm text-ink-soft">Top agent berdasarkan data n8n.</p>
-      </div>
-      <span class="text-xs font-semibold uppercase tracking-wide text-ink-soft">{leaderboard.length} anggota</span>
-    </header>
-    {#if leaderboard.length > 0}
-      <ul class="mt-4 space-y-3">
-        {#each leaderboard as member, index (member.name + index)}
-          <li class="flex items-center justify-between rounded-2xl bg-surface-muted/60 px-4 py-3">
-            <div class="flex items-center gap-3">
-              <span class="flex h-10 w-10 items-center justify-center rounded-full bg-accent-muted text-sm font-semibold text-accent">#{index + 1}</span>
-              <div>
-                <p class="text-sm font-semibold text-ink">{member.name}</p>
-                <p class="text-xs text-ink-soft">{member.handled} tiket • SLA {member.sla}</p>
+    <section class="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+      <header class="flex items-center justify-between">
+        <div>
+          <h2 class="text-lg font-semibold text-slate-900">Team Performance</h2>
+          <p class="text-sm text-slate-600">Top agent berdasarkan data n8n.</p>
+        </div>
+        <span class="text-xs font-semibold uppercase tracking-wide text-slate-600">{leaderboard.length} anggota</span>
+      </header>
+      {#if leaderboard.length > 0}
+        <ul class="mt-4 space-y-3">
+          {#each leaderboard as member, index (member.name + index)}
+            <li class="flex items-center justify-between rounded-lg bg-slate-100 px-4 py-3">
+              <div class="flex items-center gap-3">
+                <span class="flex h-10 w-10 items-center justify-center rounded-full bg-blue-100 text-sm font-semibold text-blue-600">#{index + 1}</span>
+                <div>
+                  <p class="text-sm font-semibold text-slate-900">{member.name}</p>
+                  <p class="text-xs text-slate-600">{member.handled} tiket • SLA {member.sla}</p>
+                </div>
               </div>
-            </div>
-            <span class="text-sm font-semibold text-emerald-600">{member.score}</span>
-          </li>
-        {/each}
-      </ul>
-    {:else}
-      <p class="mt-6 rounded-2xl border border-dashed border-surface-muted bg-surface px-4 py-6 text-sm text-ink-soft">
-        Belum ada data performa tim untuk ditampilkan.
-      </p>
-    {/if}
-  </section>
-</section>
+              <span class="text-sm font-semibold text-emerald-600">{member.score}</span>
+            </li>
+          {/each}
+        </ul>
+      {:else}
+        <p class="mt-6 rounded-lg border border-dashed border-slate-200 bg-white px-4 py-6 text-sm text-slate-600">
+          Belum ada data performa tim untuk ditampilkan.
+        </p>
+      {/if}
+    </section>
+  </main>
+</div>
