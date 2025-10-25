@@ -500,74 +500,87 @@
                                         </select>
                                     </label>
                                 </div>
-                                <div class="text-xs text-slate-500" id="businesses-row-count">0 businesses</div>
+                                <div class="flex flex-col gap-2 text-xs text-slate-500 sm:flex-row sm:items-center sm:gap-4">
+                                    <label class="flex items-center gap-2 rounded-full bg-slate-900/5 px-3 py-1 text-sm text-slate-500 focus-within:ring-2 focus-within:ring-sky-500">
+                                        Rows
+                                        <select id="businesses-rows-per-page" class="rounded-full border-none bg-transparent text-sm text-slate-700 focus:ring-0">
+                                            <option value="10">10</option>
+                                            <option value="15" selected>15</option>
+                                            <option value="25">25</option>
+                                        </select>
+                                    </label>
+                                    <div id="businesses-row-count">0 businesses</div>
+                                </div>
                             </div>
 
-                            <div class="mt-4 table-wrap glass-muted overflow-x-auto">
-                                <table id="businesses-table" class="min-w-[960px]">
-                                    <thead>
-                                        <tr>
-                                            <th scope="col">
-                                                <div class="flex items-center gap-2 text-left text-slate-500">
-                                                    <i data-lucide="hash" class="h-4 w-4"></i>
-                                                    <span>ID</span>
-                                                </div>
-                                            </th>
-                                            <th scope="col">
-                                                <button type="button" class="flex w-full items-center justify-between gap-2 text-left text-slate-600 transition hover:text-sky-500" data-businesses-sort="name" aria-label="Sort by business name">
-                                                    <span class="flex items-center gap-2">
-                                                        <i data-lucide="building-2" class="h-4 w-4"></i>
-                                                        <span>Business Name</span>
-                                                    </span>
-                                                    <i data-lucide="arrow-up-down" class="h-4 w-4 text-slate-400" data-sort-indicator="name"></i>
-                                                </button>
-                                            </th>
-                                            <th scope="col">
-                                                <div class="flex items-center gap-2 text-left text-slate-500">
-                                                    <i data-lucide="phone" class="h-4 w-4"></i>
-                                                    <span>Phone</span>
-                                                </div>
-                                            </th>
-                                            <th scope="col">
-                                                <div class="flex items-center gap-2 text-left text-slate-500">
-                                                    <i data-lucide="map-pin" class="h-4 w-4"></i>
-                                                    <span>Address</span>
-                                                </div>
-                                            </th>
-                                            <th scope="col">
-                                                <div class="flex items-center gap-2 text-left text-slate-500">
-                                                    <i data-lucide="globe" class="h-4 w-4"></i>
-                                                    <span>Website</span>
-                                                </div>
-                                            </th>
-                                            <th scope="col">
-                                                <button type="button" class="flex w-full items-center justify-between gap-2 text-left text-slate-600 transition hover:text-sky-500" data-businesses-sort="rating" aria-label="Sort by rating">
-                                                    <span class="flex items-center gap-2">
-                                                        <i data-lucide="star" class="h-4 w-4"></i>
-                                                        <span>Rating</span>
-                                                    </span>
-                                                    <i data-lucide="arrow-up-down" class="h-4 w-4 text-slate-400" data-sort-indicator="rating"></i>
-                                                </button>
-                                            </th>
-                                            <th scope="col">
-                                                <button type="button" class="flex w-full items-center justify-between gap-2 text-left text-slate-600 transition hover:text-sky-500" data-businesses-sort="status" aria-label="Sort by status">
-                                                    <span class="flex items-center gap-2">
-                                                        <i data-lucide="activity" class="h-4 w-4"></i>
-                                                        <span>Status</span>
-                                                    </span>
-                                                    <i data-lucide="arrow-up-down" class="h-4 w-4 text-slate-400" data-sort-indicator="status"></i>
-                                                </button>
-                                            </th>
-                                            <th scope="col">
-                                                <div class="flex items-center gap-2 text-left text-slate-500">
-                                                    <i data-lucide="tags" class="h-4 w-4"></i>
-                                                    <span>Business Types</span>
-                                                </div>
-                                            </th>
-                                        </tr>
-                                    </thead>
-                                    <tbody id="businesses-tbody"></tbody>
-                                </table>
+                            <div class="relative mt-4 table-wrap glass-muted overflow-hidden">
+                                <div class="pointer-events-none absolute inset-y-0 right-0 hidden w-16 bg-gradient-to-l from-slate-50 via-slate-50/90 to-transparent sm:block" aria-hidden="true"></div>
+                                <div class="overflow-x-auto">
+                                    <table id="businesses-table" class="min-w-[960px] table-auto border-collapse text-sm text-slate-600">
+                                        <thead>
+                                            <tr>
+                                                <th scope="col" class="whitespace-nowrap border-b border-slate-200/60 bg-slate-900/5 px-4 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                                                    <div class="flex items-center gap-2 text-left">
+                                                        <i data-lucide="hash" class="h-4 w-4"></i>
+                                                        <span>ID</span>
+                                                    </div>
+                                                </th>
+                                                <th scope="col" class="whitespace-nowrap border-b border-slate-200/60 bg-slate-900/5 px-4 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                                                    <button type="button" class="flex w-full items-center justify-between gap-2 text-left text-slate-600 transition hover:text-sky-500" data-businesses-sort="name" aria-label="Sort by business name">
+                                                        <span class="flex items-center gap-2">
+                                                            <i data-lucide="building-2" class="h-4 w-4"></i>
+                                                            <span>Business Name</span>
+                                                        </span>
+                                                        <i data-lucide="arrow-up-down" class="h-4 w-4 text-slate-400" data-sort-indicator="name"></i>
+                                                    </button>
+                                                </th>
+                                                <th scope="col" class="whitespace-nowrap border-b border-slate-200/60 bg-slate-900/5 px-4 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                                                    <div class="flex items-center gap-2 text-left">
+                                                        <i data-lucide="phone" class="h-4 w-4"></i>
+                                                        <span>Phone</span>
+                                                    </div>
+                                                </th>
+                                                <th scope="col" class="whitespace-nowrap border-b border-slate-200/60 bg-slate-900/5 px-4 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                                                    <div class="flex items-center gap-2 text-left">
+                                                        <i data-lucide="map-pin" class="h-4 w-4"></i>
+                                                        <span>Address</span>
+                                                    </div>
+                                                </th>
+                                                <th scope="col" class="whitespace-nowrap border-b border-slate-200/60 bg-slate-900/5 px-4 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                                                    <div class="flex items-center gap-2 text-left">
+                                                        <i data-lucide="globe" class="h-4 w-4"></i>
+                                                        <span>Website</span>
+                                                    </div>
+                                                </th>
+                                                <th scope="col" class="whitespace-nowrap border-b border-slate-200/60 bg-slate-900/5 px-4 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                                                    <button type="button" class="flex w-full items-center justify-between gap-2 text-left text-slate-600 transition hover:text-sky-500" data-businesses-sort="rating" aria-label="Sort by rating">
+                                                        <span class="flex items-center gap-2">
+                                                            <i data-lucide="star" class="h-4 w-4"></i>
+                                                            <span>Rating</span>
+                                                        </span>
+                                                        <i data-lucide="arrow-up-down" class="h-4 w-4 text-slate-400" data-sort-indicator="rating"></i>
+                                                    </button>
+                                                </th>
+                                                <th scope="col" class="whitespace-nowrap border-b border-slate-200/60 bg-slate-900/5 px-4 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                                                    <button type="button" class="flex w-full items-center justify-between gap-2 text-left text-slate-600 transition hover:text-sky-500" data-businesses-sort="status" aria-label="Sort by status">
+                                                        <span class="flex items-center gap-2">
+                                                            <i data-lucide="activity" class="h-4 w-4"></i>
+                                                            <span>Status</span>
+                                                        </span>
+                                                        <i data-lucide="arrow-up-down" class="h-4 w-4 text-slate-400" data-sort-indicator="status"></i>
+                                                    </button>
+                                                </th>
+                                                <th scope="col" class="whitespace-nowrap border-b border-slate-200/60 bg-slate-900/5 px-4 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                                                    <div class="flex items-center gap-2 text-left">
+                                                        <i data-lucide="tags" class="h-4 w-4"></i>
+                                                        <span>Business Types</span>
+                                                    </div>
+                                                </th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="businesses-tbody" class="divide-y divide-slate-200/60"></tbody>
+                                    </table>
+                                </div>
                             </div>
 
                             <div class="mt-4 flex flex-col gap-2 text-xs text-slate-500 sm:flex-row sm:items-center sm:justify-between">

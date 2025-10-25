@@ -977,7 +977,7 @@ const businessesTableState = {
   filtered: [],
   sort: { key: 'name', direction: 'asc' },
   filters: { status: 'all', rating: 'all', search: '' },
-  pagination: { page: 1, perPage: 10 }
+  pagination: { page: 1, perPage: 15 }
 };
 
 let businessesControlsInitialized = false;
@@ -990,14 +990,20 @@ function setupBusinessesControls() {
   const searchInput = document.getElementById('businesses-search');
   const statusFilter = document.getElementById('businesses-status-filter');
   const ratingFilter = document.getElementById('businesses-rating-filter');
+  const rowsPerPageSelect = document.getElementById('businesses-rows-per-page');
   const prevButton = document.getElementById('businesses-prev');
   const nextButton = document.getElementById('businesses-next');
 
-  if (!searchInput || !statusFilter || !ratingFilter || !prevButton || !nextButton) {
+  if (!searchInput || !statusFilter || !ratingFilter || !rowsPerPageSelect || !prevButton || !nextButton) {
     return;
   }
 
   businessesControlsInitialized = true;
+
+  const currentPerPage = Number.isFinite(businessesTableState.pagination.perPage)
+    ? businessesTableState.pagination.perPage
+    : 15;
+  rowsPerPageSelect.value = String(currentPerPage);
 
   searchInput.addEventListener('input', (event) => {
     businessesTableState.filters.search = String(event.target.value || '').toLowerCase();
@@ -1017,6 +1023,16 @@ function setupBusinessesControls() {
     businessesTableState.filters.rating = event.target.value || 'all';
     businessesTableState.pagination.page = 1;
     applyBusinessFilters();
+    renderBusinessesTable();
+  });
+
+  rowsPerPageSelect.addEventListener('change', (event) => {
+    const nextValue = Number.parseInt(event.target.value, 10);
+    if (!Number.isFinite(nextValue) || nextValue <= 0) {
+      return;
+    }
+    businessesTableState.pagination.perPage = nextValue;
+    businessesTableState.pagination.page = 1;
     renderBusinessesTable();
   });
 
@@ -1253,9 +1269,10 @@ function renderRatingCell(rating, total) {
 
   const ratingLabel = Number.isFinite(rating) ? rating.toFixed(1) : '-';
   const totalLabel = Number.isFinite(total) ? formatNumber(total) : '0';
+  const tooltip = `Rating ${ratingLabel} dari ${totalLabel} ulasan`; // will be escaped below
 
   return `
-    <div class="flex items-center gap-2">
+    <div class="flex items-center gap-2" title="${escapeHTML(tooltip)}">
       <span class="flex items-center gap-1">${stars}</span>
       <span class="text-sm font-semibold text-slate-700">${ratingLabel}</span>
       <span class="text-xs text-slate-500">(${totalLabel})</span>
@@ -1284,21 +1301,21 @@ function renderBusinessRow(business) {
   const addressFull = business.address || '';
   const truncatedAddress = addressFull ? truncateText(addressFull, 50) : '-';
   const addressCell = addressFull
-    ? `<span class="block max-w-[280px] truncate text-sm text-slate-600" title="${escapeHTML(addressFull)}">${escapeHTML(truncatedAddress)}</span>`
+    ? `<span class="block max-w-[320px] truncate text-sm text-slate-600" title="${escapeHTML(addressFull)}">${escapeHTML(truncatedAddress)}</span>`
     : '<span class="text-sm text-slate-500">-</span>';
 
   return `
     <tr class="align-top transition-colors hover:bg-slate-900/5">
-      <td class="whitespace-nowrap py-3 pr-4 text-sm font-semibold text-slate-700">${idCell}</td>
-      <td class="py-3 pr-4">
+      <td class="whitespace-nowrap px-4 py-4 text-sm font-semibold text-slate-700">${idCell}</td>
+      <td class="px-4 py-4">
         <span class="text-sm font-semibold text-slate-700">${nameCell}</span>
       </td>
-      <td class="whitespace-nowrap py-3 pr-4 text-sm text-slate-600">${phoneCell}</td>
-      <td class="py-3 pr-4">${addressCell}</td>
-      <td class="whitespace-nowrap py-3 pr-4">${renderWebsiteCell(business.website)}</td>
-      <td class="py-3 pr-4">${renderRatingCell(business.rating, business.ratingsTotal)}</td>
-      <td class="py-3 pr-4">${renderBusinessStatusBadge(business.status, business.statusLabel)}</td>
-      <td class="py-3 pr-4">${renderBusinessTypes(business.types)}</td>
+      <td class="whitespace-nowrap px-4 py-4 text-sm text-slate-600">${phoneCell}</td>
+      <td class="px-4 py-4">${addressCell}</td>
+      <td class="whitespace-nowrap px-4 py-4">${renderWebsiteCell(business.website)}</td>
+      <td class="px-4 py-4">${renderRatingCell(business.rating, business.ratingsTotal)}</td>
+      <td class="px-4 py-4">${renderBusinessStatusBadge(business.status, business.statusLabel)}</td>
+      <td class="px-4 py-4">${renderBusinessTypes(business.types)}</td>
     </tr>
   `;
 }
@@ -1306,8 +1323,8 @@ function renderBusinessRow(business) {
 function renderBusinessesSkeleton(tbody) {
   const columns = 8;
   const skeletonRow = Array.from({ length: columns }, (_, index) => {
-    const width = index === 0 ? 'w-16' : index === 1 ? 'w-40' : 'w-full';
-    return `<td class="py-3 pr-4"><div class="skeleton h-4 ${width} rounded-full"></div></td>`;
+    const width = index === 0 ? 'w-16' : index === 1 ? 'w-44' : index === 2 ? 'w-28' : 'w-full';
+    return `<td class="px-4 py-4"><div class="skeleton h-4 ${width} rounded-full"></div></td>`;
   }).join('');
 
   const rows = Array.from({ length: 5 })
@@ -1433,11 +1450,14 @@ function renderBusinessesTable() {
     tbody.innerHTML = visible.map((business) => renderBusinessRow(business)).join('');
   }
 
-  rowCount.textContent = `Total: ${total} businesses`;
+  const totalLabel = formatNumber(total);
+  rowCount.textContent = `${totalLabel} businesses`;
   if (total === 0) {
     paginationSummary.textContent = 'Tidak ada data businesses untuk ditampilkan';
   } else {
-    paginationSummary.textContent = `Menampilkan ${startIndex + 1}–${endIndex} dari ${total} businesses`;
+    const startLabel = formatNumber(startIndex + 1);
+    const endLabel = formatNumber(endIndex);
+    paginationSummary.textContent = `Menampilkan ${startLabel}–${endLabel} dari ${totalLabel} businesses`;
   }
 
   paginationContainer.classList.toggle('hidden', total <= perPage);
@@ -1498,7 +1518,7 @@ async function loadBusinessesData() {
     tbody.innerHTML =
       '<tr><td colspan="8" class="py-10 text-center text-sm text-rose-500">Terjadi kesalahan saat memuat data businesses.</td></tr>';
     if (rowCount) {
-      rowCount.textContent = 'Total: 0 businesses';
+      rowCount.textContent = '0 businesses';
     }
     if (paginationSummary) {
       paginationSummary.textContent = 'Gagal memuat data businesses';
