@@ -13,7 +13,7 @@
   import { statsStore } from '$stores/statsStore';
   import { customersStore } from '$stores/customersStore';
   import { leadsStore } from '$stores/leadsStore';
-  import { authStore } from '$stores/auth/authStore';
+  import { escalationsStore } from '$stores/escalationsStore';
   import { config } from '$config';
   import { postActionJson, postWebhookAction } from '$lib/utils/api';
   import type {
@@ -23,11 +23,9 @@
     CustomerContactHistoryItem,
     CustomerDetail,
     CustomerRecord,
-    LeadRecord
+    LeadRecord,
+    EscalationRecord
   } from '$lib/types/api';
-
-  // Ambil data user dari auth store
-  let currentUser = $authStore;
 
   const statsState = statsStore;
   const statsSummary = statsStore.summary;
@@ -41,10 +39,14 @@
   const leadFilter = leadsStore.filterTerm;
   const leadRows = leadsStore.filtered;
 
-  type ActiveTab = 'customers' | 'leads';
+  const escalationsState = escalationsStore;
+  const escalationFilter = escalationsStore.filterTerm;
+  const escalationRows = escalationsStore.filtered;
+
+  type ActiveTab = 'customers' | 'leads' | 'escalations';
   let activeTab: ActiveTab = 'customers';
   let tableResetSignal = 0;
-  type PipelineRecord = CustomerRecord | LeadRecord;
+  type PipelineRecord = CustomerRecord | LeadRecord | EscalationRecord;
 
   let pendingAction:
     | {
@@ -169,6 +171,13 @@
       sortable: true
     },
     {
+      id: 'last_contacted_at',
+      label: 'Terakhir Kontak',
+      accessor: (item) => item.last_contacted_at ? new Date(item.last_contacted_at).toLocaleDateString('id-ID') : 'Tidak ada',
+      sortable: true,
+      class: 'text-slate-600'
+    },
+    {
       id: 'next_action',
       label: 'Next Action',
       accessor: (item) => item.next_action ?? '—',
@@ -204,6 +213,52 @@
       sortAccessor: (item) => item.status,
       sortable: true,
       cell: LeadStatusCell
+    },
+    {
+      id: 'last_activity_at',
+      label: 'Aktivitas Terakhir',
+      accessor: (item) => item.last_activity_at ? new Date(item.last_activity_at).toLocaleDateString('id-ID') : 'Tidak ada',
+      sortable: true,
+      class: 'text-slate-600'
+    }
+  ];
+
+  const escalationColumns: ColumnDefinition<EscalationRecord>[] = [
+    {
+      id: 'customer_name',
+      label: 'Nama Pelanggan',
+      accessor: (item) => item.customer_name,
+      sortable: true,
+      class: 'font-medium text-slate-900'
+    },
+    {
+      id: 'reason',
+      label: 'Alasan',
+      accessor: (item) => item.reason,
+      sortable: true,
+      class: 'text-slate-600'
+    },
+    {
+      id: 'priority',
+      label: 'Prioritas',
+      accessor: (item) => item.priority,
+      sortAccessor: (item) => item.priority,
+      sortable: true,
+      class: `text-sm font-semibold`
+    },
+    {
+      id: 'created_at',
+      label: 'Waktu Dibuat',
+      accessor: (item) => new Date(item.created_at).toLocaleString('id-ID'),
+      sortable: true,
+      class: 'text-slate-600'
+    },
+    {
+      id: 'assigned_to',
+      label: 'Ditugaskan ke',
+      accessor: (item) => item.assigned_to ?? 'Belum ditugaskan',
+      sortable: true,
+      class: 'text-slate-600'
     }
   ];
 
@@ -243,9 +298,9 @@
   let countdownTimer: ReturnType<typeof setInterval> | null = null;
   let autoRefreshTimer: ReturnType<typeof setTimeout> | null = null;
 
-  const realtimeStatus = 'Standby';
+  let realtimeStatus = 'Standby';
   const periodLabel = 'Semua waktu';
-  const newItemsCount = 0;
+  let newItemsCount = 0;
 
   function formatCountdown(seconds: number): string {
     const safeSeconds = Math.max(0, seconds);
@@ -406,9 +461,14 @@
     connectionStatus = 'checking';
     clearTimers();
 
-    await Promise.all([statsStore.refresh(), customersStore.refresh(), leadsStore.refresh()]);
+    await Promise.all([
+      statsStore.refresh(), 
+      customersStore.refresh(), 
+      leadsStore.refresh(),
+      escalationsStore.refresh()
+    ]);
 
-    const states = [get(statsState), get(customersState), get(leadsState)];
+    const states = [get(statsState), get(customersState), get(leadsState), get(escalationsState)];
     const failed = states.find((state) => state.status === 'error');
 
     if (failed) {
@@ -434,8 +494,10 @@
     const value = input.value;
     if (activeTab === 'customers') {
       customersStore.filterTerm.set(value);
-    } else {
+    } else if (activeTab === 'leads') {
       leadsStore.filterTerm.set(value);
+    } else {
+      escalationsStore.filterTerm.set(value);
     }
     tableResetSignal += 1;
   }
@@ -737,12 +799,10 @@
     return null;
   }
 
-  function handleLogout() {
-    authStore.logout();
-  }
-
   onMount(() => {
     void refreshAll();
+    // Set status realtime untuk customer service
+    realtimeStatus = 'Siap melayani';
     return () => {
       clearTimers();
     };
@@ -752,24 +812,31 @@
 <div class="min-h-screen bg-white text-slate-900">
   <header class="flex flex-col gap-4 border-b border-slate-200 px-6 py-6 lg:flex-row lg:items-center lg:justify-between lg:px-12">
     <div>
-      <p class="text-xs font-semibold uppercase tracking-wide text-slate-500">CRM Command Center</p>
-      <h1 class="text-2xl font-semibold text-slate-900">Dashboard</h1>
-      <p class="mt-1 text-sm text-slate-600">Pemantauan realtime pelanggan, leads, dan eskalasi.</p>
+      <p class="text-xs font-semibold uppercase tracking-wide text-slate-500">CUSTOMER SERVICE DASHBOARD</p>
+      <h1 class="text-2xl font-semibold text-slate-900">Customer Service Center</h1>
+      <p class="mt-1 text-sm text-slate-600">Pusat layanan pelanggan: manajemen pelanggan, lead, dan eskalasi.</p>
     </div>
     <div class="flex items-center gap-4">
       <div class="hidden flex-col text-right text-xs text-slate-500 sm:flex">
-        <span class="text-sm font-semibold text-slate-900">{currentUser.user?.name || 'User'}</span>
-        <span>{currentUser.user?.email || 'user@example.com'}</span>
+        <span class="text-sm font-semibold text-slate-900">Customer Service Agent</span>
+        <span>cs@tepatlaser.id</span>
       </div>
       <button
         type="button"
         class="rounded-md border border-slate-200 px-4 py-2 text-sm font-medium text-slate-600 transition hover:border-blue-500 hover:text-blue-600"
-        on:click={handleLogout}
       >
         Logout
       </button>
     </div>
   </header>
+
+  <nav class="border-b border-slate-200 bg-slate-50 px-6 py-3 text-sm">
+    <div class="flex flex-wrap items-center gap-6">
+      <a href="/" class="text-slate-600 hover:text-blue-600">Dashboard Utama</a>
+      <a href="/customer-service" class="font-semibold text-blue-600">Customer Service</a>
+      <a href="/marketing" class="text-slate-600 hover:text-blue-600">Marketing</a>
+    </div>
+  </nav>
 
   <main class="space-y-10 px-6 py-8 lg:px-12">
     {#if feedback}
@@ -793,22 +860,22 @@
     {/if}
 
     <HeroPanel
-      title="Tepat Laser Command Center"
-      subtitle="Ringkasan performa customer service & marketing dalam satu layar"
+      title="Customer Service Command Center"
+      subtitle="Dashboard khusus untuk tim customer service dengan fokus pada pelanggan dan eskalasi"
       workflowId={config.n8n.workflowId}
-    baseUrl={config.n8n.baseUrl}
-    connectionStatus={connectionStatus}
-    lastUpdatedLabel={lastUpdatedLabel}
-    refreshOptions={refreshIntervalOptions}
-    refreshInterval={refreshInterval}
-    countdownLabel={countdownLabel}
-    isRefreshing={isRefreshing}
-    refreshError={refreshError}
-    onRefresh={refreshAll}
-    onChangeInterval={handleIntervalChange}
-    newItemsCount={newItemsCount}
-    realtimeStatus={realtimeStatus}
-    periodLabel={periodLabel}
+      baseUrl={config.n8n.baseUrl}
+      connectionStatus={connectionStatus}
+      lastUpdatedLabel={lastUpdatedLabel}
+      refreshOptions={refreshIntervalOptions}
+      refreshInterval={refreshInterval}
+      countdownLabel={countdownLabel}
+      isRefreshing={isRefreshing}
+      refreshError={refreshError}
+      onRefresh={refreshAll}
+      onChangeInterval={handleIntervalChange}
+      newItemsCount={newItemsCount}
+      realtimeStatus={realtimeStatus}
+      periodLabel={periodLabel}
     >
       <a
         slot="actions"
@@ -823,18 +890,20 @@
       <header class="flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
         <div>
           <h2 class="text-2xl font-semibold text-slate-900">Ringkasan KPI</h2>
-          <p class="text-sm text-slate-600">Empat angka utama untuk memantau pelanggan, leads, eskalasi, dan respons.</p>
+          <p class="text-sm text-slate-600">Statistik penting untuk tim customer service.</p>
         </div>
       </header>
 
       <div class="mt-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         {#if $statsSummary}
           {#each $statsSummary as card (card.id)}
-            <KpiCard {...card} />
+            {#if card.id !== 'totalLeads'} <!-- Sembunyikan leads untuk customer service -->
+              <KpiCard {...card} />
+            {/if}
           {/each}
         {:else}
           {#if $statsState.status === 'loading'}
-            {#each Array(4) as _, index (index)}
+            {#each Array(3) as _, index (index)} <!-- Kurangi jumlah loading card -->
               <article class="animate-pulse rounded-lg border border-slate-200 bg-slate-100 p-5" aria-hidden="true">
                 <div class="h-3 w-24 rounded bg-slate-200"></div>
                 <div class="mt-4 h-6 w-16 rounded bg-slate-200"></div>
@@ -865,7 +934,7 @@
             }}
             type="button"
           >
-            Customers
+            Pelanggan
           </button>
           <button
             class={`rounded-md px-4 py-2 transition ${
@@ -881,6 +950,20 @@
           >
             Leads
           </button>
+          <button
+            class={`rounded-md px-4 py-2 transition ${
+              activeTab === 'escalations'
+                ? 'bg-blue-600 text-white shadow-sm'
+                : 'bg-transparent text-slate-600 hover:text-blue-600'
+            }`}
+            on:click={() => {
+              activeTab = 'escalations';
+              tableResetSignal += 1;
+            }}
+            type="button"
+          >
+            Eskalasi
+          </button>
         </nav>
 
         <div class="flex w-full flex-col gap-3 sm:w-auto sm:flex-row sm:items-center">
@@ -888,9 +971,19 @@
           <input
             id="data-search"
             type="search"
-            placeholder={activeTab === 'customers' ? 'Cari pelanggan…' : 'Cari leads…'}
+            placeholder={
+              activeTab === 'customers' 
+                ? 'Cari pelanggan…' 
+                : activeTab === 'leads'
+                  ? 'Cari leads…'
+                  : 'Cari eskalasi…'
+            }
             class="w-full rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-700 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200 sm:w-72"
-            value={activeTab === 'customers' ? $customerFilter : $leadFilter}
+            value={
+              activeTab === 'customers' ? $customerFilter : 
+              activeTab === 'leads' ? $leadFilter : 
+              $escalationsStore.filterTerm
+            }
             on:input={handleSearch}
           />
           <button
@@ -899,6 +992,7 @@
             on:click={() => {
               customersStore.filterTerm.set('');
               leadsStore.filterTerm.set('');
+              escalationsStore.filterTerm.set('');
               tableResetSignal += 1;
             }}
           >
@@ -922,7 +1016,7 @@
             resetSignal={tableResetSignal}
             on:select={(event) => handleSelectAction('customers', event)}
           />
-        {:else}
+        {:else if activeTab === 'leads'}
           <DataTable
             items={$leadRows}
             columns={leadColumns}
@@ -936,268 +1030,282 @@
             resetSignal={tableResetSignal}
             on:select={(event) => handleSelectAction('leads', event)}
           />
+        {:else}
+          <DataTable
+            items={$escalationRows}
+            columns={escalationColumns}
+            keyField="id"
+            loading={$escalationsState.status === 'loading'}
+            error={$escalationsState.status === 'error' ? $escalationsState.error : null}
+            emptyMessage="Belum ada eskalasi."
+            summaryLabel="eskalasi"
+            exportFilename="escalations.csv"
+            showActionsColumn
+            resetSignal={tableResetSignal}
+            on:select={(event) => handleSelectAction('escalations', event)}
+          />
         {/if}
       </div>
     </section>
     <p class="sr-only" aria-live="polite">
       {#if pendingAction}
-        Aksi {pendingAction.action} dipilih untuk {pendingAction.dataset === 'customers' ? 'pelanggan' : 'lead'}{' '}
+        Aksi {pendingAction.action} dipilih untuk {pendingAction.dataset === 'customers' ? 'pelanggan' : pendingAction.dataset === 'leads' ? 'lead' : 'eskalasi'}{' '}
         {pendingAction.record.name}.
       {/if}
     </p>
 
-  <Modal
-    open={detailModal.open}
-    title={detailModalTitle()}
-    subtitle={detailModalSubtitle()}
-    size="lg"
-    on:close={closeDetailModal}
-  >
-    {#if detailModal.loading}
-      <p class="text-sm text-slate-600">Memuat detail…</p>
-    {:else if detailModal.error}
-      <p class="text-sm text-rose-600">{detailModal.error}</p>
-    {:else if detailModal.dataset === 'customers'}
-      {#if detailModal.customerDetail}
-        <div class="space-y-6">
-          <section class="rounded-xl border border-slate-200 bg-white px-4 py-4 shadow-sm">
-            <h3 class="text-sm font-semibold uppercase tracking-wide text-slate-500">Profil Pelanggan</h3>
-            <dl class="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
-              <div>
-                <dt class="text-xs text-slate-500">Nama</dt>
-                <dd class="text-sm font-medium text-slate-900">{detailModal.customerDetail.name ?? '—'}</dd>
-              </div>
-              <div>
-                <dt class="text-xs text-slate-500">Telepon</dt>
-                <dd class="text-sm font-medium text-slate-900">{detailModal.customerDetail.phone ?? '—'}</dd>
-              </div>
-              <div>
-                <dt class="text-xs text-slate-500">Lokasi</dt>
-                <dd class="text-sm text-slate-600">{detailModal.customerDetail.location ?? '—'}</dd>
-              </div>
-              <div>
-                <dt class="text-xs text-slate-500">Prioritas</dt>
-                <dd class="text-sm font-medium text-slate-900">
-                  {detailModal.customerDetail.customer_priority ?? detailModal.customerDetail.priority ?? '—'}
-                </dd>
-              </div>
-              <div>
-                <dt class="text-xs text-slate-500">PIC</dt>
-                <dd class="text-sm text-slate-600">{detailModal.customerDetail.assigned_to ?? '—'}</dd>
-              </div>
-              <div>
-                <dt class="text-xs text-slate-500">Tags</dt>
-                <dd class="text-sm text-slate-600">
-                  {#if Array.isArray(detailModal.customerDetail.tags) && detailModal.customerDetail.tags.length > 0}
-                    {detailModal.customerDetail.tags.join(', ')}
-                  {:else}
-                    —
-                  {/if}
-                </dd>
-              </div>
-            </dl>
-          </section>
-          <section class="rounded-xl border border-slate-200 bg-white px-4 py-4 shadow-sm">
-            <h3 class="text-sm font-semibold uppercase tracking-wide text-slate-500">Riwayat Kontak</h3>
-            {#if normalizeContactHistory(detailModal.customerDetail).length > 0}
-              <ol class="mt-4 space-y-3">
-                {#each normalizeContactHistory(detailModal.customerDetail) as item, index (index)}
-                  <li class="rounded-lg border border-slate-200 bg-white px-4 py-3 shadow-sm">
-                    <p class="text-sm font-semibold text-slate-900">{item.channel ?? 'Interaksi'}</p>
-                    <p class="text-xs text-slate-500">{formatDateTime(item.time ?? item.timestamp)}</p>
-                    <p class="mt-2 text-sm text-slate-600">{item.summary ?? item.notes ?? 'Tidak ada catatan.'}</p>
-                  </li>
-                {/each}
-              </ol>
-            {:else}
-              <p class="mt-4 text-sm text-slate-600">Belum ada riwayat kontak.</p>
-            {/if}
-          </section>
-        </div>
+    <Modal
+      open={detailModal.open}
+      title={detailModalTitle()}
+      subtitle={detailModalSubtitle()}
+      size="lg"
+      on:close={closeDetailModal}
+    >
+      {#if detailModal.loading}
+        <p class="text-sm text-slate-600">Memuat detail…</p>
+      {:else if detailModal.error}
+        <p class="text-sm text-rose-600">{detailModal.error}</p>
+      {:else if detailModal.dataset === 'customers'}
+        {#if detailModal.customerDetail}
+          <div class="space-y-6">
+            <section class="rounded-xl border border-slate-200 bg-white px-4 py-4 shadow-sm">
+              <h3 class="text-sm font-semibold uppercase tracking-wide text-slate-500">Profil Pelanggan</h3>
+              <dl class="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <div>
+                  <dt class="text-xs text-slate-500">Nama</dt>
+                  <dd class="text-sm font-medium text-slate-900">{detailModal.customerDetail.name ?? '—'}</dd>
+                </div>
+                <div>
+                  <dt class="text-xs text-slate-500">Telepon</dt>
+                  <dd class="text-sm font-medium text-slate-900">{detailModal.customerDetail.phone ?? '—'}</dd>
+                </div>
+                <div>
+                  <dt class="text-xs text-slate-500">Lokasi</dt>
+                  <dd class="text-sm text-slate-600">{detailModal.customerDetail.location ?? '—'}</dd>
+                </div>
+                <div>
+                  <dt class="text-xs text-slate-500">Prioritas</dt>
+                  <dd class="text-sm font-medium text-slate-900">
+                    {detailModal.customerDetail.customer_priority ?? detailModal.customerDetail.priority ?? '—'}
+                  </dd>
+                </div>
+                <div>
+                  <dt class="text-xs text-slate-500">PIC</dt>
+                  <dd class="text-sm text-slate-600">{detailModal.customerDetail.assigned_to ?? '—'}</dd>
+                </div>
+                <div>
+                  <dt class="text-xs text-slate-500">Tags</dt>
+                  <dd class="text-sm text-slate-600">
+                    {#if Array.isArray(detailModal.customerDetail.tags) && detailModal.customerDetail.tags.length > 0}
+                      {detailModal.customerDetail.tags.join(', ')}
+                    {:else}
+                      —
+                    {/if}
+                  </dd>
+                </div>
+              </dl>
+            </section>
+            <section class="rounded-xl border border-slate-200 bg-white px-4 py-4 shadow-sm">
+              <h3 class="text-sm font-semibold uppercase tracking-wide text-slate-500">Riwayat Kontak</h3>
+              {#if normalizeContactHistory(detailModal.customerDetail).length > 0}
+                <ol class="mt-4 space-y-3">
+                  {#each normalizeContactHistory(detailModal.customerDetail) as item, index (index)}
+                    <li class="rounded-lg border border-slate-200 bg-white px-4 py-3 shadow-sm">
+                      <p class="text-sm font-semibold text-slate-900">{item.channel ?? 'Interaksi'}</p>
+                      <p class="text-xs text-slate-500">{formatDateTime(item.time ?? item.timestamp)}</p>
+                      <p class="mt-2 text-sm text-slate-600">{item.summary ?? item.notes ?? 'Tidak ada catatan.'}</p>
+                    </li>
+                  {/each}
+                </ol>
+              {:else}
+                <p class="mt-4 text-sm text-slate-600">Belum ada riwayat kontak.</p>
+              {/if}
+            </section>
+          </div>
+        {:else}
+          <p class="text-sm text-slate-600">Detail pelanggan tidak tersedia.</p>
+        {/if}
+      {:else if detailModal.dataset === 'leads'}
+        {#if detailModal.leadDetail}
+          <div class="space-y-6">
+            <section class="rounded-xl border border-slate-200 bg-white px-4 py-4 shadow-sm">
+              <h3 class="text-sm font-semibold uppercase tracking-wide text-slate-500">Informasi Lead</h3>
+              <dl class="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <div>
+                  <dt class="text-xs text-slate-500">Nama</dt>
+                  <dd class="text-sm font-medium text-slate-900">{detailModal.leadDetail.name ?? '—'}</dd>
+                </div>
+                <div>
+                  <dt class="text-xs text-slate-500">Kontak</dt>
+                  <dd class="text-sm font-medium text-slate-900">{leadContactDisplay(detailModal.leadDetail)}</dd>
+                </div>
+                <div>
+                  <dt class="text-xs text-slate-500">Sumber</dt>
+                  <dd class="text-sm text-slate-600">{detailModal.leadDetail.source ?? '—'}</dd>
+                </div>
+                <div>
+                  <dt class="text-xs text-slate-500">Status</dt>
+                  <dd class="text-sm font-medium text-slate-900">{detailModal.leadDetail.status ?? '—'}</dd>
+                </div>
+                <div>
+                  <dt class="text-xs text-slate-500">Score</dt>
+                  <dd class="text-sm font-medium text-slate-900">{leadScoreDisplay(detailModal.leadDetail)}</dd>
+                </div>
+                <div>
+                  <dt class="text-xs text-slate-500">PIC</dt>
+                  <dd class="text-sm text-slate-600">{leadOwnerDisplay(detailModal.leadDetail)}</dd>
+                </div>
+              </dl>
+            </section>
+            <section class="rounded-xl border border-slate-200 bg-white px-4 py-4 shadow-sm">
+              <h3 class="text-sm font-semibold uppercase tracking-wide text-slate-500">Timeline Interaksi</h3>
+              {#if normalizeLeadTimeline(detailModal.leadDetail).length > 0}
+                <ol class="mt-4 space-y-3">
+                  {#each normalizeLeadTimeline(detailModal.leadDetail) as item, index (index)}
+                    <li class="rounded-lg border border-slate-200 bg-white px-4 py-3 shadow-sm">
+                      <p class="text-sm font-semibold text-slate-900">{item.channel ?? 'Aktivitas'}</p>
+                      <p class="text-xs text-slate-500">{formatDateTime(item.time ?? item.timestamp)}</p>
+                      <p class="mt-2 text-sm text-slate-600">{item.notes ?? item.summary ?? 'Tidak ada catatan.'}</p>
+                    </li>
+                  {/each}
+                </ol>
+              {:else}
+                <p class="mt-4 text-sm text-slate-600">Belum ada interaksi.</p>
+              {/if}
+            </section>
+          </div>
+        {:else}
+          <p class="text-sm text-slate-600">Detail lead tidak tersedia.</p>
+        {/if}
       {:else}
-        <p class="text-sm text-slate-600">Detail pelanggan tidak tersedia.</p>
+        <p class="text-sm text-slate-600">Pilih entri untuk melihat detail.</p>
       {/if}
-    {:else if detailModal.dataset === 'leads'}
-      {#if detailModal.leadDetail}
-        <div class="space-y-6">
-          <section class="rounded-xl border border-slate-200 bg-white px-4 py-4 shadow-sm">
-            <h3 class="text-sm font-semibold uppercase tracking-wide text-slate-500">Informasi Lead</h3>
-            <dl class="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
-              <div>
-                <dt class="text-xs text-slate-500">Nama</dt>
-                <dd class="text-sm font-medium text-slate-900">{detailModal.leadDetail.name ?? '—'}</dd>
-              </div>
-              <div>
-                <dt class="text-xs text-slate-500">Kontak</dt>
-                <dd class="text-sm font-medium text-slate-900">{leadContactDisplay(detailModal.leadDetail)}</dd>
-              </div>
-              <div>
-                <dt class="text-xs text-slate-500">Sumber</dt>
-                <dd class="text-sm text-slate-600">{detailModal.leadDetail.source ?? '—'}</dd>
-              </div>
-              <div>
-                <dt class="text-xs text-slate-500">Status</dt>
-                <dd class="text-sm font-medium text-slate-900">{detailModal.leadDetail.status ?? '—'}</dd>
-              </div>
-              <div>
-                <dt class="text-xs text-slate-500">Score</dt>
-                <dd class="text-sm font-medium text-slate-900">{leadScoreDisplay(detailModal.leadDetail)}</dd>
-              </div>
-              <div>
-                <dt class="text-xs text-slate-500">PIC</dt>
-                <dd class="text-sm text-slate-600">{leadOwnerDisplay(detailModal.leadDetail)}</dd>
-              </div>
-            </dl>
-          </section>
-          <section class="rounded-xl border border-slate-200 bg-white px-4 py-4 shadow-sm">
-            <h3 class="text-sm font-semibold uppercase tracking-wide text-slate-500">Timeline Interaksi</h3>
-            {#if normalizeLeadTimeline(detailModal.leadDetail).length > 0}
-              <ol class="mt-4 space-y-3">
-                {#each normalizeLeadTimeline(detailModal.leadDetail) as item, index (index)}
-                  <li class="rounded-lg border border-slate-200 bg-white px-4 py-3 shadow-sm">
-                    <p class="text-sm font-semibold text-slate-900">{item.channel ?? 'Aktivitas'}</p>
-                    <p class="text-xs text-slate-500">{formatDateTime(item.time ?? item.timestamp)}</p>
-                    <p class="mt-2 text-sm text-slate-600">{item.notes ?? item.summary ?? 'Tidak ada catatan.'}</p>
-                  </li>
-                {/each}
-              </ol>
-            {:else}
-              <p class="mt-4 text-sm text-slate-600">Belum ada interaksi.</p>
-            {/if}
-          </section>
+    </Modal>
+
+    <Modal open={chatModal.open} title={`Percakapan • ${chatModalTitle()}`} subtitle={extractIdentifiers(chatModal.record).phone} size="lg" on:close={closeChatModal}>
+      {#if chatModal.loading}
+        <p class="text-sm text-slate-600">Memuat riwayat chat…</p>
+      {:else if chatModal.error}
+        <div class="space-y-4">
+          <p class="text-sm text-rose-600">{chatModal.error}</p>
+          <button
+            type="button"
+            class="rounded-md border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-600 transition hover:border-blue-500 hover:text-blue-600"
+            on:click={retryChatHistory}
+          >
+            Coba lagi
+          </button>
         </div>
+      {:else if chatModal.messages.length === 0}
+        <p class="text-sm text-slate-600">Belum ada percakapan.</p>
       {:else}
-        <p class="text-sm text-slate-600">Detail lead tidak tersedia.</p>
+        <ol class="space-y-3">
+          {#each chatModal.messages as message, index (index)}
+            <li class="rounded-lg border border-slate-200 bg-white px-4 py-3 shadow-sm">
+              <div class="flex items-center justify-between gap-2">
+                <p class="text-sm font-semibold text-slate-900">{message.sender ?? message.from ?? 'Customer'}</p>
+                <span class="text-xs text-slate-500">{formatDateTime(message.time ?? message.timestamp ?? message.created_at)}</span>
+              </div>
+              <p class="mt-2 text-sm text-slate-600">{message.text ?? message.body ?? message.message ?? '—'}</p>
+            </li>
+          {/each}
+        </ol>
       {/if}
-  {:else}
-    <p class="text-sm text-slate-600">Pilih entri untuk melihat detail.</p>
-    {/if}
-  </Modal>
+    </Modal>
 
-  <Modal open={chatModal.open} title={`Percakapan • ${chatModalTitle()}`} subtitle={extractIdentifiers(chatModal.record).phone} size="lg" on:close={closeChatModal}>
-    {#if chatModal.loading}
-      <p class="text-sm text-slate-600">Memuat riwayat chat…</p>
-    {:else if chatModal.error}
-      <div class="space-y-4">
-        <p class="text-sm text-rose-600">{chatModal.error}</p>
-      <button
-        type="button"
-        class="rounded-md border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-600 transition hover:border-blue-500 hover:text-blue-600"
-        on:click={retryChatHistory}
-      >
-        Coba lagi
-      </button>
+    <Modal
+      open={messageModal.open}
+      title="Kirim Pesan WhatsApp"
+      subtitle={messageModal.phone ? `Ke ${messageModal.phone}` : null}
+      size="md"
+      on:close={closeMessageModal}
+    >
+      <form id="whatsapp-form" class="space-y-4" on:submit|preventDefault={submitMessage}>
+        <div>
+          <label class="text-xs font-semibold uppercase tracking-wide text-slate-500" for="whatsapp-phone">Nomor</label>
+          <input
+            id="whatsapp-phone"
+            type="tel"
+            class="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-700 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200"
+            bind:value={messageModal.phone}
+            required
+          />
+        </div>
+        <div>
+          <label class="text-xs font-semibold uppercase tracking-wide text-slate-500" for="whatsapp-message">Pesan</label>
+          <textarea
+            id="whatsapp-message"
+            class="mt-1 h-32 w-full rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-700 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200"
+            bind:value={messageModal.message}
+            required
+          />
+        </div>
+        {#if messageModal.error}
+          <p class="text-sm text-rose-600">{messageModal.error}</p>
+        {/if}
+      </form>
+      <div class="flex items-center justify-end gap-3" slot="footer">
+        <button
+          type="button"
+          class="rounded-md border border-slate-200 px-3 py-2 text-sm font-medium text-slate-600 transition hover:border-blue-500 hover:text-blue-600"
+          on:click={closeMessageModal}
+        >
+          Batal
+        </button>
+        <button
+          type="submit"
+          form="whatsapp-form"
+          class="inline-flex items-center justify-center rounded-md bg-blue-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-500 disabled:opacity-60"
+          disabled={messageModal.sending}
+        >
+          {messageModal.sending ? 'Mengirim…' : 'Kirim Pesan'}
+        </button>
       </div>
-    {:else if chatModal.messages.length === 0}
-      <p class="text-sm text-slate-600">Belum ada percakapan.</p>
-    {:else}
-      <ol class="space-y-3">
-        {#each chatModal.messages as message, index (index)}
-          <li class="rounded-lg border border-slate-200 bg-white px-4 py-3 shadow-sm">
-            <div class="flex items-center justify-between gap-2">
-              <p class="text-sm font-semibold text-slate-900">{message.sender ?? message.from ?? 'Agent'}</p>
-              <span class="text-xs text-slate-500">{formatDateTime(message.time ?? message.timestamp ?? message.created_at)}</span>
-            </div>
-            <p class="mt-2 text-sm text-slate-600">{message.text ?? message.body ?? message.message ?? '—'}</p>
-          </li>
-        {/each}
-      </ol>
-    {/if}
-  </Modal>
+    </Modal>
 
-  <Modal
-    open={messageModal.open}
-    title="Kirim Pesan WhatsApp"
-    subtitle={messageModal.phone ? `Ke ${messageModal.phone}` : null}
-    size="md"
-    on:close={closeMessageModal}
-  >
-    <form id="whatsapp-form" class="space-y-4" on:submit|preventDefault={submitMessage}>
-      <div>
-        <label class="text-xs font-semibold uppercase tracking-wide text-slate-500" for="whatsapp-phone">Nomor</label>
-        <input
-          id="whatsapp-phone"
-          type="tel"
-          class="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-700 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200"
-          bind:value={messageModal.phone}
-          required
-        />
+    <Modal
+      open={resolveModal.open}
+      title="Selesaikan Eskalasi"
+      subtitle={resolveModal.escalationId}
+      size="md"
+      on:close={closeResolveModal}
+    >
+      <form id="resolve-form" class="space-y-4" on:submit|preventDefault={submitResolve}>
+        <p class="text-sm text-slate-600">
+          Konfirmasi penyelesaian eskalasi untuk{' '}
+          <strong class="text-slate-900">{resolveModalTargetName()}</strong>.
+          Tambahkan catatan bila diperlukan.
+        </p>
+        <div>
+          <label class="text-xs font-semibold uppercase tracking-wide text-slate-500" for="resolve-notes">Catatan</label>
+          <textarea
+            id="resolve-notes"
+            class="mt-1 h-28 w-full rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-700 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200"
+            placeholder="Opsional"
+            bind:value={resolveModal.notes}
+          />
+        </div>
+        {#if resolveModal.error}
+          <p class="text-sm text-rose-600">{resolveModal.error}</p>
+        {/if}
+      </form>
+      <div class="flex items-center justify-end gap-3" slot="footer">
+        <button
+          type="button"
+          class="rounded-md border border-slate-200 px-3 py-2 text-sm font-medium text-slate-600 transition hover:border-blue-500 hover:text-blue-600"
+          on:click={closeResolveModal}
+        >
+          Batal
+        </button>
+        <button
+          type="submit"
+          form="resolve-form"
+          class="inline-flex items-center justify-center rounded-md bg-blue-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-500 disabled:opacity-60"
+          disabled={resolveModal.sending}
+        >
+          {resolveModal.sending ? 'Memproses…' : 'Selesaikan'}
+        </button>
       </div>
-      <div>
-        <label class="text-xs font-semibold uppercase tracking-wide text-slate-500" for="whatsapp-message">Pesan</label>
-        <textarea
-          id="whatsapp-message"
-          class="mt-1 h-32 w-full rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-700 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200"
-          bind:value={messageModal.message}
-          required
-        />
-      </div>
-      {#if messageModal.error}
-        <p class="text-sm text-rose-600">{messageModal.error}</p>
-      {/if}
-    </form>
-    <div class="flex items-center justify-end gap-3" slot="footer">
-      <button
-        type="button"
-        class="rounded-md border border-slate-200 px-3 py-2 text-sm font-medium text-slate-600 transition hover:border-blue-500 hover:text-blue-600"
-        on:click={closeMessageModal}
-      >
-        Batal
-      </button>
-      <button
-        type="submit"
-        form="whatsapp-form"
-        class="inline-flex items-center justify-center rounded-md bg-blue-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-500 disabled:opacity-60"
-        disabled={messageModal.sending}
-      >
-        {messageModal.sending ? 'Mengirim…' : 'Kirim Pesan'}
-      </button>
-    </div>
-  </Modal>
-
-  <Modal
-    open={resolveModal.open}
-    title="Selesaikan Eskalasi"
-    subtitle={resolveModal.escalationId}
-    size="md"
-    on:close={closeResolveModal}
-  >
-    <form id="resolve-form" class="space-y-4" on:submit|preventDefault={submitResolve}>
-      <p class="text-sm text-slate-600">
-        Konfirmasi penyelesaian eskalasi untuk{' '}
-        <strong class="text-slate-900">{resolveModalTargetName()}</strong>.
-        Tambahkan catatan bila diperlukan.
-      </p>
-      <div>
-        <label class="text-xs font-semibold uppercase tracking-wide text-slate-500" for="resolve-notes">Catatan</label>
-        <textarea
-          id="resolve-notes"
-          class="mt-1 h-28 w-full rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-700 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200"
-          placeholder="Opsional"
-          bind:value={resolveModal.notes}
-        />
-      </div>
-      {#if resolveModal.error}
-        <p class="text-sm text-rose-600">{resolveModal.error}</p>
-      {/if}
-    </form>
-    <div class="flex items-center justify-end gap-3" slot="footer">
-      <button
-        type="button"
-        class="rounded-md border border-slate-200 px-3 py-2 text-sm font-medium text-slate-600 transition hover:border-blue-500 hover:text-blue-600"
-        on:click={closeResolveModal}
-      >
-        Batal
-      </button>
-      <button
-        type="submit"
-        form="resolve-form"
-        class="inline-flex items-center justify-center rounded-md bg-blue-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-500 disabled:opacity-60"
-        disabled={resolveModal.sending}
-      >
-        {resolveModal.sending ? 'Memproses…' : 'Selesaikan'}
-      </button>
-    </div>
-  </Modal>
+    </Modal>
   </main>
 </div>
