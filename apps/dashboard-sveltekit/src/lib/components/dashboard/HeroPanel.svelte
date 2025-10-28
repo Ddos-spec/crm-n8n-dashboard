@@ -44,11 +44,11 @@ const indicatorTone: Record<ConnectionStatus, string> = {
   }
 </script>
 
-<section class="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+<section class="rounded-xl border border-slate-200 bg-white p-6 shadow-sm" role="region" aria-labelledby="hero-title">
   <div class="flex flex-col gap-6 border-b border-slate-200 pb-6 lg:flex-row lg:items-center lg:justify-between">
     <div class="space-y-3">
       <p class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">CRM Dashboard</p>
-      <h1 class="text-3xl font-semibold text-slate-900">{title}</h1>
+      <h1 id="hero-title" class="text-3xl font-semibold text-slate-900">{title}</h1>
       {#if subtitle}
         <p class="text-sm text-slate-600">{subtitle}</p>
       {/if}
@@ -58,8 +58,8 @@ const indicatorTone: Record<ConnectionStatus, string> = {
       </p>
     </div>
     <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:gap-6">
-      <div class="flex items-center gap-3 rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
-        <span class={`h-2.5 w-2.5 rounded-full ${indicatorTone[connectionStatus]}`}></span>
+      <div class="flex items-center gap-3 rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600" role="status" aria-live="polite">
+        <span class={`h-2.5 w-2.5 rounded-full ${indicatorTone[connectionStatus]}`} aria-hidden="true"></span>
         <span class={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-medium ${statusMeta[connectionStatus].tone}`}>
           {statusMeta[connectionStatus].label}
         </span>
@@ -71,27 +71,30 @@ const indicatorTone: Record<ConnectionStatus, string> = {
       </div>
       <div class="flex flex-col gap-3 sm:items-end">
         <div class="flex flex-col gap-3 sm:flex-row sm:items-center">
-          <label class="flex items-center gap-2 rounded-md border border-slate-200 bg-white px-3 py-2 text-xs font-semibold uppercase tracking-wide text-slate-600">
+          <label for="auto-refresh-select" class="flex items-center gap-2 rounded-md border border-slate-200 bg-white px-3 py-2 text-xs font-semibold uppercase tracking-wide text-slate-600">
             Auto refresh
-            <select
-              class="rounded-md border border-slate-300 bg-white px-2 py-1 text-xs font-medium text-slate-900 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200"
-              on:change={handleChange}
-              disabled={isRefreshing}
-              value={refreshInterval}
-            >
+          </label>
+          <select
+            id="auto-refresh-select"
+            class="rounded-md border border-slate-300 bg-white px-2 py-1 text-xs font-medium text-slate-900 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200"
+            on:change={handleChange}
+            disabled={isRefreshing}
+            value={refreshInterval}
+            aria-label="Pengaturan interval refresh otomatis"
+          >
               {#each refreshOptions as option (option.value)}
                 <option value={option.value}>{refreshLabel(option)}</option>
               {/each}
-            </select>
-          </label>
+          </select>
           <button
             type="button"
             class="inline-flex items-center gap-2 rounded-md bg-blue-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-500 disabled:cursor-not-allowed disabled:bg-blue-300"
             on:click={() => onRefresh?.()}
             disabled={isRefreshing}
+            aria-label="Refresh data sekarang"
           >
             {#if isRefreshing}
-              <span class="h-4 w-4 animate-spin rounded-full border-2 border-white/70 border-t-transparent"></span>
+              <span class="h-4 w-4 animate-spin rounded-full border-2 border-white/70 border-t-transparent" aria-hidden="true"></span>
               Menyegarkan…
             {:else}
               Refresh data
@@ -109,21 +112,21 @@ const indicatorTone: Record<ConnectionStatus, string> = {
   </div>
   <div class="mt-6 grid gap-4 text-sm text-slate-600 md:grid-cols-3">
     <div class="flex items-center gap-3 rounded-lg border border-slate-200 bg-white px-4 py-3 shadow-sm">
-      <span class="inline-flex h-10 w-10 items-center justify-center rounded-md bg-blue-50 text-sm font-semibold text-blue-600">{newItemsCount}</span>
+      <span class="inline-flex h-10 w-10 items-center justify-center rounded-md bg-blue-50 text-sm font-semibold text-blue-600" aria-label="Jumlah update baru">{newItemsCount}</span>
       <div>
         <p class="text-xs font-semibold uppercase tracking-wide text-slate-500">Update baru</p>
         <p class="text-sm text-slate-900">Sejak refresh terakhir</p>
       </div>
     </div>
     <div class="flex items-center gap-3 rounded-lg border border-slate-200 bg-white px-4 py-3 shadow-sm">
-      <span class="inline-flex h-10 w-10 items-center justify-center rounded-md bg-emerald-50 text-emerald-600">•</span>
+      <span class="inline-flex h-10 w-10 items-center justify-center rounded-md bg-emerald-50 text-emerald-600" aria-label="Status real-time">•</span>
       <div>
         <p class="text-xs font-semibold uppercase tracking-wide text-slate-500">Status real-time</p>
         <p class="text-sm text-slate-900">{realtimeStatus}</p>
       </div>
     </div>
     <div class="flex items-center gap-3 rounded-lg border border-slate-200 bg-white px-4 py-3 shadow-sm">
-      <span class="inline-flex h-10 w-10 items-center justify-center rounded-md bg-slate-100 text-slate-700">🗓</span>
+      <span class="inline-flex h-10 w-10 items-center justify-center rounded-md bg-slate-100 text-slate-700" aria-label="Periode aktif">🗓</span>
       <div>
         <p class="text-xs font-semibold uppercase tracking-wide text-slate-500">Periode aktif</p>
         <p class="text-sm text-slate-900">{periodLabel}</p>
@@ -131,7 +134,7 @@ const indicatorTone: Record<ConnectionStatus, string> = {
     </div>
   </div>
   {#if refreshError}
-    <div class="mt-6 rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+    <div class="mt-6 rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700" role="alert" aria-live="assertive">
       Gagal memuat data terbaru: {refreshError}
     </div>
   {/if}

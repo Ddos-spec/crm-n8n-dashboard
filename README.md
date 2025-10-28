@@ -1,6 +1,6 @@
-# Tepat Laser CRM Dashboard
+# Tepat Laser CRM Dashboard (SvelteKit Edition)
 
-Dashboard CRM modern berbasis HTML/CSS/JavaScript murni yang terhubung ke workflow n8n melalui Cloudflare Worker proxy. Tampilan baru menekankan visualisasi data, tabel interaktif, dan pengalaman pengguna profesional untuk tim customer service, marketing, dan analis.
+Dashboard CRM modern berbasis SvelteKit yang terhubung ke workflow n8n melalui Cloudflare Worker proxy. Tampilan baru menekankan visualisasi data, tabel interaktif, dan pengalaman pengguna profesional untuk tim customer service, marketing, dan analis. Aplikasi ini kini dilengkapi dengan sistem otentikasi dan arsitektur berbasis halaman.
 
 ## Fitur Utama
 
@@ -13,10 +13,12 @@ Dashboard CRM modern berbasis HTML/CSS/JavaScript murni yang terhubung ke workfl
 - Tabel pipeline pelanggan dengan pencarian, filter prioritas, range tanggal, sorting per kolom, dan pagination (10/25/50 baris).
 - Tabel escalation dengan status badge berwarna, aksi cepat (detail & resolve), serta ekspor CSV.
 - Notifikasi urgent dan aktivitas terbaru disusun otomatis dari data customers/leads.
+- Fokus khusus pada penanganan eskalasi dan interaksi pelanggan.
 
 ### Marketing & Analitik
 - Tabel leads lengkap dengan pencarian, filter status, filter owner, sorting, pagination, dan tombol follow-up.
 - Widget analitik yang dapat diekspor (CSV) mencakup conversion rate, response time, tickets resolved, NPS, revenue impact, dan active campaigns.
+- Fokus khusus pada manajemen lead dan analisis performa pemasaran.
 
 ### Interaktivitas & UX
 - Quick actions (Assign Lead, Resolve Escalation, Send Message) dengan modal form dan toast notification.
@@ -26,28 +28,70 @@ Dashboard CRM modern berbasis HTML/CSS/JavaScript murni yang terhubung ke workfl
 
 ## Struktur Proyek
 ```
-index.html         # Struktur HTML utama + style dasar
-config.js          # Konfigurasi endpoint n8n & opsi UI
-api-connector.js   # Wrapper fetch Cloudflare Worker → n8n
-webhook-handler.js # (Opsional) helper integrasi lanjutan
-dashboard.js       # Logika UI, tabel, charts, state management
+crm-n8n-dashboard/
+├── package.json
+├── README.md
+└── apps/
+    └── dashboard-sveltekit/
+        ├── package.json
+        ├── svelte.config.js
+        ├── vite.config.ts
+        ├── src/
+        │   ├── app.html
+        │   ├── app.postcss
+        │   ├── routes/           # Halaman-halaman aplikasi
+        │   │   ├── +layout.svelte  # Layout utama dengan navigasi
+        │   │   ├── +page.svelte    # Dashboard utama
+        │   │   ├── customer-service/ # Halaman customer service
+        │   │   │   └── +page.svelte
+        │   │   ├── marketing/      # Halaman marketing
+        │   │   │   └── +page.svelte
+        │   │   └── login/          # Halaman login
+        │   │       └── +page.svelte
+        │   ├── lib/
+        │   │   ├── components/     # Komponen UI
+        │   │   ├── stores/         # State management (Svelte stores)
+        │   │   │   ├── auth/       # Store autentikasi
+        │   │   │   └── ...         # Store lainnya
+        │   │   ├── types/          # Definisi tipe TypeScript
+        │   │   └── utils/          # Fungsi-fungsi utilitas
+        │   └── hooks.ts            # Server hooks (otentikasi)
 ```
 
-## Dependensi CDN
-- [Tailwind CSS](https://cdn.tailwindcss.com)
-- [Lucide Icons](https://lucide.dev)
-- [Moment.js](https://momentjs.com/) + locale Indonesia
+## Dependensi Utama
+- [SvelteKit](https://kit.svelte.dev/)
+- [Tailwind CSS](https://tailwindcss.com/)
 - [Chart.js](https://www.chartjs.org/) v4
+- [Lucide Icons](https://lucide.dev)
+
+## Teknologi & Arsitektur
+- **Frontend**: SvelteKit (Svelte + Vite)
+- **Styling**: Tailwind CSS
+- **Otentikasi**: Sistem login berbasis localStorage dengan role-based access
+- **API Proxy**: Server routes untuk menyembunyikan endpoint n8n sensitif
+- **State Management**: Svelte stores
+- **Aksesibilitas**: WCAG compliant components
 
 ## Cara Menjalankan
-1. Clone repository dan buka `index.html` melalui HTTP server (mis. `python -m http.server`) untuk menghindari isu CORS.
-2. Pastikan konfigurasi `CONFIG.n8n.baseUrl` mengarah ke Cloudflare Worker proxy yang telah terhubung dengan webhook n8n.
-3. Dashboard otomatis memuat data quick stats, customers, leads, dan escalations. Gunakan tombol **Refresh data** untuk sinkron manual atau aktifkan auto-refresh.
+1. Clone repository dan masuk ke direktori proyek
+2. Install dependensi: `npm install` (di root dan di dalam `apps/dashboard-sveltekit`)
+3. Atur environment variables (lihat `.env.example`)
+4. Jalankan development server: `npm run dev` (di `apps/dashboard-sveltekit`)
+5. Buka browser di `http://localhost:5173`
 
-## Pengembangan Lanjutan
-- Tambahkan dark mode toggle dengan mengganti atribut `data-theme` pada `<body>`.
-- Integrasikan notifikasi push (WebSocket / SSE) untuk real-time update tanpa polling.
-- Lengkapi aksi quick actions dengan workflow n8n spesifik (assign lead, resolve escalation) sesuai kebutuhan bisnis.
+## Akun Demo
+- **Admin**: username: `admin`, password: `password`
+- **Customer Service**: username: `cs`, password: `cs123`
+- **Marketing**: username: `marketing`, password: `marketing123`
+
+## Fitur-fitur Baru
+- Sistem otentikasi dan manajemen session
+- Arsitektur multi-halaman (Dashboard Utama, Customer Service, Marketing)
+- Server-side proxy untuk menyembunyikan endpoint eksternal
+- Optimasi interval refresh berdasarkan role pengguna
+- Aksesibilitas ditingkatkan sesuai standar WCAG
+- Tipe data TypeScript yang lebih lengkap
+- Penanganan error yang lebih baik
 
 ## Lisensi
 Proyek ini mengikuti lisensi pada repository asli Tepat Laser CRM Dashboard.

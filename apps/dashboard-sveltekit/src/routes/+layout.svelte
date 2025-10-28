@@ -21,7 +21,9 @@
         
         if (protectedPaths.includes(currentPath) && !state.isAuthenticated) {
           // Redirect ke halaman login jika belum otentikasi
-          window.location.href = '/login';
+          if (currentPath !== '/login') {
+            window.location.href = '/login';
+          }
         }
       }
     });
@@ -37,29 +39,31 @@
   <title>CRM Dashboard (SvelteKit)</title>
 </svelte:head>
 
-{#if !isLoading && isAuthenticated}
-  <nav class="border-b border-slate-200 bg-slate-50 px-6 py-3 text-sm">
-    <div class="flex flex-wrap items-center gap-6">
-      <a 
-        href="/" 
-        class="{$page.url.pathname === '/' ? 'font-semibold text-blue-600' : 'text-slate-600 hover:text-blue-600'}"
-      >
-        Dashboard Utama
-      </a>
-      <a 
-        href="/customer-service" 
-        class="{$page.url.pathname === '/customer-service' ? 'font-semibold text-blue-600' : 'text-slate-600 hover:text-blue-600'}"
-      >
-        Customer Service
-      </a>
-      <a 
-        href="/marketing" 
-        class="{$page.url.pathname === '/marketing' ? 'font-semibold text-blue-600' : 'text-slate-600 hover:text-blue-600'}"
-      >
-        Marketing
-      </a>
-    </div>
-  </nav>
+{#if !isLoading}
+  {#if $page.url.pathname !== '/login' && isAuthenticated}
+    <nav class="border-b border-slate-200 bg-slate-50 px-6 py-3 text-sm">
+      <div class="flex flex-wrap items-center gap-6">
+        <a 
+          href="/" 
+          class="{$page.url.pathname === '/' ? 'font-semibold text-blue-600' : 'text-slate-600 hover:text-blue-600'}"
+        >
+          Dashboard Utama
+        </a>
+        <a 
+          href="/customer-service" 
+          class="{$page.url.pathname === '/customer-service' ? 'font-semibold text-blue-600' : 'text-slate-600 hover:text-blue-600'}"
+        >
+          Customer Service
+        </a>
+        <a 
+          href="/marketing" 
+          class="{$page.url.pathname === '/marketing' ? 'font-semibold text-blue-600' : 'text-slate-600 hover:text-blue-600'}"
+        >
+          Marketing
+        </a>
+      </div>
+    </nav>
+  {/if}
 {/if}
 
 <slot />

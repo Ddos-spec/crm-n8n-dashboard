@@ -14,6 +14,7 @@
   import { customersStore } from '$stores/customersStore';
   import { leadsStore } from '$stores/leadsStore';
   import { escalationsStore } from '$stores/escalationsStore';
+  import { authStore } from '$stores/auth/authStore';
   import { config } from '$config';
   import { postActionJson, postWebhookAction } from '$lib/utils/api';
   import type {
@@ -26,6 +27,9 @@
     LeadRecord,
     EscalationRecord
   } from '$lib/types/api';
+
+  // Ambil data user dari auth store
+  let currentUser = $authStore;
 
   const statsState = statsStore;
   const statsSummary = statsStore.summary;
@@ -799,6 +803,10 @@
     return null;
   }
 
+  function handleLogout() {
+    authStore.logout();
+  }
+
   onMount(() => {
     void refreshAll();
     // Set status realtime untuk customer service
@@ -818,12 +826,13 @@
     </div>
     <div class="flex items-center gap-4">
       <div class="hidden flex-col text-right text-xs text-slate-500 sm:flex">
-        <span class="text-sm font-semibold text-slate-900">Customer Service Agent</span>
-        <span>cs@tepatlaser.id</span>
+        <span class="text-sm font-semibold text-slate-900">{currentUser.user?.name || 'Customer Service'}</span>
+        <span>{currentUser.user?.email || 'cs@tepatlaser.id'}</span>
       </div>
       <button
         type="button"
         class="rounded-md border border-slate-200 px-4 py-2 text-sm font-medium text-slate-600 transition hover:border-blue-500 hover:text-blue-600"
+        on:click={handleLogout}
       >
         Logout
       </button>

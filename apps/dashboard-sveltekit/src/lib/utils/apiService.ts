@@ -1,5 +1,6 @@
 import { browser } from '$app/environment';
 import { config } from '$config';
+import type { ApiClientOptions } from '$lib/types/api';
 
 type Fetcher = (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>;
 
@@ -7,26 +8,21 @@ const defaultHeaders = {
   'content-type': 'application/json'
 };
 
-export interface ApiClientOptions {
-  fetcher?: Fetcher;
-  signal?: AbortSignal;
-}
-
 /**
- * Fungsi untuk melakukan request ke API
- * Jika di server, akan menggunakan URL lengkap ke n8n
- * Jika di klien, akan menggunakan endpoint proxy lokal
+ * Fungsi untuk melakukan request ke API eksternal melalui proxy server-side
  */
 export async function getJson<T>(endpoint: keyof typeof config.apiEndpoints, options: ApiClientOptions = {}): Promise<T> {
   const { fetcher = fetch, signal } = options;
   
+  // Jika di browser, gunakan fetch biasa ke endpoint internal
+  // Jika di server (SSR), kita perlu mengarahkan ke proxy internal
   let url: string;
   
   if (browser) {
-    // Di sisi klien, gunakan endpoint proxy lokal
+    // Di sisi klien, gunakan endpoint yang didefinisikan di konfigurasi
     url = config.apiEndpoints[endpoint];
   } else {
-    // Di sisi server, gunakan URL lengkap ke n8n
+    // Di sisi server, kita gunakan URL lengkap
     url = new URL(config.apiEndpoints[endpoint], config.n8n.baseUrl).href;
   }
   
@@ -41,9 +37,7 @@ export async function getJson<T>(endpoint: keyof typeof config.apiEndpoints, opt
 }
 
 /**
- * Fungsi untuk melakukan request POST ke API
- * Jika di server, akan menggunakan URL lengkap ke n8n
- * Jika di klien, akan menggunakan endpoint proxy lokal
+ * Fungsi untuk melakukan request POST ke API eksternal melalui proxy server-side
  */
 export async function postJson<TInput, TResponse>(endpoint: keyof typeof config.apiEndpoints, body: TInput, options: ApiClientOptions = {}): Promise<TResponse> {
   const { fetcher = fetch, signal } = options;
@@ -51,10 +45,10 @@ export async function postJson<TInput, TResponse>(endpoint: keyof typeof config.
   let url: string;
   
   if (browser) {
-    // Di sisi klien, gunakan endpoint proxy lokal
+    // Di sisi klien, gunakan endpoint yang didefinisikan di konfigurasi
     url = config.apiEndpoints[endpoint];
   } else {
-    // Di sisi server, gunakan URL lengkap ke n8n
+    // Di sisi server, kita gunakan URL lengkap
     url = new URL(config.apiEndpoints[endpoint], config.n8n.baseUrl).href;
   }
   
@@ -73,6 +67,9 @@ export async function postJson<TInput, TResponse>(endpoint: keyof typeof config.
   return (await response.json()) as TResponse;
 }
 
+/**
+ * Fungsi untuk membuat payload aksi
+ */
 export function buildActionPayload(action: string, data: Record<string, unknown> = {}) {
   return {
     action,
@@ -81,6 +78,9 @@ export function buildActionPayload(action: string, data: Record<string, unknown>
   };
 }
 
+/**
+ * Fungsi untuk POST aksi ke API
+ */
 export async function postActionJson<TResponse>(
   endpoint: keyof typeof config.apiEndpoints,
   action: string,
@@ -90,6 +90,9 @@ export async function postActionJson<TResponse>(
   return postJson(endpoint, buildActionPayload(action, data), options);
 }
 
+/**
+ * Fungsi untuk POST webhook aksi
+ */
 export async function postWebhookAction(
   action: string,
   data: Record<string, unknown> = {},
@@ -100,11 +103,9 @@ export async function postWebhookAction(
   let url: string;
   
   if (browser) {
-    // Di sisi klien, gunakan endpoint proxy lokal
     url = config.n8n.webhookUrl;
   } else {
-    // Di sisi server, gunakan URL lengkap ke n8n
-    url = new URL(config.n8n.webhookUrl, config.n8n.baseUrl).href;
+    url = config.n8n.webhookUrl; // Di server, kita gunakan URL yang sama
   }
   
   const response = await fetcher(url, {
@@ -126,6 +127,9 @@ export async function postWebhookAction(
   }
 }
 
+/**
+ * Fungsi untuk parsing error dengan aman
+ */
 async function safeParseError(response: Response): Promise<string> {
   try {
     const data = await response.json();

@@ -218,22 +218,26 @@
   });
 </script>
 
-<div class="space-y-4" bind:this={tableContainer}>
+<div class="space-y-4" bind:this={tableContainer} role="region" aria-labelledby="table-label" aria-roledescription="data table">
   <div class="overflow-x-auto">
-    <table class="min-w-full divide-y divide-slate-200 text-sm text-slate-900">
+    <table class="min-w-full divide-y divide-slate-200 text-sm text-slate-900" role="table">
+      <caption id="table-label" class="sr-only">{summaryLabel} table</caption>
       <thead class="bg-slate-100 text-xs font-semibold uppercase tracking-wide text-slate-600">
-        <tr>
+        <tr role="row">
           {#each resolvedColumns as column (column.id)}
             <th
               scope="col"
               class={`whitespace-nowrap px-4 py-3 font-semibold ${getCellAlignmentClass(column.align)} ${column.class ?? ''}`}
               style={column.width ? `width: ${column.width}` : undefined}
+              role="columnheader"
+              {#if column.sortable}aria-sort={sortKey === column.id ? (sortDirection === 'asc' ? 'ascending' : 'descending') : 'none'}{/if}
             >
               {#if column.sortable}
                 <button
                   type="button"
                   class="inline-flex items-center gap-1 text-inherit hover:text-slate-900"
                   on:click={() => toggleSort(column.id)}
+                  aria-label={`Urutkan berdasarkan ${column.label}`}
                 >
                   <span>{column.label}</span>
                   {#if sortKey === column.id}
@@ -247,37 +251,37 @@
             </th>
           {/each}
           {#if showActionsColumn}
-            <th scope="col" class="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wide text-slate-600">
+            <th scope="col" class="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wide text-slate-600" role="columnheader">
               {actionsLabel}
             </th>
           {/if}
         </tr>
       </thead>
-      <tbody class="divide-y divide-slate-200 bg-white">
+      <tbody class="divide-y divide-slate-200 bg-white" role="rowgroup">
         {#if loading}
-          <tr>
-            <td colspan={resolvedColumns.length + (showActionsColumn ? 1 : 0)} class="px-4 py-6 text-center text-sm text-slate-600">
+          <tr role="row">
+            <td role="cell" colspan={resolvedColumns.length + (showActionsColumn ? 1 : 0)} class="px-4 py-6 text-center text-sm text-slate-600">
               Memuat data…
             </td>
           </tr>
         {:else if error}
-          <tr>
-            <td colspan={resolvedColumns.length + (showActionsColumn ? 1 : 0)} class="px-4 py-6 text-center text-sm text-rose-600">
+          <tr role="row">
+            <td role="cell" colspan={resolvedColumns.length + (showActionsColumn ? 1 : 0)} class="px-4 py-6 text-center text-sm text-rose-600">
               {error}
             </td>
           </tr>
         {:else if totalItems === 0}
-          <tr>
-            <td colspan={resolvedColumns.length + (showActionsColumn ? 1 : 0)} class="px-4 py-10 text-center text-sm text-slate-600">
+          <tr role="row">
+            <td role="cell" colspan={resolvedColumns.length + (showActionsColumn ? 1 : 0)} class="px-4 py-10 text-center text-sm text-slate-600">
               {emptyMessage}
             </td>
           </tr>
         {:else}
-          {#each visibleItems as item, index}
+          {#each visibleItems as item, index (index)}
             {@const rowKey = resolveRowKey(item, index)}
-            <tr class="transition hover:bg-slate-50">
+            <tr class="transition hover:bg-slate-50" role="row">
               {#each resolvedColumns as column (column.id)}
-                <td class={`px-4 py-3 align-top ${getCellAlignmentClass(column.align)} ${column.class ?? ''}`}>
+                <td role="cell" class={`px-4 py-3 align-top ${getCellAlignmentClass(column.align)} ${column.class ?? ''}`}>
                   {#if column.cell}
                     <svelte:component this={column.cell} {item} />
                   {:else}
@@ -286,7 +290,7 @@
                 </td>
               {/each}
               {#if showActionsColumn}
-                <td class="px-4 py-3 text-right">
+                <td role="cell" class="px-4 py-3 text-right">
                   {#if item}
                     <div class="relative inline-block text-left">
                       <button
@@ -295,15 +299,17 @@
                         on:click={() => (openMenuKey = openMenuKey === rowKey ? null : rowKey)}
                         aria-haspopup="true"
                         aria-expanded={openMenuKey === rowKey}
+                        aria-label="Buka menu aksi"
                       >
                         <span class="sr-only">Buka menu aksi</span>
                         ⋯
                       </button>
                       {#if openMenuKey === rowKey}
-                        <div class="absolute right-0 z-20 mt-2 w-44 overflow-hidden rounded-lg border border-slate-200 bg-white shadow-lg">
-                          <ul class="py-1 text-left text-sm text-slate-700">
-                            <li>
+                        <div class="absolute right-0 z-20 mt-2 w-44 overflow-hidden rounded-lg border border-slate-200 bg-white shadow-lg" role="menu">
+                          <ul class="py-1 text-left text-sm text-slate-700" role="menubar">
+                            <li role="none">
                               <button
+                                role="menuitem"
                                 type="button"
                                 class="flex w-full items-center gap-2 px-4 py-2 text-left hover:bg-slate-100"
                                 on:click={() => {
@@ -314,8 +320,9 @@
                                 Detail
                               </button>
                             </li>
-                            <li>
+                            <li role="none">
                               <button
+                                role="menuitem"
                                 type="button"
                                 class="flex w-full items-center gap-2 px-4 py-2 text-left hover:bg-slate-100"
                                 on:click={() => {
@@ -326,8 +333,9 @@
                                 Chat
                               </button>
                             </li>
-                            <li>
+                            <li role="none">
                               <button
+                                role="menuitem"
                                 type="button"
                                 class="flex w-full items-center gap-2 px-4 py-2 text-left hover:bg-slate-100"
                                 on:click={() => {
@@ -338,8 +346,9 @@
                                 Tandai selesai
                               </button>
                             </li>
-                            <li>
+                            <li role="none">
                               <button
+                                role="menuitem"
                                 type="button"
                                 class="flex w-full items-center gap-2 px-4 py-2 text-left hover:bg-slate-100"
                                 on:click={() => {
@@ -365,7 +374,7 @@
   </div>
 
   <div class="flex flex-col gap-4 border-t border-slate-200 pt-4 text-sm text-slate-600 sm:flex-row sm:items-center sm:justify-between">
-    <div>
+    <div role="status" aria-live="polite">
       {#if totalItems > 0}
         Menampilkan {pageStartIndex + 1}-{pageEndIndex} dari {totalItems} {summaryLabel}.
       {:else}
@@ -378,32 +387,38 @@
           type="button"
           class="rounded-md border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-600 transition hover:border-blue-500 hover:text-blue-600"
           on:click={exportToCsv}
+          aria-label="Ekspor data ke CSV"
         >
           Ekspor CSV
         </button>
       {/if}
       <div class="flex items-center gap-2">
-        <span class="text-xs uppercase tracking-wide text-slate-500">Tampilkan</span>
+        <label for="page-size-select" class="text-xs uppercase tracking-wide text-slate-500">
+          Tampilkan
+        </label>
         <select
+          id="page-size-select"
           class="rounded-md border border-slate-300 bg-white px-2 py-1 text-sm text-slate-700 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200"
           bind:value={pageSize}
           on:change={(event) => changePageSize(Number(event.currentTarget.value))}
+          aria-label="Ubah jumlah item per halaman"
         >
           {#each computedPageSizeOptions as option}
             <option value={option}>{option}</option>
           {/each}
         </select>
       </div>
-      <nav class="flex items-center gap-2" aria-label="Pagination">
+      <nav class="flex items-center gap-2" aria-label="Navigasi halaman">
         <button
           type="button"
           class="rounded-md border border-slate-200 px-3 py-1 text-sm text-slate-600 transition hover:border-blue-500 hover:text-blue-600 disabled:cursor-not-allowed disabled:border-slate-200 disabled:text-slate-400"
           on:click={goToPreviousPage}
           disabled={page <= 1}
+          aria-label="Halaman sebelumnya"
         >
           Sebelumnya
         </button>
-        <span class="text-xs uppercase tracking-wide text-slate-500">
+        <span class="text-xs uppercase tracking-wide text-slate-500" aria-live="polite">
           Halaman {totalItems === 0 ? 0 : page} dari {totalItems === 0 ? 0 : totalPages}
         </span>
         <button
@@ -411,6 +426,7 @@
           class="rounded-md border border-slate-200 px-3 py-1 text-sm text-slate-600 transition hover:border-blue-500 hover:text-blue-600 disabled:cursor-not-allowed disabled:border-slate-200 disabled:text-slate-400"
           on:click={goToNextPage}
           disabled={page >= totalPages}
+          aria-label="Halaman berikutnya"
         >
           Selanjutnya
         </button>
