@@ -572,6 +572,13 @@ function App() {
                   </tbody>
                 </table>
               </div>
+              {customers.length > itemsPerPage && (
+                <Pagination 
+                  currentPage={currentPage} 
+                  totalPages={totalCustomerPages} 
+                  paginate={paginate} 
+                />
+              )}
             </div>
 
             {/* Escalations */}
