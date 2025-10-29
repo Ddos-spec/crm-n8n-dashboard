@@ -135,13 +135,13 @@ function App() {
     if (!message.trim() || !selectedCustomer) return;
     
     try {
-      const response = await axios.post(`${API_URL}/api/send-whatsapp`, {
-        phone: selectedCustomer.phone,
-        message: message,
-        customer_id: selectedCustomer.id
-      });
+      const response = await api.sendWhatsApp(
+        selectedCustomer.phone,
+        message,
+        selectedCustomer.id
+      );
       
-      if (response.data.success) {
+      if (response.success) {
         showNotification('Pesan berhasil dikirim!', 'success');
         setMessage('');
         // Refresh chat history
