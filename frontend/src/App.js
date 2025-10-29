@@ -379,7 +379,7 @@ function App() {
             <div className="flex justify-between items-center mb-6">
               <h2 className="text-3xl font-bold text-gray-900">Customer Service</h2>
               <button
-                onClick={() => exportToCSV('customers')}
+                onClick={() => handleExportCSV('customers')}
                 className="flex items-center px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700"
               >
                 <Download className="w-4 h-4 mr-2" />
