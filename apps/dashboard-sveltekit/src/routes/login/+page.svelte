@@ -102,16 +102,28 @@
         
         <div>
           <label for="password" class="block text-sm font-medium text-slate-700">Password</label>
-          <div class="mt-1">
-            <input
-              id="password"
-              name="password"
-              type={showPassword ? 'text' : 'password'}
-              autocomplete="current-password"
-              required
-              class="block w-full appearance-none rounded-md border border-slate-300 px-3 py-2 placeholder-slate-400 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-blue-500 sm:text-sm"
-              bind:value={password}
-            />
+          <div class="mt-1 relative">
+            {#if showPassword}
+              <input
+                id="password"
+                name="password"
+                type="text"
+                autocomplete="current-password"
+                required
+                class="block w-full appearance-none rounded-md border border-slate-300 px-3 py-2 placeholder-slate-400 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-blue-500 sm:text-sm"
+                bind:value={password}
+              />
+            {:else}
+              <input
+                id="password"
+                name="password"
+                type="password"
+                autocomplete="current-password"
+                required
+                class="block w-full appearance-none rounded-md border border-slate-300 px-3 py-2 placeholder-slate-400 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-blue-500 sm:text-sm"
+                bind:value={password}
+              />
+            {/if}
           </div>
         </div>
         
