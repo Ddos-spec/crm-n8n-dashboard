@@ -109,10 +109,19 @@ function App() {
   // Fetch chat history
   const fetchChatHistory = async (customerId) => {
     try {
-      const response = await axios.get(`${API_URL}/api/chat-history/${customerId}`);
-      if (response.data.success) {
-        setChatHistory(response.data.chats);
-        setSelectedCustomer(response.data.customer);
+      const response = await api.getChatHistory(customerId);
+      if (response.success && Array.isArray(response.data)) {
+        setChatHistory(response.data);
+        // Set customer info from first chat if available
+        if (response.data.length > 0 && response.data[0].customer_name) {
+          setSelectedCustomer({
+            id: customerId,
+            name: response.data[0].customer_name,
+            phone: response.data[0].customer_phone
+          });
+        } else {
+          setSelectedCustomer({ id: customerId, phone: 'Unknown' });
+        }
         setShowChatModal(true);
       }
     } catch (error) {
