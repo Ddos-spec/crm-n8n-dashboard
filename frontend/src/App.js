@@ -828,6 +828,13 @@ function App() {
                   </tbody>
                 </table>
               </div>
+              {businesses.length > itemsPerPage && (
+                <Pagination 
+                  currentPage={currentPage} 
+                  totalPages={totalBusinessPages} 
+                  paginate={paginate} 
+                />
+              )}
             </div>
           </div>
         )}
