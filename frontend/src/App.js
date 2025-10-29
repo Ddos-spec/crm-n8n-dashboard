@@ -207,7 +207,11 @@ function App() {
 
   // Load data based on active tab
   useEffect(() => {
-    if (activeTab === 'customer-service') {
+    if (activeTab === 'home') {
+      // Load data for home dashboard
+      fetchCustomers();
+      fetchBusinesses();
+    } else if (activeTab === 'customer-service') {
       fetchCustomers();
       fetchEscalations();
     } else if (activeTab === 'marketing') {
