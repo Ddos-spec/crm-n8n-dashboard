@@ -3,9 +3,7 @@ import {
   Home, Users, Briefcase, MessageSquare, X, 
   Search, Download, Filter, Send, RefreshCw, AlertCircle 
 } from 'lucide-react';
-import axios from 'axios';
-
-const API_URL = process.env.REACT_APP_BACKEND_URL || 'http://localhost:8001';
+import { api, exportToCSV } from './api';
 
 function App() {
   const [activeTab, setActiveTab] = useState('home');
