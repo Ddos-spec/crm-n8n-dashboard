@@ -50,7 +50,7 @@
   }
 
   function initializeFooterObserver() {
-    if (typeof MutationObserver === 'undefined') return;
+    if (!browser || typeof MutationObserver === 'undefined') return;
     footerObserver?.disconnect();
     if (!footerContainer) {
       return;
@@ -61,7 +61,7 @@
   }
 
   async function focusDialog() {
-    if (!open || typeof document === 'undefined') return;
+    if (!open || !browser) return;
     await tick();
     dialogRef?.focus();
   }
