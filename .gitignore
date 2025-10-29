@@ -3,3 +3,7 @@ dist/
 apps/**/node_modules/
 apps/dashboard-sveltekit/build/
 apps/dashboard-sveltekit/.svelte-kit/
+-e 
+# Environment files
+*.env
+*.env.*
