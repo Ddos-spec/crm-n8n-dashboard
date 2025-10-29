@@ -1,8 +1,17 @@
 {
   "name": "crm-n8n-dashboard",
   "version": "1.0.0",
+  "description": "CRM Dashboard dengan React dan n8n Integration",
   "private": true,
   "scripts": {
-    "build": "npm run build --prefix apps/dashboard-sveltekit"
-  }
+    "build": "cd frontend && yarn build",
+    "start": "cd frontend && yarn start",
+    "deploy": "cd frontend && yarn deploy"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/ddos-spec/crm-n8n-dashboard.git"
+  },
+  "author": "DDOS-SPEC",
+  "license": "MIT"
 }
