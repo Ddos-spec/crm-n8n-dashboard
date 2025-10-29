@@ -452,7 +452,7 @@ function App() {
                             </span>
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                            {customer.total_messages || 0}
+                            {customer.message_count || customer.total_messages || 0}
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm">
                             <button
