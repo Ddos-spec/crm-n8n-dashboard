@@ -3,10 +3,16 @@ import axios from 'axios';
 // Base URL untuk n8n webhooks
 const N8N_BASE_URL = 'https://projek-n8n-n8n.qk6yxt.easypanel.host/webhook';
 
-// Helper untuk handle response dari n8n (yang return array dengan 1 object)
+// Helper untuk handle response dari n8n
 const handleN8nResponse = (response) => {
-  if (Array.isArray(response.data) && response.data.length > 0) {
-    return response.data[0];
+  // n8n returns array of objects, each with success, data, etc
+  if (Array.isArray(response.data)) {
+    // Extract data from each object in array
+    const dataArray = response.data.map(item => item.data).filter(Boolean);
+    return {
+      success: true,
+      data: dataArray
+    };
   }
   return response.data;
 };
