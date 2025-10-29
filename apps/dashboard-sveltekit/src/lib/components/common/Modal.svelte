@@ -76,7 +76,7 @@
   }
 
   onMount(() => {
-    if (typeof document !== 'undefined') {
+    if (browser) {
       document.addEventListener('keydown', handleKeydown);
     }
     initializeFooterObserver();
@@ -84,7 +84,7 @@
 
   onDestroy(() => {
     updateBodyScroll(false);
-    if (typeof document !== 'undefined') {
+    if (browser) {
       document.removeEventListener('keydown', handleKeydown);
     }
     footerObserver?.disconnect();
