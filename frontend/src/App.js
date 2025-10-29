@@ -71,15 +71,15 @@ function App() {
   const fetchBusinesses = async () => {
     setLoading(true);
     try {
-      const params = new URLSearchParams();
-      if (filters.search) params.append('search', filters.search);
-      if (filters.status) params.append('status', filters.status);
-      if (filters.dateFrom) params.append('date_from', filters.dateFrom);
-      if (filters.dateTo) params.append('date_to', filters.dateTo);
+      const params = {};
+      if (filters.search) params.search = filters.search;
+      if (filters.status) params.status = filters.status;
+      if (filters.dateFrom) params.date_from = filters.dateFrom;
+      if (filters.dateTo) params.date_to = filters.dateTo;
       
-      const response = await axios.get(`${API_URL}/api/businesses?${params.toString()}`);
-      if (response.data.success) {
-        setBusinesses(response.data.data);
+      const response = await api.getBusinesses(params);
+      if (response.success && Array.isArray(response.data)) {
+        setBusinesses(response.data);
       }
     } catch (error) {
       console.error('Error fetching businesses:', error);
