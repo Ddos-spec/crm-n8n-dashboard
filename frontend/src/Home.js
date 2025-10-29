@@ -3,7 +3,7 @@ import {
   LineChart, Line, BarChart, Bar, PieChart, Pie, Cell,
   XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer 
 } from 'recharts';
-import { Users, Briefcase, AlertCircle, MessageSquare, TrendingUp, TrendingDown } from 'lucide-react';
+import { Users, Briefcase, AlertCircle, MessageSquare, TrendingUp } from 'lucide-react';
 
 const COLORS = ['#3B82F6', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6'];
 
