@@ -1,21 +1,40 @@
+# Dependencies
 node_modules/
-dist/
-apps/**/node_modules/
-apps/dashboard-sveltekit/build/
-apps/dashboard-sveltekit/.svelte-kit/
--e 
-# Environment files
-*.env
-*.env.*
--e 
-# Environment files
-*.env
-*.env.*
--e 
-# Environment files
-*.env
-*.env.*
--e 
-# Environment files
-*.env
-*.env.*
+__pycache__/
+*.pyc
+.venv/
+
+# Production
+/frontend/build
+
+# Environment (keep .env for reference but add to .gitignore in production)
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+*.log
+
+# Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Testing
+/coverage
+
+# Misc
+.cache/
+
+# Backend specific
+backend/__pycache__/
