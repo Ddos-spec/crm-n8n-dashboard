@@ -49,15 +49,15 @@ function App() {
   const fetchCustomers = async () => {
     setLoading(true);
     try {
-      const params = new URLSearchParams();
-      if (filters.search) params.append('search', filters.search);
-      if (filters.priority) params.append('priority', filters.priority);
-      if (filters.dateFrom) params.append('date_from', filters.dateFrom);
-      if (filters.dateTo) params.append('date_to', filters.dateTo);
+      const params = {};
+      if (filters.search) params.search = filters.search;
+      if (filters.priority) params.priority = filters.priority;
+      if (filters.dateFrom) params.date_from = filters.dateFrom;
+      if (filters.dateTo) params.date_to = filters.dateTo;
       
-      const response = await axios.get(`${API_URL}/api/customers?${params.toString()}`);
-      if (response.data.success) {
-        setCustomers(response.data.data);
+      const response = await api.getCustomers(params);
+      if (response.success && Array.isArray(response.data)) {
+        setCustomers(response.data);
       }
     } catch (error) {
       console.error('Error fetching customers:', error);
