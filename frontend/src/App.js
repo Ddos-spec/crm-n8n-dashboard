@@ -787,7 +787,7 @@ function App() {
                         </td>
                       </tr>
                     ) : (
-                      businesses.map((business) => (
+                      currentBusinesses.map((business) => (
                         <tr key={business.id} className="hover:bg-gray-50">
                           <td className="px-6 py-4">
                             <div className="text-sm font-medium text-gray-900">{business.name}</div>
