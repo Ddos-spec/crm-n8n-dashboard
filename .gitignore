@@ -38,3 +38,7 @@ Thumbs.db
 
 # Backend specific
 backend/__pycache__/
+-e 
+# Environment files
+*.env
+*.env.*
