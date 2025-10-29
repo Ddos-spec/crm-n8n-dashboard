@@ -156,8 +156,8 @@ function App() {
   // Resolve escalation
   const resolveEscalation = async (escalationId) => {
     try {
-      const response = await axios.post(`${API_URL}/api/escalations/${escalationId}/resolve`, {});
-      if (response.data.success) {
+      const response = await api.resolveEscalation(escalationId);
+      if (response.success) {
         showNotification('Eskalasi berhasil diselesaikan', 'success');
         fetchEscalations();
       }
@@ -168,10 +168,28 @@ function App() {
   };
 
   // Export to CSV
-  const exportToCSV = (type) => {
-    const url = `${API_URL}/api/export/${type}`;
-    window.open(url, '_blank');
-    showNotification('Mengunduh file CSV...', 'success');
+  const handleExportCSV = (type) => {
+    let data, filename;
+    
+    switch(type) {
+      case 'customers':
+        data = customers;
+        filename = 'customers.csv';
+        break;
+      case 'businesses':
+        data = businesses;
+        filename = 'leads.csv';
+        break;
+      case 'chat-history':
+        data = chatHistory;
+        filename = 'chat_history.csv';
+        break;
+      default:
+        return;
+    }
+    
+    exportToCSV(data, filename);
+    showNotification('File CSV berhasil diunduh', 'success');
   };
 
   // Show notification
