@@ -28,9 +28,16 @@ function App() {
   // Fetch dashboard stats
   const fetchStats = async () => {
     try {
-      const response = await axios.get(`${API_URL}/api/stats`);
-      if (response.data.success) {
-        setStats(response.data.data);
+      const response = await api.getStats();
+      if (response.success) {
+        // Map n8n response format to our format
+        setStats({
+          total_customers: parseInt(response.data.totalCustomers) || 0,
+          total_leads: parseInt(response.data.totalLeads) || 0,
+          open_escalations: parseInt(response.data.totalEscalations) || 0,
+          today_chats: 0, // n8n doesn't provide this, we'll show 0
+          recent_activities: [] // n8n doesn't provide this yet
+        });
       }
     } catch (error) {
       console.error('Error fetching stats:', error);
