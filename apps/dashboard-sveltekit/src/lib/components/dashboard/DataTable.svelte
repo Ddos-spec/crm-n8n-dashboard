@@ -230,7 +230,7 @@
               class={`whitespace-nowrap px-4 py-3 font-semibold ${getCellAlignmentClass(column.align)} ${column.class ?? ''}`}
               style={column.width ? `width: ${column.width}` : undefined}
               role="columnheader"
-              {#if column.sortable}aria-sort={sortKey === column.id ? (sortDirection === 'asc' ? 'ascending' : 'descending') : 'none'}{/if}
+              aria-sort={column.sortable && sortKey === column.id ? (sortDirection === 'asc' ? 'ascending' : 'descending') : 'none'}
             >
               {#if column.sortable}
                 <button
