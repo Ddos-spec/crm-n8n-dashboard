@@ -47,6 +47,8 @@ jobs:
         env:
           PUBLIC_BASE_PATH: /crm-n8n-dashboard
         run: npm run build
+      - name: Add .nojekyll to build output
+        run: touch apps/dashboard-sveltekit/build/.nojekyll
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
