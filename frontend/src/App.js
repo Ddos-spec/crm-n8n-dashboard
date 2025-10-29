@@ -251,7 +251,7 @@ function App() {
                     : 'text-gray-600 hover:bg-gray-100'
                 }`}
               >
-                <Home className="w-5 h-5 mr-2" />
+                <HomeIcon className="w-5 h-5 mr-2" />
                 Home
               </button>
               <button
