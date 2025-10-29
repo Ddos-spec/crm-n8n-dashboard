@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { 
-  Home as HomeIcon, Users, Briefcase, MessageSquare, X, 
-  Search, Download, Filter, Send, RefreshCw, AlertCircle 
+  Home as HomeIcon, Users, Briefcase, X, 
+  Search, Download, Filter, Send, RefreshCw
 } from 'lucide-react';
 import { api, exportToCSV } from './api';
 import Home from './Home';
