@@ -1,0 +1,13 @@
+{
+  "files": {
+    "main.css": "/crm-n8n-dashboard/static/css/main.5f03ee90.css",
+    "main.js": "/crm-n8n-dashboard/static/js/main.e4a7ce59.js",
+    "index.html": "/crm-n8n-dashboard/index.html",
+    "main.5f03ee90.css.map": "/crm-n8n-dashboard/static/css/main.5f03ee90.css.map",
+    "main.e4a7ce59.js.map": "/crm-n8n-dashboard/static/js/main.e4a7ce59.js.map"
+  },
+  "entrypoints": [
+    "static/css/main.5f03ee90.css",
+    "static/js/main.e4a7ce59.js"
+  ]
+}
