@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { 
-  Home, Users, Briefcase, MessageSquare, X, 
+  Home as HomeIcon, Users, Briefcase, MessageSquare, X, 
   Search, Download, Filter, Send, RefreshCw, AlertCircle 
 } from 'lucide-react';
 import { api, exportToCSV } from './api';
+import Home from './Home';
 
 function App() {
   const [activeTab, setActiveTab] = useState('home');
