@@ -25,6 +25,8 @@ function App() {
     dateTo: ''
   });
   const [notification, setNotification] = useState(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage] = useState(10);
 
   // Fetch dashboard stats
   const fetchStats = async () => {
