@@ -45,7 +45,7 @@ jobs:
       - name: Build frontend bundle
         working-directory: apps/dashboard-sveltekit
         env:
-          PUBLIC_BASE_PATH: /crm-n8n-dashboard/
+          PUBLIC_BASE_PATH: /crm-n8n-dashboard
         run: npm run build
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
