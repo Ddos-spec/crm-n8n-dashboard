@@ -92,13 +92,13 @@ function App() {
   // Fetch escalations
   const fetchEscalations = async () => {
     try {
-      const params = new URLSearchParams();
-      if (filters.status) params.append('status_filter', filters.status);
-      if (filters.priority) params.append('priority', filters.priority);
+      const params = {};
+      if (filters.status) params.status_filter = filters.status;
+      if (filters.priority) params.priority = filters.priority;
       
-      const response = await axios.get(`${API_URL}/api/escalations?${params.toString()}`);
-      if (response.data.success) {
-        setEscalations(response.data.data);
+      const response = await api.getEscalations(params);
+      if (response.success && Array.isArray(response.data)) {
+        setEscalations(response.data);
       }
     } catch (error) {
       console.error('Error fetching escalations:', error);
