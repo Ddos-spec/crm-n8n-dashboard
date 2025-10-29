@@ -222,6 +222,21 @@ function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTab]);
 
+  // Pagination helpers
+  const indexOfLastItem = currentPage * itemsPerPage;
+  const indexOfFirstItem = indexOfLastItem - itemsPerPage;
+  const currentCustomers = customers.slice(indexOfFirstItem, indexOfLastItem);
+  const currentBusinesses = businesses.slice(indexOfFirstItem, indexOfLastItem);
+  const totalCustomerPages = Math.ceil(customers.length / itemsPerPage);
+  const totalBusinessPages = Math.ceil(businesses.length / itemsPerPage);
+
+  const paginate = (pageNumber) => setCurrentPage(pageNumber);
+
+  // Reset to page 1 when changing tabs
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [activeTab]);
+
   // Format date
   const formatDate = (dateString) => {
     if (!dateString) return '-';
