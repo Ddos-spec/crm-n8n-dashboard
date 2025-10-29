@@ -35,7 +35,7 @@
   }
 
   function updateBodyScroll(lock: boolean) {
-    if (typeof document === 'undefined') return;
+    if (!browser) return;
     if (lock) {
       previousOverflow = document.body.style.overflow;
       document.body.style.overflow = 'hidden';
