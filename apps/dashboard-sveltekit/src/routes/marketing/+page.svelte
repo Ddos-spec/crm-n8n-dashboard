@@ -608,9 +608,10 @@
               tableResetSignal += 1;
             }}
             type="button"
-            disabled <!-- Analitik akan diimplementasi nanti -->
+            disabled={true}
           >
             Analitik
+            <!-- Analitik akan diimplementasi nanti -->
           </button>
         </nav>
 
