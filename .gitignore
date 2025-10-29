@@ -7,3 +7,7 @@ apps/dashboard-sveltekit/.svelte-kit/
 # Environment files
 *.env
 *.env.*
+-e 
+# Environment files
+*.env
+*.env.*
