@@ -201,6 +201,7 @@ function App() {
   // Initial load
   useEffect(() => {
     fetchStats();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Load data based on active tab
@@ -211,6 +212,7 @@ function App() {
     } else if (activeTab === 'marketing') {
       fetchBusinesses();
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTab]);
 
   // Format date
