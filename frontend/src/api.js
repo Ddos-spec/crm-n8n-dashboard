@@ -1,7 +1,8 @@
 import axios from 'axios';
 
-// Base URL untuk Python Backend Lokal
-const API_BASE_URL = 'http://localhost:8001/api';
+// Base URL: Menggunakan Environment Variable (untuk Prod) atau Localhost (untuk Dev)
+// Di GitHub Actions, variable ini akan diisi lewat Secrets
+const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://localhost:8001/api';
 
 // Helper untuk handle response
 const handleResponse = (response) => {
