@@ -2,6 +2,7 @@ from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from typing import Optional, List
+from contextlib import asynccontextmanager
 from datetime import datetime, timedelta
 import httpx
 import os
@@ -12,7 +13,20 @@ from database import get_db_connection, test_connection
 
 load_dotenv()
 
-app = FastAPI(title="CRM API")
+# --- LIFESPAN MANAGER (Pengganti on_event startup) ---
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Startup: Cek koneksi DB
+    print("🚀 Starting up application...")
+    if test_connection():
+        print("✅ Database connected successfully")
+    else:
+        print("❌ Database connection failed")
+    yield
+    # Shutdown: Clean up jika ada (saat ini kosong)
+    print("🛑 Shutting down application...")
+
+app = FastAPI(title="CRM API", lifespan=lifespan)
 
 # CORS Configuration
 app.add_middleware(
@@ -23,13 +37,15 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-@app.on_event("startup")
-async def startup_event():
-    """Test database connection on startup"""
-    if test_connection():
-        print("✅ Database connected successfully")
-    else:
-        print("❌ Database connection failed")
+# --- ROOT ENDPOINT (PENTING UNTUK HEALTH CHECK) ---
+@app.get("/")
+async def root():
+    """Root endpoint for health checks"""
+    return {
+        "status": "online",
+        "message": "CRM Backend is running",
+        "timestamp": datetime.now().isoformat()
+    }
 
 @app.get("/api/health")
 async def health_check():
