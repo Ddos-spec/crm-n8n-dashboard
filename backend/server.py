@@ -590,4 +590,7 @@ async def export_chat_history_csv():
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8001)
+    # Gunakan PORT dari environment variable, default ke 8001 jika tidak ada
+    port = int(os.getenv("PORT", 8001))
+    print(f"🚀 Server berjalan di port {port}")
+    uvicorn.run(app, host="0.0.0.0", port=port)
