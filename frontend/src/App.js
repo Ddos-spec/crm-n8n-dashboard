@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { 
-  Home as HomeIcon, Users, Briefcase, X, 
+  Home as HomeIcon, Users, Briefcase, 
   Search, Download, Filter, Send, RefreshCw, AlertCircle, MessageSquare 
 } from 'lucide-react';
 import { api, exportToCSV } from './api';
@@ -265,9 +265,7 @@ function App() {
   // Pagination helpers
   const indexOfLastItem = currentPage * itemsPerPage;
   const indexOfFirstItem = indexOfLastItem - itemsPerPage;
-  const currentCustomers = customers.slice(indexOfFirstItem, indexOfLastItem);
   const currentBusinesses = businesses.slice(indexOfFirstItem, indexOfLastItem);
-  const totalCustomerPages = Math.ceil(customers.length / itemsPerPage);
   const totalBusinessPages = Math.ceil(businesses.length / itemsPerPage);
 
   const paginate = (pageNumber) => setCurrentPage(pageNumber);
