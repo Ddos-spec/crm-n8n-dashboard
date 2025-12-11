@@ -1,19 +1,10 @@
 import axios from 'axios';
 
-// Base URL untuk n8n webhooks
-const N8N_BASE_URL = 'https://projek-n8n-n8n.qk6yxt.easypanel.host/webhook';
+// Base URL untuk Python Backend Lokal
+const API_BASE_URL = 'http://localhost:8001/api';
 
-// Helper untuk handle response dari n8n
-const handleN8nResponse = (response) => {
-  // n8n returns array of objects, each with success, data, etc
-  if (Array.isArray(response.data)) {
-    // Extract data from each object in array
-    const dataArray = response.data.map(item => item.data).filter(Boolean);
-    return {
-      success: true,
-      data: dataArray
-    };
-  }
+// Helper untuk handle response
+const handleResponse = (response) => {
   return response.data;
 };
 
@@ -21,75 +12,86 @@ const handleN8nResponse = (response) => {
 export const api = {
   // Dashboard Stats
   getStats: async () => {
-    const response = await axios.post(`${N8N_BASE_URL}/crm/quick-stats`, {});
-    return handleN8nResponse(response);
+    const response = await axios.get(`${API_BASE_URL}/stats`);
+    return handleResponse(response);
   },
 
   // Customers
   getCustomers: async (params = {}) => {
-    const response = await axios.post(`${N8N_BASE_URL}/crm/customers-list`, params);
-    return handleN8nResponse(response);
+    // Convert generic params to snake_case query params expected by backend
+    const queryParams = new URLSearchParams();
+    if (params.search) queryParams.append('search', params.search);
+    if (params.priority) queryParams.append('priority', params.priority);
+    if (params.date_from) queryParams.append('date_from', params.date_from);
+    if (params.date_to) queryParams.append('date_to', params.date_to);
+    
+    const response = await axios.get(`${API_BASE_URL}/customers?${queryParams.toString()}`);
+    return handleResponse(response);
   },
 
   getCustomerDetail: async (customerId) => {
-    const response = await axios.post(`${N8N_BASE_URL}/crm/customer-details`, { 
-      customer_id: customerId 
-    });
-    return handleN8nResponse(response);
+    const response = await axios.get(`${API_BASE_URL}/customers/${customerId}`);
+    return handleResponse(response);
   },
 
   // Chat History
   getChatHistory: async (customerId) => {
-    const response = await axios.post(`${N8N_BASE_URL}/crm/chat-history`, { 
-      customer_id: customerId 
-    });
-    return handleN8nResponse(response);
+    const response = await axios.get(`${API_BASE_URL}/chat-history/${customerId}`);
+    return handleResponse(response);
   },
 
   // Send WhatsApp
   sendWhatsApp: async (phone, message, customerId) => {
-    const response = await axios.post(`${N8N_BASE_URL}/crm/resolve-escalation`, {
-      to: phone.replace('@s.whatsapp.net', ''),
-      message: message
+    const response = await axios.post(`${API_BASE_URL}/send-whatsapp`, {
+      phone: phone.replace('@s.whatsapp.net', ''),
+      message: message,
+      customer_id: customerId
     });
-    return handleN8nResponse(response);
+    return handleResponse(response);
   },
 
   // Businesses/Leads
   getBusinesses: async (params = {}) => {
-    const response = await axios.post(`${N8N_BASE_URL}/crm/leads-list`, params);
-    return handleN8nResponse(response);
+    const queryParams = new URLSearchParams();
+    if (params.search) queryParams.append('search', params.search);
+    if (params.status) queryParams.append('status', params.status);
+    if (params.date_from) queryParams.append('date_from', params.date_from);
+    if (params.date_to) queryParams.append('date_to', params.date_to);
+
+    const response = await axios.get(`${API_BASE_URL}/businesses?${queryParams.toString()}`);
+    return handleResponse(response);
   },
 
   // Escalations
   getEscalations: async (params = {}) => {
-    const response = await axios.post(`${N8N_BASE_URL}/crm/escalations-list`, params);
-    return handleN8nResponse(response);
+    const queryParams = new URLSearchParams();
+    if (params.status_filter) queryParams.append('status_filter', params.status_filter);
+    if (params.priority) queryParams.append('priority', params.priority);
+
+    const response = await axios.get(`${API_BASE_URL}/escalations?${queryParams.toString()}`);
+    return handleResponse(response);
   },
 
   resolveEscalation: async (escalationId) => {
-    const response = await axios.post(`${N8N_BASE_URL}/crm/resolve-escalation`, {
-      escalation_id: escalationId
-    });
-    return handleN8nResponse(response);
+    const response = await axios.post(`${API_BASE_URL}/escalations/${escalationId}/resolve`, {});
+    return handleResponse(response);
   },
 
-  // Export CSV - using browser download
+  // Export CSV - using browser download via backend
   exportCustomersCSV: () => {
-    // Since n8n doesn't have export endpoint, we'll handle this client-side
-    return null;
+    window.location.href = `${API_BASE_URL}/export/customers`;
   },
 
   exportBusinessesCSV: () => {
-    return null;
+    window.location.href = `${API_BASE_URL}/export/businesses`;
   },
 
   exportChatHistoryCSV: () => {
-    return null;
+    window.location.href = `${API_BASE_URL}/export/chat-history`;
   }
 };
 
-// Export to CSV helper (client-side)
+// Export to CSV helper (client-side backup/legacy)
 export const exportToCSV = (data, filename) => {
   if (!data || data.length === 0) {
     alert('Tidak ada data untuk diexport');

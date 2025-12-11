@@ -14,45 +14,42 @@ body {
     sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: #f9fafb; /* Changed from gradient to neutral background for admin feel */
   min-height: 100vh;
 }
 
-.modal-overlay {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: rgba(0, 0, 0, 0.5);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 1000;
-  animation: fadeIn 0.2s ease-in-out;
+/* Custom Scrollbar for Chat & Sidebar */
+.custom-scrollbar::-webkit-scrollbar {
+  width: 6px;
 }
 
-.modal-content {
-  background: white;
-  border-radius: 12px;
-  max-width: 90%;
-  max-height: 90vh;
-  overflow-y: auto;
-  animation: slideUp 0.3s ease-out;
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
 }
 
-@keyframes fadeIn {
-  from { opacity: 0; }
-  to { opacity: 1; }
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background-color: rgba(156, 163, 175, 0.5);
+  border-radius: 20px;
+  border: 2px solid transparent;
+  background-clip: content-box;
 }
 
-@keyframes slideUp {
+.custom-scrollbar:hover::-webkit-scrollbar-thumb {
+  background-color: rgba(107, 114, 128, 0.8);
+}
+
+/* Animations */
+@keyframes slideInFromTop {
   from {
+    transform: translateY(-10px);
     opacity: 0;
-    transform: translateY(20px);
   }
   to {
-    opacity: 1;
     transform: translateY(0);
+    opacity: 1;
   }
+}
+
+.animate-in.slide-in-from-top-2 {
+  animation: slideInFromTop 0.3s ease-out forwards;
 }

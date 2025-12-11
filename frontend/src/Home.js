@@ -7,113 +7,44 @@ import { Users, Briefcase, AlertCircle, MessageSquare, TrendingUp } from 'lucide
 
 const COLORS = ['#3B82F6', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6'];
 
-const Home = ({ stats, customers, businesses }) => {
-  // Process data untuk grafik
-  const processCustomersByPriority = () => {
-    if (!customers || customers.length === 0) return [];
-    
-    const priorityCounts = customers.reduce((acc, customer) => {
-      const priority = customer.customer_priority || 'normal';
-      acc[priority] = (acc[priority] || 0) + 1;
-      return acc;
-    }, {});
-    
-    return Object.entries(priorityCounts).map(([name, value]) => ({
-      name: name.charAt(0).toUpperCase() + name.slice(1),
-      value
-    }));
-  };
+const Home = ({ stats }) => {
+  // Data Transformers (Mapping Backend Data to Recharts Format)
+  
+  const customersByPriority = (stats?.customers_by_priority || []).map(item => ({
+    name: (item.customer_priority || 'Normal').charAt(0).toUpperCase() + (item.customer_priority || 'normal').slice(1),
+    value: item.count
+  }));
 
-  const processLeadsByStatus = () => {
-    if (!businesses || businesses.length === 0) return [];
-    
-    const statusCounts = businesses.reduce((acc, business) => {
-      const status = business.status || 'new';
-      acc[status] = (acc[status] || 0) + 1;
-      return acc;
-    }, {});
-    
-    return Object.entries(statusCounts).map(([name, value]) => ({
-      name: name.replace('_', ' ').toUpperCase(),
-      value
-    }));
-  };
+  const leadsByStatus = (stats?.leads_by_status || []).map(item => ({
+    name: (item.status || 'New').replace('_', ' ').toUpperCase(),
+    value: item.count
+  }));
 
-  const processCustomerTrend = () => {
-    if (!customers || customers.length === 0) return [];
-    
-    // Group by date
-    const dateCounts = customers.reduce((acc, customer) => {
-      const date = new Date(customer.created_at).toLocaleDateString('id-ID', { month: 'short', day: 'numeric' });
-      acc[date] = (acc[date] || 0) + 1;
-      return acc;
-    }, {});
-    
-    return Object.entries(dateCounts)
-      .sort((a, b) => new Date(a[0]) - new Date(b[0]))
-      .slice(-7) // Last 7 days
-      .map(([date, count]) => ({
-        date,
-        customers: count
-      }));
-  };
+  const customerTrend = (stats?.customer_trend || []).map(item => ({
+    date: item.date,
+    customers: item.count
+  }));
 
-  const processMessageDistribution = () => {
-    if (!customers || customers.length === 0) return [];
-    
-    const ranges = {
-      '0-10': 0,
-      '11-20': 0,
-      '21-50': 0,
-      '51-100': 0,
-      '100+': 0
-    };
-    
-    customers.forEach(customer => {
-      const count = customer.message_count || customer.total_messages || 0;
-      if (count <= 10) ranges['0-10']++;
-      else if (count <= 20) ranges['11-20']++;
-      else if (count <= 50) ranges['21-50']++;
-      else if (count <= 100) ranges['51-100']++;
-      else ranges['100+']++;
-    });
-    
-    return Object.entries(ranges).map(([range, count]) => ({
-      range,
-      count
-    }));
-  };
+  const messageDistribution = (stats?.message_distribution || []).map(item => ({
+    range: item.range,
+    count: item.count
+  }));
 
-  const getTopCustomers = () => {
-    if (!customers || customers.length === 0) return [];
+  const topCustomers = stats?.top_customers || [];
+  const topLeads = stats?.top_leads || [];
+
+  // Insight Calculations from Backend Data
+  const totalMessages = stats?.total_messages || 0;
+  const totalCustomers = stats?.total_customers || 1; // Prevent division by zero
+  const avgMessagesPerCustomer = (totalMessages / totalCustomers).toFixed(1);
+  
+  const highPriorityCount = (stats?.customers_by_priority || [])
+    .find(c => c.customer_priority === 'high')?.count || 0;
     
-    return customers
-      .filter(c => c.message_count || c.total_messages)
-      .sort((a, b) => (b.message_count || b.total_messages || 0) - (a.message_count || a.total_messages || 0))
-      .slice(0, 5);
-  };
-
-  const getTopLeads = () => {
-    if (!businesses || businesses.length === 0) return [];
-    
-    return businesses
-      .filter(b => b.lead_score)
-      .sort((a, b) => (b.lead_score || 0) - (a.lead_score || 0))
-      .slice(0, 5);
-  };
-
-  const customersByPriority = processCustomersByPriority();
-  const leadsByStatus = processLeadsByStatus();
-  const customerTrend = processCustomerTrend();
-  const messageDistribution = processMessageDistribution();
-  const topCustomers = getTopCustomers();
-  const topLeads = getTopLeads();
-
-  // Calculate insights
-  const totalMessages = customers?.reduce((sum, c) => sum + (c.message_count || c.total_messages || 0), 0) || 0;
-  const avgMessagesPerCustomer = customers?.length > 0 ? (totalMessages / customers.length).toFixed(1) : 0;
-  const highPriorityCount = customers?.filter(c => c.customer_priority === 'high').length || 0;
-  const qualifiedLeads = businesses?.filter(b => b.status === 'qualified').length || 0;
+  const qualifiedLeads = (stats?.leads_by_status || [])
+    .find(l => l.status === 'qualified')?.count || 0;
+  
+  const totalLeads = stats?.total_leads || 1;
 
   return (
     <div>
@@ -130,11 +61,11 @@ const Home = ({ stats, customers, businesses }) => {
           <div className="flex items-center justify-between mb-4">
             <Users className="w-10 h-10 opacity-80" />
             <div className="bg-white bg-opacity-20 rounded-lg px-3 py-1 text-xs">
-              +{Math.floor(Math.random() * 15)}% minggu ini
+              Total Database
             </div>
           </div>
           <p className="text-sm opacity-90 mb-1">Total Customer</p>
-          <p className="text-4xl font-bold">{stats?.total_customers || customers?.length || 0}</p>
+          <p className="text-4xl font-bold">{stats?.total_customers || 0}</p>
           <p className="text-xs mt-2 opacity-80">{highPriorityCount} prioritas tinggi</p>
         </div>
         
@@ -142,11 +73,11 @@ const Home = ({ stats, customers, businesses }) => {
           <div className="flex items-center justify-between mb-4">
             <Briefcase className="w-10 h-10 opacity-80" />
             <div className="bg-white bg-opacity-20 rounded-lg px-3 py-1 text-xs">
-              +{Math.floor(Math.random() * 20)}% minggu ini
+              Total Database
             </div>
           </div>
           <p className="text-sm opacity-90 mb-1">Total Lead</p>
-          <p className="text-4xl font-bold">{stats?.total_leads || businesses?.length || 0}</p>
+          <p className="text-4xl font-bold">{stats?.total_leads || 0}</p>
           <p className="text-xs mt-2 opacity-80">{qualifiedLeads} lead qualified</p>
         </div>
         
@@ -293,7 +224,7 @@ const Home = ({ stats, customers, businesses }) => {
                     </div>
                   </div>
                   <div className="text-right">
-                    <p className="font-bold text-blue-600">{customer.message_count || customer.total_messages || 0}</p>
+                    <p className="font-bold text-blue-600">{customer.message_count || 0}</p>
                     <p className="text-xs text-gray-500">pesan</p>
                   </div>
                 </div>
@@ -354,7 +285,7 @@ const Home = ({ stats, customers, businesses }) => {
           <div className="bg-white rounded-lg p-4 shadow-sm">
             <p className="text-sm text-gray-600 mb-1">Conversion Rate</p>
             <p className="text-2xl font-bold text-green-600">
-              {businesses?.length > 0 ? ((qualifiedLeads / businesses.length) * 100).toFixed(1) : 0}%
+              {totalLeads > 0 ? ((qualifiedLeads / totalLeads) * 100).toFixed(1) : 0}%
             </p>
             <p className="text-xs text-gray-500 mt-1">lead menjadi qualified</p>
           </div>

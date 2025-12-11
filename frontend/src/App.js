@@ -1,930 +1,177 @@
-import React, { useState, useEffect } from 'react';
-import { 
-  Home as HomeIcon, Users, Briefcase, X, 
-  Search, Download, Filter, Send, RefreshCw
-} from 'lucide-react';
-import { api, exportToCSV } from './api';
-import Home from './Home';
-
-function App() {
-  const [activeTab, setActiveTab] = useState('home');
-  const [loading, setLoading] = useState(false);
-  const [stats, setStats] = useState(null);
-  const [customers, setCustomers] = useState([]);
-  const [businesses, setBusinesses] = useState([]);
-  const [escalations, setEscalations] = useState([]);
-  const [selectedCustomer, setSelectedCustomer] = useState(null);
-  const [chatHistory, setChatHistory] = useState([]);
-  const [showChatModal, setShowChatModal] = useState(false);
-  const [message, setMessage] = useState('');
-  const [filters, setFilters] = useState({
-    search: '',
-    status: '',
-    priority: '',
-    dateFrom: '',
-    dateTo: ''
-  });
-  const [notification, setNotification] = useState(null);
-  const [currentPage, setCurrentPage] = useState(1);
-  const [itemsPerPage] = useState(10);
-
-  // Fetch dashboard stats
-  const fetchStats = async () => {
-    try {
-      const response = await api.getStats();
-      if (response.success) {
-        // Map n8n response format to our format
-        setStats({
-          total_customers: parseInt(response.data.totalCustomers) || 0,
-          total_leads: parseInt(response.data.totalLeads) || 0,
-          open_escalations: parseInt(response.data.totalEscalations) || 0,
-          today_chats: 0, // n8n doesn't provide this, we'll show 0
-          recent_activities: [] // n8n doesn't provide this yet
-        });
-      }
-    } catch (error) {
-      console.error('Error fetching stats:', error);
-      showNotification('Gagal memuat statistik', 'error');
-    }
-  };
-
-  // Fetch customers
-  const fetchCustomers = async () => {
-    setLoading(true);
-    try {
-      const params = {};
-      if (filters.search) params.search = filters.search;
-      if (filters.priority) params.priority = filters.priority;
-      if (filters.dateFrom) params.date_from = filters.dateFrom;
-      if (filters.dateTo) params.date_to = filters.dateTo;
-      
-      const response = await api.getCustomers(params);
-      if (response.success && Array.isArray(response.data)) {
-        setCustomers(response.data);
-      }
-    } catch (error) {
-      console.error('Error fetching customers:', error);
-      showNotification('Gagal memuat data customer', 'error');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // Fetch businesses
-  const fetchBusinesses = async () => {
-    setLoading(true);
-    try {
-      const params = {};
-      if (filters.search) params.search = filters.search;
-      if (filters.status) params.status = filters.status;
-      if (filters.dateFrom) params.date_from = filters.dateFrom;
-      if (filters.dateTo) params.date_to = filters.dateTo;
-      
-      const response = await api.getBusinesses(params);
-      if (response.success && Array.isArray(response.data)) {
-        setBusinesses(response.data);
-      }
-    } catch (error) {
-      console.error('Error fetching businesses:', error);
-      showNotification('Gagal memuat data lead', 'error');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // Fetch escalations
-  const fetchEscalations = async () => {
-    try {
-      const params = {};
-      if (filters.status) params.status_filter = filters.status;
-      if (filters.priority) params.priority = filters.priority;
-      
-      const response = await api.getEscalations(params);
-      if (response.success && Array.isArray(response.data)) {
-        setEscalations(response.data);
-      }
-    } catch (error) {
-      console.error('Error fetching escalations:', error);
-      showNotification('Gagal memuat data eskalasi', 'error');
-    }
-  };
-
-  // Fetch chat history
-  const fetchChatHistory = async (customerId) => {
-    try {
-      const response = await api.getChatHistory(customerId);
-      if (response.success && Array.isArray(response.data)) {
-        setChatHistory(response.data);
-        // Set customer info from first chat if available
-        if (response.data.length > 0 && response.data[0].customer_name) {
-          setSelectedCustomer({
-            id: customerId,
-            name: response.data[0].customer_name,
-            phone: response.data[0].customer_phone
-          });
-        } else {
-          setSelectedCustomer({ id: customerId, phone: 'Unknown' });
-        }
-        setShowChatModal(true);
-      }
-    } catch (error) {
-      console.error('Error fetching chat history:', error);
-      showNotification('Gagal memuat riwayat chat', 'error');
-    }
-  };
-
-  // Send WhatsApp message
-  const sendWhatsAppMessage = async () => {
-    if (!message.trim() || !selectedCustomer) return;
-    
-    try {
-      const response = await api.sendWhatsApp(
-        selectedCustomer.phone,
-        message,
-        selectedCustomer.id
-      );
-      
-      if (response.success) {
-        showNotification('Pesan berhasil dikirim!', 'success');
-        setMessage('');
-        // Refresh chat history
-        fetchChatHistory(selectedCustomer.id);
-      }
-    } catch (error) {
-      console.error('Error sending message:', error);
-      showNotification('Gagal mengirim pesan', 'error');
-    }
-  };
-
-  // Resolve escalation
-  const resolveEscalation = async (escalationId) => {
-    try {
-      const response = await api.resolveEscalation(escalationId);
-      if (response.success) {
-        showNotification('Eskalasi berhasil diselesaikan', 'success');
-        fetchEscalations();
-      }
-    } catch (error) {
-      console.error('Error resolving escalation:', error);
-      showNotification('Gagal menyelesaikan eskalasi', 'error');
-    }
-  };
-
-  // Export to CSV
-  const handleExportCSV = (type) => {
-    let data, filename;
-    
-    switch(type) {
-      case 'customers':
-        data = customers;
-        filename = 'customers.csv';
-        break;
-      case 'businesses':
-        data = businesses;
-        filename = 'leads.csv';
-        break;
-      case 'chat-history':
-        data = chatHistory;
-        filename = 'chat_history.csv';
-        break;
-      default:
-        return;
-    }
-    
-    exportToCSV(data, filename);
-    showNotification('File CSV berhasil diunduh', 'success');
-  };
-
-  // Show notification
-  const showNotification = (msg, type = 'info') => {
-    setNotification({ message: msg, type });
-    setTimeout(() => setNotification(null), 3000);
-  };
-
-  // Initial load
-  useEffect(() => {
-    fetchStats();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  // Load data based on active tab
-  useEffect(() => {
-    if (activeTab === 'home') {
-      // Load data for home dashboard
-      fetchCustomers();
-      fetchBusinesses();
-    } else if (activeTab === 'customer-service') {
-      fetchCustomers();
-      fetchEscalations();
-    } else if (activeTab === 'marketing') {
-      fetchBusinesses();
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeTab]);
-
-  // Pagination helpers
-  const indexOfLastItem = currentPage * itemsPerPage;
-  const indexOfFirstItem = indexOfLastItem - itemsPerPage;
-  const currentCustomers = customers.slice(indexOfFirstItem, indexOfLastItem);
-  const currentBusinesses = businesses.slice(indexOfFirstItem, indexOfLastItem);
-  const totalCustomerPages = Math.ceil(customers.length / itemsPerPage);
-  const totalBusinessPages = Math.ceil(businesses.length / itemsPerPage);
-
-  const paginate = (pageNumber) => setCurrentPage(pageNumber);
-
-  // Reset to page 1 when changing tabs
-  useEffect(() => {
-    setCurrentPage(1);
-  }, [activeTab]);
-
-  // Format date
-  const formatDate = (dateString) => {
-    if (!dateString) return '-';
-    const date = new Date(dateString);
-    return date.toLocaleDateString('id-ID', { 
-      day: '2-digit', 
-      month: 'short', 
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    });
-  };
-
-  // Format phone number
-  const formatPhone = (phone) => {
-    if (!phone) return '-';
-    return phone.replace('@s.whatsapp.net', '');
-  };
-
-  // Pagination Component
-  const Pagination = ({ currentPage, totalPages, paginate }) => {
-    const pageNumbers = [];
-    const maxVisible = 5;
-    
-    let startPage = Math.max(1, currentPage - Math.floor(maxVisible / 2));
-    let endPage = Math.min(totalPages, startPage + maxVisible - 1);
-    
-    if (endPage - startPage < maxVisible - 1) {
-      startPage = Math.max(1, endPage - maxVisible + 1);
-    }
-    
-    for (let i = startPage; i <= endPage; i++) {
-      pageNumbers.push(i);
-    }
-
-    return (
-      <div className="flex items-center justify-between px-6 py-4 border-t border-gray-200">
-        <div className="text-sm text-gray-700">
-          Halaman <span className="font-semibold">{currentPage}</span> dari{' '}
-          <span className="font-semibold">{totalPages}</span>
-        </div>
-        <div className="flex space-x-2">
-          <button
-            onClick={() => paginate(currentPage - 1)}
-            disabled={currentPage === 1}
-            className={`px-3 py-1 rounded ${
-              currentPage === 1
-                ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                : 'bg-blue-500 text-white hover:bg-blue-600'
-            }`}
-          >
-            Prev
-          </button>
-          
-          {startPage > 1 && (
-            <>
-              <button
-                onClick={() => paginate(1)}
-                className="px-3 py-1 rounded bg-gray-100 hover:bg-gray-200"
-              >
-                1
-              </button>
-              {startPage > 2 && <span className="px-2">...</span>}
-            </>
-          )}
-          
-          {pageNumbers.map(number => (
-            <button
-              key={number}
-              onClick={() => paginate(number)}
-              className={`px-3 py-1 rounded ${
-                currentPage === number
-                  ? 'bg-blue-600 text-white'
-                  : 'bg-gray-100 hover:bg-gray-200'
-              }`}
-            >
-              {number}
-            </button>
-          ))}
-          
-          {endPage < totalPages && (
-            <>
-              {endPage < totalPages - 1 && <span className="px-2">...</span>}
-              <button
-                onClick={() => paginate(totalPages)}
-                className="px-3 py-1 rounded bg-gray-100 hover:bg-gray-200"
-              >
-                {totalPages}
-              </button>
-            </>
-          )}
-          
-          <button
-            onClick={() => paginate(currentPage + 1)}
-            disabled={currentPage === totalPages}
-            className={`px-3 py-1 rounded ${
-              currentPage === totalPages
-                ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                : 'bg-blue-500 text-white hover:bg-blue-600'
-            }`}
-          >
-            Next
-          </button>
-        </div>
-      </div>
-    );
-  };
-
-  return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
-      {/* Header */}
-      <header className="bg-white shadow-md">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center py-4">
-            <h1 className="text-2xl font-bold text-gray-900">CRM Dashboard</h1>
-            <nav className="flex space-x-4">
-              <button
-                onClick={() => setActiveTab('home')}
-                className={`flex items-center px-4 py-2 rounded-lg transition ${
-                  activeTab === 'home' 
-                    ? 'bg-blue-600 text-white' 
-                    : 'text-gray-600 hover:bg-gray-100'
-                }`}
-              >
-                <HomeIcon className="w-5 h-5 mr-2" />
-                Home
-              </button>
-              <button
-                onClick={() => setActiveTab('customer-service')}
-                className={`flex items-center px-4 py-2 rounded-lg transition ${
-                  activeTab === 'customer-service' 
-                    ? 'bg-blue-600 text-white' 
-                    : 'text-gray-600 hover:bg-gray-100'
-                }`}
-              >
-                <Users className="w-5 h-5 mr-2" />
-                Customer Service
-              </button>
-              <button
-                onClick={() => setActiveTab('marketing')}
-                className={`flex items-center px-4 py-2 rounded-lg transition ${
-                  activeTab === 'marketing' 
-                    ? 'bg-blue-600 text-white' 
-                    : 'text-gray-600 hover:bg-gray-100'
-                }`}
-              >
-                <Briefcase className="w-5 h-5 mr-2" />
-                Marketing
-              </button>
-            </nav>
-          </div>
-        </div>
-      </header>
-
-      {/* Notification */}
-      {notification && (
-        <div className={`fixed top-4 right-4 z-50 px-6 py-3 rounded-lg shadow-lg ${
-          notification.type === 'success' ? 'bg-green-500' : 
-          notification.type === 'error' ? 'bg-red-500' : 'bg-blue-500'
-        } text-white`}>
-          {notification.message}
-        </div>
-      )}
-
-      {/* Main Content */}
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* HOME TAB */}
-        {activeTab === 'home' && (
-          <Home 
-            stats={stats} 
-            customers={customers} 
-            businesses={businesses} 
-          />
-        )}
-
-        {/* CUSTOMER SERVICE TAB */}
-        {activeTab === 'customer-service' && (
-          <div>
-            <div className="flex justify-between items-center mb-6">
-              <h2 className="text-3xl font-bold text-gray-900">Customer Service</h2>
-              <button
-                onClick={() => handleExportCSV('customers')}
-                className="flex items-center px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700"
-              >
-                <Download className="w-4 h-4 mr-2" />
-                Export CSV
-              </button>
-            </div>
-
-            {/* Filters */}
-            <div className="bg-white rounded-xl shadow-md p-6 mb-6">
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Cari</label>
-                  <div className="relative">
-                    <Search className="absolute left-3 top-3 w-4 h-4 text-gray-400" />
-                    <input
-                      type="text"
-                      placeholder="Nama atau telepon..."
-                      value={filters.search}
-                      onChange={(e) => setFilters({...filters, search: e.target.value})}
-                      className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                    />
-                  </div>
-                </div>
-                
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Prioritas</label>
-                  <select
-                    value={filters.priority}
-                    onChange={(e) => setFilters({...filters, priority: e.target.value})}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                  >
-                    <option value="">Semua</option>
-                    <option value="high">High</option>
-                    <option value="normal">Normal</option>
-                    <option value="low">Low</option>
-                  </select>
-                </div>
-                
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Dari Tanggal</label>
-                  <input
-                    type="date"
-                    value={filters.dateFrom}
-                    onChange={(e) => setFilters({...filters, dateFrom: e.target.value})}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                  />
-                </div>
-                
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Sampai Tanggal</label>
-                  <input
-                    type="date"
-                    value={filters.dateTo}
-                    onChange={(e) => setFilters({...filters, dateTo: e.target.value})}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                  />
-                </div>
-              </div>
-              
-              <div className="mt-4 flex space-x-2">
-                <button
-                  onClick={fetchCustomers}
-                  className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
-                >
-                  <Filter className="w-4 h-4 inline mr-2" />
-                  Terapkan Filter
-                </button>
-                <button
-                  onClick={() => {
-                    setFilters({ search: '', status: '', priority: '', dateFrom: '', dateTo: '' });
-                    setTimeout(fetchCustomers, 100);
-                  }}
-                  className="px-6 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300"
-                >
-                  Reset
-                </button>
-              </div>
-            </div>
-
-            {/* Customers Table */}
-            <div className="bg-white rounded-xl shadow-md overflow-hidden mb-6">
-              <div className="px-6 py-4 border-b border-gray-200">
-                <h3 className="text-lg font-semibold text-gray-900">Daftar Customer</h3>
-              </div>
-              <div className="overflow-x-auto">
-                <table className="min-w-full divide-y divide-gray-200">
-                  <thead className="bg-gray-50">
-                    <tr>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Nama</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Telepon</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Lokasi</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Stage</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Prioritas</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Total Pesan</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Aksi</th>
-                    </tr>
-                  </thead>
-                  <tbody className="bg-white divide-y divide-gray-200">
-                    {loading ? (
-                      <tr>
-                        <td colSpan="7" className="px-6 py-4 text-center text-gray-500">
-                          Memuat data...
-                        </td>
-                      </tr>
-                    ) : customers.length === 0 ? (
-                      <tr>
-                        <td colSpan="7" className="px-6 py-4 text-center text-gray-500">
-                          Tidak ada data customer
-                        </td>
-                      </tr>
-                    ) : (
-                      currentCustomers.map((customer) => (
-                        <tr key={customer.id} className="hover:bg-gray-50">
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <div className="text-sm font-medium text-gray-900">{customer.name || '-'}</div>
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                            {formatPhone(customer.phone)}
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                            {customer.location || '-'}
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <span className="px-2 py-1 text-xs font-semibold rounded-full bg-blue-100 text-blue-800">
-                              {customer.conversation_stage}
-                            </span>
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <span className={`px-2 py-1 text-xs font-semibold rounded-full ${
-                              customer.customer_priority === 'high' ? 'bg-red-100 text-red-800' :
-                              customer.customer_priority === 'normal' ? 'bg-green-100 text-green-800' :
-                              'bg-gray-100 text-gray-800'
-                            }`}>
-                              {customer.customer_priority}
-                            </span>
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                            {customer.message_count || customer.total_messages || 0}
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm">
-                            <button
-                              onClick={() => fetchChatHistory(customer.id)}
-                              className="text-blue-600 hover:text-blue-900 font-medium"
-                            >
-                              Lihat Chat
-                            </button>
-                          </td>
-                        </tr>
-                      ))
-                    )}
-                  </tbody>
-                </table>
-              </div>
-              {customers.length > itemsPerPage && (
-                <Pagination 
-                  currentPage={currentPage} 
-                  totalPages={totalCustomerPages} 
-                  paginate={paginate} 
-                />
-              )}
-            </div>
-
-            {/* Escalations */}
-            <div className="bg-white rounded-xl shadow-md overflow-hidden">
-              <div className="px-6 py-4 border-b border-gray-200 flex justify-between items-center">
-                <h3 className="text-lg font-semibold text-gray-900">Eskalasi</h3>
-                <button
-                  onClick={fetchEscalations}
-                  className="text-blue-600 hover:text-blue-800"
-                >
-                  <RefreshCw className="w-4 h-4" />
-                </button>
-              </div>
-              <div className="overflow-x-auto">
-                <table className="min-w-full divide-y divide-gray-200">
-                  <thead className="bg-gray-50">
-                    <tr>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Customer</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Tipe</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Prioritas</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Alasan</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Tanggal</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Aksi</th>
-                    </tr>
-                  </thead>
-                  <tbody className="bg-white divide-y divide-gray-200">
-                    {escalations.length === 0 ? (
-                      <tr>
-                        <td colSpan="7" className="px-6 py-4 text-center text-gray-500">
-                          Tidak ada eskalasi
-                        </td>
-                      </tr>
-                    ) : (
-                      escalations.map((escalation) => (
-                        <tr key={escalation.id} className="hover:bg-gray-50">
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <div className="text-sm font-medium text-gray-900">
-                              {escalation.customer_name || formatPhone(escalation.customer_phone)}
-                            </div>
-                            <div className="text-xs text-gray-500">{formatPhone(escalation.customer_phone)}</div>
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                            {escalation.escalation_type}
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <span className={`px-2 py-1 text-xs font-semibold rounded-full ${
-                              escalation.priority_level === 'urgent' ? 'bg-red-100 text-red-800' :
-                              escalation.priority_level === 'high' ? 'bg-orange-100 text-orange-800' :
-                              'bg-green-100 text-green-800'
-                            }`}>
-                              {escalation.priority_level}
-                            </span>
-                          </td>
-                          <td className="px-6 py-4 text-sm text-gray-500 max-w-xs truncate">
-                            {escalation.escalation_reason || '-'}
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <span className={`px-2 py-1 text-xs font-semibold rounded-full ${
-                              escalation.status === 'open' ? 'bg-yellow-100 text-yellow-800' :
-                              'bg-green-100 text-green-800'
-                            }`}>
-                              {escalation.status}
-                            </span>
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                            {formatDate(escalation.created_at)}
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm">
-                            {escalation.status === 'open' && (
-                              <button
-                                onClick={() => resolveEscalation(escalation.id)}
-                                className="text-green-600 hover:text-green-900 font-medium"
-                              >
-                                Selesaikan
-                              </button>
-                            )}
-                          </td>
-                        </tr>
-                      ))
-                    )}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* MARKETING TAB */}
+{/* MARKETING TAB */}
         {activeTab === 'marketing' && (
-          <div>
-            <div className="flex justify-between items-center mb-6">
-              <h2 className="text-3xl font-bold text-gray-900">Marketing</h2>
-              <button
-                onClick={() => handleExportCSV('businesses')}
-                className="flex items-center px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700"
-              >
-                <Download className="w-4 h-4 mr-2" />
-                Export CSV
-              </button>
-            </div>
+          <div className="h-full overflow-auto p-6">
+            <div className="max-w-7xl mx-auto">
+              <div className="flex justify-between items-center mb-6">
+                <h2 className="text-3xl font-bold text-gray-900">Marketing</h2>
+                <button
+                  onClick={() => handleExportCSV('businesses')}
+                  className="flex items-center px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700"
+                >
+                  <Download className="w-4 h-4 mr-2" />
+                  Export CSV
+                </button>
+              </div>
 
-            {/* Filters */}
-            <div className="bg-white rounded-xl shadow-md p-6 mb-6">
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Cari</label>
-                  <div className="relative">
-                    <Search className="absolute left-3 top-3 w-4 h-4 text-gray-400" />
+              {/* Filters */}
+              <div className="bg-white rounded-xl shadow-md p-6 mb-6">
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Cari</label>
+                    <div className="relative">
+                      <Search className="absolute left-3 top-3 w-4 h-4 text-gray-400" />
+                      <input
+                        type="text"
+                        placeholder="Nama, telepon, atau alamat..."
+                        value={filters.search}
+                        onChange={(e) => setFilters({...filters, search: e.target.value})}
+                        className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                      />
+                    </div>
+                  </div>
+                  
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Status</label>
+                    <select
+                      value={filters.status}
+                      onChange={(e) => setFilters({...filters, status: e.target.value})}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                    >
+                      <option value="">Semua</option>
+                      <option value="new">New</option>
+                      <option value="contacted">Contacted</option>
+                      <option value="qualified">Qualified</option>
+                      <option value="invalid_whatsapp">Invalid WhatsApp</option>
+                    </select>
+                  </div>
+                  
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Dari Tanggal</label>
                     <input
-                      type="text"
-                      placeholder="Nama, telepon, atau alamat..."
-                      value={filters.search}
-                      onChange={(e) => setFilters({...filters, search: e.target.value})}
-                      className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                      type="date"
+                      value={filters.dateFrom}
+                      onChange={(e) => setFilters({...filters, dateFrom: e.target.value})}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
+                  
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Sampai Tanggal</label>
+                    <input
+                      type="date"
+                      value={filters.dateTo}
+                      onChange={(e) => setFilters({...filters, dateTo: e.target.value})}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                     />
                   </div>
                 </div>
                 
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Status</label>
-                  <select
-                    value={filters.status}
-                    onChange={(e) => setFilters({...filters, status: e.target.value})}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                  >
-                    <option value="">Semua</option>
-                    <option value="new">New</option>
-                    <option value="contacted">Contacted</option>
-                    <option value="qualified">Qualified</option>
-                    <option value="invalid_whatsapp">Invalid WhatsApp</option>
-                  </select>
-                </div>
-                
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Dari Tanggal</label>
-                  <input
-                    type="date"
-                    value={filters.dateFrom}
-                    onChange={(e) => setFilters({...filters, dateFrom: e.target.value})}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                  />
-                </div>
-                
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Sampai Tanggal</label>
-                  <input
-                    type="date"
-                    value={filters.dateTo}
-                    onChange={(e) => setFilters({...filters, dateTo: e.target.value})}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                  />
-                </div>
-              </div>
-              
-              <div className="mt-4 flex space-x-2">
-                <button
-                  onClick={fetchBusinesses}
-                  className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
-                >
-                  <Filter className="w-4 h-4 inline mr-2" />
-                  Terapkan Filter
-                </button>
-                <button
-                  onClick={() => {
-                    setFilters({ search: '', status: '', priority: '', dateFrom: '', dateTo: '' });
-                    setTimeout(fetchBusinesses, 100);
-                  }}
-                  className="px-6 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300"
-                >
-                  Reset
-                </button>
-              </div>
-            </div>
-
-            {/* Businesses Table */}
-            <div className="bg-white rounded-xl shadow-md overflow-hidden">
-              <div className="px-6 py-4 border-b border-gray-200">
-                <h3 className="text-lg font-semibold text-gray-900">Daftar Lead</h3>
-              </div>
-              <div className="overflow-x-auto">
-                <table className="min-w-full divide-y divide-gray-200">
-                  <thead className="bg-gray-50">
-                    <tr>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Nama</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Telepon</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Alamat</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Segmen</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Skor</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Rating</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Kontak</th>
-                    </tr>
-                  </thead>
-                  <tbody className="bg-white divide-y divide-gray-200">
-                    {loading ? (
-                      <tr>
-                        <td colSpan="8" className="px-6 py-4 text-center text-gray-500">
-                          Memuat data...
-                        </td>
-                      </tr>
-                    ) : businesses.length === 0 ? (
-                      <tr>
-                        <td colSpan="8" className="px-6 py-4 text-center text-gray-500">
-                          Tidak ada data lead
-                        </td>
-                      </tr>
-                    ) : (
-                      currentBusinesses.map((business) => (
-                        <tr key={business.id} className="hover:bg-gray-50">
-                          <td className="px-6 py-4">
-                            <div className="text-sm font-medium text-gray-900">{business.name}</div>
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                            {business.phone || business.formatted_phone_number || '-'}
-                          </td>
-                          <td className="px-6 py-4 text-sm text-gray-500 max-w-xs truncate">
-                            {business.address || '-'}
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                            {business.market_segment}
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <span className={`px-2 py-1 text-xs font-semibold rounded-full ${
-                              business.status === 'new' ? 'bg-blue-100 text-blue-800' :
-                              business.status === 'contacted' ? 'bg-yellow-100 text-yellow-800' :
-                              business.status === 'qualified' ? 'bg-green-100 text-green-800' :
-                              'bg-red-100 text-red-800'
-                            }`}>
-                              {business.status}
-                            </span>
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <span className="px-2 py-1 text-xs font-bold bg-purple-100 text-purple-800 rounded">
-                              {business.lead_score}
-                            </span>
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                            ⭐ {business.rating || 0} ({business.user_ratings_total || 0})
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                            {business.contact_attempts} kali
-                          </td>
-                        </tr>
-                      ))
-                    )}
-                  </tbody>
-                </table>
-              </div>
-              {businesses.length > itemsPerPage && (
-                <Pagination 
-                  currentPage={currentPage} 
-                  totalPages={totalBusinessPages} 
-                  paginate={paginate} 
-                />
-              )}
-            </div>
-          </div>
-        )}
-      </main>
-
-      {/* Chat Modal */}
-      {showChatModal && (
-        <div className="modal-overlay" onClick={() => setShowChatModal(false)}>
-          <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{width: '800px', maxWidth: '90%'}}>
-            <div className="p-6">
-              <div className="flex justify-between items-center mb-4">
-                <div>
-                  <h3 className="text-xl font-bold text-gray-900">
-                    Riwayat Chat - {selectedCustomer?.name || formatPhone(selectedCustomer?.phone)}
-                  </h3>
-                  <p className="text-sm text-gray-500">{formatPhone(selectedCustomer?.phone)}</p>
-                </div>
-                <button
-                  onClick={() => setShowChatModal(false)}
-                  className="text-gray-400 hover:text-gray-600"
-                >
-                  <X className="w-6 h-6" />
-                </button>
-              </div>
-
-              {/* Chat History */}
-              <div className="bg-gray-50 rounded-lg p-4 mb-4" style={{maxHeight: '400px', overflowY: 'auto'}}>
-                {chatHistory.length === 0 ? (
-                  <p className="text-gray-500 text-center py-8">Belum ada riwayat chat</p>
-                ) : (
-                  <div className="space-y-3">
-                    {chatHistory.slice().reverse().map((chat) => (
-                      <div
-                        key={chat.id}
-                        className={`p-3 rounded-lg ${
-                          chat.message_type === 'incoming' 
-                            ? 'bg-white border border-gray-200' 
-                            : 'bg-blue-100 border border-blue-200 ml-auto'
-                        }`}
-                        style={{maxWidth: '80%', marginLeft: chat.message_type === 'outgoing' ? 'auto' : '0'}}
-                      >
-                        <div className="flex items-start justify-between mb-1">
-                          <span className={`text-xs font-semibold ${
-                            chat.message_type === 'incoming' ? 'text-gray-700' : 'text-blue-700'
-                          }`}>
-                            {chat.message_type === 'incoming' ? 'Customer' : 'Anda'}
-                          </span>
-                          <span className="text-xs text-gray-500 ml-2">
-                            {formatDate(chat.created_at)}
-                          </span>
-                        </div>
-                        <p className="text-sm text-gray-800">{chat.content}</p>
-                        {chat.classification && (
-                          <span className="inline-block mt-2 px-2 py-1 text-xs bg-gray-200 text-gray-700 rounded">
-                            {chat.classification}
-                          </span>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-
-              {/* Send Message */}
-              <div className="border-t pt-4">
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Balas Pesan via WhatsApp
-                </label>
-                <div className="flex space-x-2">
-                  <textarea
-                    value={message}
-                    onChange={(e) => setMessage(e.target.value)}
-                    placeholder="Ketik pesan Anda..."
-                    rows="3"
-                    className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 resize-none"
-                  />
+                <div className="mt-4 flex space-x-2">
                   <button
-                    onClick={sendWhatsAppMessage}
-                    disabled={!message.trim()}
-                    className="px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:bg-gray-300 disabled:cursor-not-allowed flex items-center"
+                    onClick={fetchBusinesses}
+                    className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
                   >
-                    <Send className="w-4 h-4 mr-2" />
-                    Kirim
+                    <Filter className="w-4 h-4 inline mr-2" />
+                    Terapkan Filter
+                  </button>
+                  <button
+                    onClick={() => {
+                      setFilters({ search: '', status: '', priority: '', dateFrom: '', dateTo: '' });
+                      setTimeout(fetchBusinesses, 100);
+                    }}
+                    className="px-6 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300"
+                  >
+                    Reset
                   </button>
                 </div>
               </div>
+
+              {/* Businesses Table */}
+              <div className="bg-white rounded-xl shadow-md overflow-hidden">
+                <div className="px-6 py-4 border-b border-gray-200">
+                  <h3 className="text-lg font-semibold text-gray-900">Daftar Lead</h3>
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="min-w-full divide-y divide-gray-200">
+                    <thead className="bg-gray-50">
+                      <tr>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Nama</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Telepon</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Alamat</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Segmen</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Skor</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Rating</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Kontak</th>
+                      </tr>
+                    </thead>
+                    <tbody className="bg-white divide-y divide-gray-200">
+                      {loading ? (
+                        <tr>
+                          <td colSpan="8" className="px-6 py-4 text-center text-gray-500">
+                            Memuat data...
+                          </td>
+                        </tr>
+                      ) : businesses.length === 0 ? (
+                        <tr>
+                          <td colSpan="8" className="px-6 py-4 text-center text-gray-500">
+                            Tidak ada data lead
+                          </td>
+                        </tr>
+                      ) : (
+                        currentBusinesses.map((business) => (
+                          <tr key={business.id} className="hover:bg-gray-50">
+                            <td className="px-6 py-4">
+                              <div className="text-sm font-medium text-gray-900">{business.name}</div>
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                              {business.phone || business.formatted_phone_number || '-'}
+                            </td>
+                            <td className="px-6 py-4 text-sm text-gray-500 max-w-xs truncate">
+                              {business.address || '-'}
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                              {business.market_segment}
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap">
+                              <span className={`px-2 py-1 text-xs font-semibold rounded-full ${
+                                business.status === 'new' ? 'bg-blue-100 text-blue-800' :
+                                business.status === 'contacted' ? 'bg-yellow-100 text-yellow-800' :
+                                business.status === 'qualified' ? 'bg-green-100 text-green-800' :
+                                'bg-red-100 text-red-800'
+                              }`}>
+                                {business.status}
+                              </span>
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap">
+                              <span className="px-2 py-1 text-xs font-bold bg-purple-100 text-purple-800 rounded">
+                                {business.lead_score}
+                              </span>
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                              ⭐ {business.rating || 0} ({business.user_ratings_total || 0})
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                              {business.contact_attempts} kali
+                            </td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+                {businesses.length > itemsPerPage && (
+                  <Pagination 
+                    currentPage={currentPage} 
+                    totalPages={totalBusinessPages} 
+                    paginate={paginate} 
+                  />
+                )}
+              </div>
             </div>
           </div>
-        </div>
-      )}
+        )}
+      </div>
     </div>
   );
 }

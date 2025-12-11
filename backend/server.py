@@ -38,44 +38,100 @@ async def health_check():
 # ==================== DASHBOARD STATISTICS ====================
 @app.get("/api/stats")
 async def get_dashboard_stats():
-    """Get dashboard statistics"""
+    """Get dashboard statistics with full aggregation"""
     try:
         with get_db_connection() as conn:
             with conn.cursor() as cur:
-                # Total customers
+                # 1. Basic Counts
                 cur.execute("SELECT COUNT(*) as total FROM customers")
                 total_customers = cur.fetchone()['total']
                 
-                # Total leads (businesses with phone)
                 cur.execute("SELECT COUNT(*) as total FROM businesses WHERE has_phone = true")
                 total_leads = cur.fetchone()['total']
                 
-                # Total escalations
                 cur.execute("SELECT COUNT(*) as total FROM escalations WHERE status = 'open'")
                 open_escalations = cur.fetchone()['total']
                 
-                # Today's chats
                 cur.execute("""
                     SELECT COUNT(*) as total FROM chat_history 
                     WHERE DATE(created_at) = CURRENT_DATE
                 """)
                 today_chats = cur.fetchone()['total']
-                
-                # Recent activities
+
+                # 2. Total Messages (Sum across all customers)
+                cur.execute("SELECT SUM(total_messages) as total FROM customers")
+                result = cur.fetchone()
+                total_messages = result['total'] if result and result['total'] else 0
+
+                # 3. Customers by Priority
+                cur.execute("""
+                    SELECT customer_priority, COUNT(*) as count 
+                    FROM customers 
+                    GROUP BY customer_priority
+                """)
+                customers_by_priority = cur.fetchall()
+
+                # 4. Leads by Status
+                cur.execute("""
+                    SELECT status, COUNT(*) as count 
+                    FROM businesses 
+                    WHERE has_phone = true 
+                    GROUP BY status
+                """)
+                leads_by_status = cur.fetchall()
+
+                # 5. Customer Trend (Last 7 Days)
+                cur.execute("""
+                    SELECT TO_CHAR(created_at, 'Mon DD') as date, COUNT(*) as count
+                    FROM customers
+                    WHERE created_at >= NOW() - INTERVAL '7 days'
+                    GROUP BY TO_CHAR(created_at, 'Mon DD'), DATE(created_at)
+                    ORDER BY DATE(created_at)
+                """)
+                customer_trend = cur.fetchall()
+
+                # 6. Message Distribution
                 cur.execute("""
                     SELECT 
-                        'chat' as type,
-                        c.name as customer_name,
-                        c.phone as customer_phone,
-                        ch.content as description,
-                        ch.created_at as timestamp
-                    FROM chat_history ch
-                    LEFT JOIN customers c ON ch.customer_id = c.id
-                    WHERE ch.created_at >= NOW() - INTERVAL '24 hours'
-                    ORDER BY ch.created_at DESC
-                    LIMIT 10
+                        CASE 
+                            WHEN total_messages <= 10 THEN '0-10'
+                            WHEN total_messages <= 20 THEN '11-20'
+                            WHEN total_messages <= 50 THEN '21-50'
+                            WHEN total_messages <= 100 THEN '51-100'
+                            ELSE '100+' 
+                        END as range,
+                        COUNT(*) as count
+                    FROM customers
+                    GROUP BY range
+                    ORDER BY 
+                        CASE range
+                            WHEN '0-10' THEN 1
+                            WHEN '11-20' THEN 2
+                            WHEN '21-50' THEN 3
+                            WHEN '51-100' THEN 4
+                            ELSE 5
+                        END
                 """)
-                recent_activities = cur.fetchall()
+                message_distribution = cur.fetchall()
+
+                # 7. Top 5 Customers
+                cur.execute("""
+                    SELECT id, name, phone, total_messages as message_count
+                    FROM customers
+                    ORDER BY total_messages DESC NULLS LAST
+                    LIMIT 5
+                """)
+                top_customers = cur.fetchall()
+
+                # 8. Top 5 Leads
+                cur.execute("""
+                    SELECT id, name, market_segment, lead_score
+                    FROM businesses
+                    WHERE has_phone = true
+                    ORDER BY lead_score DESC NULLS LAST
+                    LIMIT 5
+                """)
+                top_leads = cur.fetchall()
                 
                 return {
                     "success": True,
@@ -84,7 +140,13 @@ async def get_dashboard_stats():
                         "total_leads": total_leads,
                         "open_escalations": open_escalations,
                         "today_chats": today_chats,
-                        "recent_activities": recent_activities
+                        "total_messages": total_messages,
+                        "customers_by_priority": customers_by_priority,
+                        "leads_by_status": leads_by_status,
+                        "customer_trend": customer_trend,
+                        "message_distribution": message_distribution,
+                        "top_customers": top_customers,
+                        "top_leads": top_leads
                     }
                 }
     except Exception as e:
@@ -362,7 +424,7 @@ async def get_escalations(
             with conn.cursor() as cur:
                 query = """
                     SELECT 
-                        e.id, e.escalation_type, e.priority_level, e.status,
+                        e.id, e.customer_id, e.escalation_type, e.priority_level, e.status,
                         e.escalation_reason, e.created_at,
                         c.name as customer_name, c.phone as customer_phone
                     FROM escalations e
