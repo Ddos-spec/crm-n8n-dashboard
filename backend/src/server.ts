@@ -1,0 +1,95 @@
+import crypto from 'crypto';
+import cors from 'cors';
+import dotenv from 'dotenv';
+import express from 'express';
+import helmet from 'helmet';
+import rateLimit from 'express-rate-limit';
+import { config } from './config/env';
+import { checkDbConnection } from './lib/db';
+
+dotenv.config();
+
+const app = express();
+
+const allowedOrigins = process.env.CORS_ORIGIN
+  ? process.env.CORS_ORIGIN.split(',').map((o) => o.trim())
+  : ['http://localhost:5173'];
+
+app.use(
+  cors({
+    origin: allowedOrigins,
+    credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-Tenant-ID', 'Origin'],
+    maxAge: 86400,
+  }),
+);
+app.options('*', cors());
+
+app.use(helmet());
+app.use(express.json());
+
+const limiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 100,
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+app.use(limiter);
+
+app.use((req, res, next) => {
+  const requestId = crypto.randomUUID();
+  res.locals.requestId = requestId;
+  next();
+});
+
+const buildMeta = (requestId: string) => ({
+  timestamp: new Date().toISOString(),
+  requestId,
+});
+
+app.get('/health', async (_req, res) => {
+  try {
+    const dbOk = await checkDbConnection();
+    const status = dbOk ? 'ok' : 'db_unreachable';
+
+    return res.status(dbOk ? 200 : 503).json({
+      data: {
+        status,
+        uptime: process.uptime(),
+      },
+      meta: buildMeta(res.locals.requestId),
+    });
+  } catch (error) {
+    console.error('[GET /health]', error);
+    return res.status(500).json({
+      error: 'Internal server error',
+      code: 'HEALTHCHECK_FAILED',
+      meta: buildMeta(res.locals.requestId),
+    });
+  }
+});
+
+app.use((_req, res) => {
+  return res.status(404).json({
+    error: 'Not Found',
+    code: 'NOT_FOUND',
+    meta: buildMeta(res.locals.requestId),
+  });
+});
+
+app.use((err: unknown, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
+  console.error('[UNHANDLED_ERROR]', err);
+  return res.status(500).json({
+    error: 'Internal server error',
+    code: 'INTERNAL_ERROR',
+    meta: buildMeta(res.locals.requestId),
+  });
+});
+
+const port = config.port;
+
+app.listen(port, () => {
+  console.log(`Server running on port ${port} (${config.nodeEnv})`);
+});
