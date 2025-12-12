@@ -61,6 +61,11 @@ app.use((req, res, next) => {
 // Explicit OPTIONS handler for preflight requests
 app.options('*', cors(corsOptions));
 
+// ==================== SIMPLE PING (NO DB) ====================
+app.get('/ping', (req, res) => {
+  res.send('pong');
+});
+
 // ==================== ROOT & HEALTH CHECK ====================
 app.get('/', (req, res) => {
   res.json({
