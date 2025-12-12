@@ -1,4 +1,3 @@
-import React from 'react';
 import { NavLink } from 'react-router-dom';
 import { LayoutDashboard, Building2, Users, MessageSquare, AlertTriangle, BookOpen, BarChart2, Settings } from 'lucide-react';
 
