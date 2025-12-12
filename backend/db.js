@@ -34,6 +34,7 @@ export async function testConnection() {
 // Query helper
 export async function query(text, params) {
   const start = Date.now();
+  console.log('📝 Query started:', { text: text.substring(0, 50) + '...' });
   try {
     const res = await pool.query(text, params);
     const duration = Date.now() - start;

@@ -15,6 +15,7 @@ const frontendUrls = process.env.FRONTEND_URL
   ? process.env.FRONTEND_URL.split(',').map(url => url.trim())
   : ['https://ddos-spec.github.io'];
 
+console.log('🌍 Environment FRONTEND_URL:', process.env.FRONTEND_URL);
 const allowedOrigins = [
   ...frontendUrls,
   'http://localhost:3000',
