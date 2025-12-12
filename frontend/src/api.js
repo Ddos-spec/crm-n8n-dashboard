@@ -2,7 +2,9 @@ import axios from 'axios';
 
 // Base URL: Menggunakan Environment Variable (untuk Prod) atau Localhost (untuk Dev)
 // Di GitHub Actions, variable ini akan diisi lewat Secrets
-const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://localhost:8001/api';
+// Note: Jangan tambahkan trailing slash di environment variable
+const baseUrl = process.env.REACT_APP_API_BASE_URL || 'http://localhost:8001';
+const API_BASE_URL = baseUrl.replace(/\/$/, '') + '/api'; // Remove trailing slash and add /api
 
 // Helper untuk handle response
 const handleResponse = (response) => {
