@@ -1,0 +1,86 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model Business {
+  id               Int      @id @default(autoincrement())
+  place_id         String   @unique
+  name             String
+  phone            String?
+  rating           Float?
+  lead_score       Int      @default(0)
+  campaign_batch   String?
+  status           String   @default("new")
+  contact_attempts Int      @default(0)
+  message_sent     Boolean  @default(false)
+  created_at       DateTime @default(now())
+  updated_at       DateTime @updatedAt
+
+  @@map("businesses")
+}
+
+model Customer {
+  id                 Int      @id @default(autoincrement())
+  phone              String   @unique
+  name               String?
+  status             String   @default("active")
+  conversation_stage String   @default("greeting")
+  cooldown_until     DateTime?
+  message_count_today Int     @default(0)
+  created_at         DateTime @default(now())
+  updated_at         DateTime @updatedAt
+
+  chat_history       ChatHistory[]
+  escalations        Escalation[]
+
+  @@map("customers")
+}
+
+model ChatHistory {
+  id              Int      @id @default(autoincrement())
+  customer_id     Int
+  message_type    String
+  content         String
+  escalated       Boolean  @default(false)
+  classification  String?
+  ai_confidence   Float?
+  created_at      DateTime @default(now())
+
+  customer        Customer @relation(fields: [customer_id], references: [id])
+
+  @@map("chat_history")
+}
+
+model Escalation {
+  id              Int      @id @default(autoincrement())
+  customer_id     Int
+  escalation_type String
+  priority_level  String
+  status          String   @default("open")
+  assigned_to     String?
+  created_at      DateTime @default(now())
+  resolved_at     DateTime?
+
+  customer        Customer @relation(fields: [customer_id], references: [id])
+
+  @@map("escalations")
+}
+
+model KnowledgeAI {
+  id              Int      @id @default(autoincrement())
+  category        String
+  keywords        String[]
+  question_pattern String?
+  answer_template String
+  priority        Int      @default(0)
+  usage_count     Int      @default(0)
+  last_used       DateTime?
+  created_at      DateTime @default(now())
+
+  @@map("knowledge_ai")
+}
