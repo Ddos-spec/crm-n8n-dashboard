@@ -72,11 +72,17 @@ app.use(express.static(path.join(__dirname, '../public')));
 
 // Handle React Routing (SPA) - Send index.html for any unknown route
 // KECUALI route yang diawali /api (biar error API tetap return JSON, bukan HTML)
-app.get('*', (req, res, next) => {
+app.use((req, res, next) => {
+  // Skip if it's an API route
   if (req.path.startsWith('/api')) {
     return next();
   }
-  res.sendFile(path.join(__dirname, '../public/index.html'));
+  // Serve index.html for all other routes (SPA routing)
+  res.sendFile(path.join(__dirname, '../public/index.html'), (err) => {
+    if (err) {
+      next(err);
+    }
+  });
 });
 
 app.use(errorHandler); // Error handler ditaruh paling bawah
