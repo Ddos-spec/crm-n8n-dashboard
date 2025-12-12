@@ -14,7 +14,7 @@ RUN npm ci --only=production
 COPY . .
 
 # Beritahu Docker port yang dipakai
-EXPOSE 8001
+EXPOSE 3000
 
 # Jalankan server
 CMD ["node", "server.js"]

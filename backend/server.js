@@ -7,7 +7,7 @@ import pool, { testConnection, query } from './db.js';
 dotenv.config();
 
 const app = express();
-const PORT = process.env.PORT || 8001;
+const PORT = process.env.PORT || 3000;
 
 // CORS Configuration
 // Read allowed origins from environment variable or use defaults
