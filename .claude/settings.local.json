@@ -8,7 +8,9 @@
       "Bash(git add:*)",
       "Bash(git commit -m \"$(cat <<''EOF''\nEnhance CORS dengan logging dan troubleshooting guide\n\nMenambahkan fitur debugging untuk mengatasi masalah CORS yang mungkin terjadi setelah deploy:\n\n1. Tambah logging detail untuk debugging:\n   - Log origin setiap request\n   - Log semua headers untuk analisis\n   - Memudahkan identifikasi masalah CORS di production\n\n2. Explicit OPTIONS handler:\n   - Handle preflight requests secara eksplisit\n   - Pastikan browser bisa melakukan CORS check sebelum request sebenarnya\n\n3. Troubleshooting guide lengkap (CORS_TROUBLESHOOTING.md):\n   - Checklist step-by-step untuk debug CORS\n   - Test menggunakan cURL\n   - Solusi untuk reverse proxy (Nginx/Caddy)\n   - Debug logs yang berguna\n   - Solusi alternatif untuk debugging\n\n4. Alternative CORS config untuk debugging:\n   - File example jika whitelist tidak bekerja\n   - Allow all origins (hanya untuk debugging)\n   - Warning keamanan yang jelas\n\nReferensi: backend/server.js:45-54\n\n🤖 Generated with [Claude Code](https://claude.com/claude-code)\n\nCo-Authored-By: Claude <noreply@anthropic.com>\nEOF\n)\")",
       "Bash(git commit:*)",
-      "Bash(git push:*)"
+      "Bash(git push:*)",
+      "Bash(taskkill:*)",
+      "Bash(nul)"
     ],
     "deny": [],
     "ask": []
