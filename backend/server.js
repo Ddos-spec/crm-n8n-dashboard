@@ -7,8 +7,8 @@ import pool, { testConnection, query } from './db.js';
 dotenv.config();
 
 const app = express();
-// Force Port 3000 to avoid any environment confusion or permission issues with Port 80
-const PORT = 3000;
+// Allow PORT env var (e.g. 3500), default to 3500 to match successful pattern
+const PORT = process.env.PORT || 3500;
 
 // CORS Configuration
 // Read allowed origins from environment variable or use defaults
