@@ -1,0 +1,12 @@
+version: "3.9"
+
+services:
+  backend:
+    container_name: crm-backend
+    build:
+      context: .
+    env_file:
+      - .env
+    ports:
+      - "4321:3000"
+    restart: unless-stopped
