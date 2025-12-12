@@ -58,18 +58,17 @@ ENV NODE_ENV=production
 # Copy backend package.json
 COPY backend/package*.json ./
 
-# Install ONLY production dependencies
+# Copy Prisma schema FIRST (needed for install)
+COPY backend/prisma ./prisma/
+
+# Install ONLY production dependencies (includes @prisma/client)
 RUN npm ci --only=production
 
-# Copy Prisma schema
-COPY backend/prisma ./prisma/
+# Generate Prisma Client in production stage
+RUN npx prisma generate
 
 # Copy built backend from builder stage
 COPY --from=backend-builder /app/backend/dist ./dist
-
-# Copy Prisma Client from builder
-COPY --from=backend-builder /app/backend/node_modules/.prisma ./node_modules/.prisma
-COPY --from=backend-builder /app/backend/node_modules/@prisma/client ./node_modules/@prisma/client
 
 # Copy built frontend to backend's public folder
 COPY --from=frontend-builder /app/frontend/dist ./public
