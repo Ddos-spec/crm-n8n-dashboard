@@ -1,14 +1,14 @@
-# Gunakan image Python yang ringan
-FROM python:3.10-slim
+# Gunakan image Node.js yang ringan
+FROM node:18-alpine
 
 # Set folder kerja di dalam container
 WORKDIR /app
 
-# Copy requirements.txt dari folder saat ini (karena context build sudah di dalam backend)
-COPY requirements.txt .
+# Copy package.json dan package-lock.json
+COPY package*.json ./
 
 # Install dependencies
-RUN pip install --no-cache-dir -r requirements.txt
+RUN npm ci --only=production
 
 # Copy seluruh file dari folder saat ini ke container
 COPY . .
@@ -17,4 +17,4 @@ COPY . .
 EXPOSE 8888
 
 # Jalankan server
-CMD ["python", "server.py"]
+CMD ["node", "server.js"]
