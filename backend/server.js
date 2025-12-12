@@ -11,12 +11,16 @@ const app = express();
 const PORT = process.env.PORT || 3500;
 
 // CORS Configuration
-// Read allowed origins from environment variable or use defaults
-const frontendUrls = process.env.FRONTEND_URL
-  ? process.env.FRONTEND_URL.split(',').map(url => url.trim())
+// Priority: CORS_ORIGIN (from user env) > FRONTEND_URL > Defaults
+const envOrigin = process.env.CORS_ORIGIN || process.env.FRONTEND_URL;
+
+const frontendUrls = envOrigin
+  ? envOrigin.split(',').map(url => url.trim().replace(/\/$/, '')) // Remove trailing slash for matching
   : ['https://ddos-spec.github.io'];
 
-console.log('🌍 Environment FRONTEND_URL:', process.env.FRONTEND_URL);
+console.log('🌍 CORS Config Source:', envOrigin ? 'Environment Variable' : 'Default');
+console.log('🔗 Allowed Origins:', frontendUrls);
+
 const allowedOrigins = [
   ...frontendUrls,
   'http://localhost:3000',
