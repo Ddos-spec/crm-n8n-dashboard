@@ -1,8 +1,0 @@
-{
-  "rewrites": [
-    {
-      "source": "/api/:path*",
-      "destination": "https://filter-bot-crmcutting.qk6yxt.easypanel.host/api/:path*"
-    }
-  ]
-}
