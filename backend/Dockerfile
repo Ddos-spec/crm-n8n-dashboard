@@ -1,3 +1,11 @@
+# =============================================
+# Backend-Only Dockerfile (Legacy)
+# =============================================
+# NOTE: For single VPS deployment with frontend included,
+# use the Dockerfile in the project root instead.
+# This file is kept for backend-only deployments.
+# =============================================
+
 # --- Stage 1: Builder ---
 FROM node:20-alpine AS builder
 
@@ -52,11 +60,17 @@ COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
 COPY --from=builder /app/node_modules/@prisma/client ./node_modules/@prisma/client
 
 # Create a non-root user for security
-# (node image comes with a user named 'node')
-USER node
+RUN addgroup -g 1001 -S nodejs && \
+    adduser -S nodejs -u 1001
 
-# Expose the port (Easypanel usually looks for this or ENV PORT)
-EXPOSE 1234
+USER nodejs
+
+# Expose the port
+EXPOSE 4444
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=3s --start-period=40s \
+  CMD node -e "require('http').get('http://localhost:4444/api/health', (r) => {process.exit(r.statusCode === 200 ? 0 : 1)})"
 
 # Start the application
 CMD ["node", "dist/index.js"]

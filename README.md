@@ -2,6 +2,8 @@
 
 This project is a Full-Stack CRM application built with Node.js, Express, Prisma, and React.
 
+**🚀 Easypanel Deployment**: Project ini di-deploy menggunakan Docker di Easypanel (single VPS).
+
 ## Project Structure
 
 - `backend/`: Node.js + Express API
@@ -73,21 +75,58 @@ This project is a Full-Stack CRM application built with Node.js, Express, Prisma
    npm run build
    ```
 
-## Deployment
+## Deployment ke Easypanel
 
-### Backend (Easypanel/VPS)
-1. Push code to repository.
-2. In Easypanel, create a new service from the repository.
-3. Set the build path/context to `backend`.
-4. Add all environment variables from `backend/.env`.
-5. Deploy.
+### Quick Deploy
 
-### Frontend (Vercel)
-1. Push code to repository.
-2. Import project in Vercel.
-3. Set Root Directory to `frontend`.
-4. Add `REACT_APP_API_BASE_URL` environment variable.
-5. Deploy.
+1. **Login ke Easypanel Dashboard** di VPS kamu
+
+2. **Create New Service**
+   - Pilih "Docker Compose"
+   - Upload atau paste file `docker-compose.yml` dari repo ini
+
+3. **Set Environment Variables** di Easypanel:
+   ```env
+   DB_PASSWORD=your-secure-password
+   JWT_SECRET=generate-with-openssl-rand-hex-64
+   PUBLIC_URL=https://your-domain.easypanel.host
+   CORS_ORIGIN=*
+   WHATSAPP_API_URL=https://app.notif.my.id/api/v2/send-message
+   WHATSAPP_API_KEY=your-api-key
+   ```
+
+4. **Deploy**
+   - Klik Deploy
+   - Tunggu build selesai (5-10 menit)
+
+5. **Run Database Migrations**
+   - Buka terminal di Easypanel untuk container `app`
+   - Jalankan: `npx prisma migrate deploy`
+
+6. **Setup Domain** (opsional)
+   - Di Easypanel, tambahkan custom domain
+   - SSL otomatis di-handle Easypanel
+
+Selesai! Aplikasi bisa diakses di domain yang kamu set.
+
+### Generate JWT Secret
+```bash
+openssl rand -hex 64
+```
+
+### Local Development
+
+```bash
+# Backend
+cd backend
+npm install
+npm run dev
+
+# Frontend (terminal baru)
+cd frontend
+npm install
+npm run dev
+```
 
 ## Integration & Testing
 

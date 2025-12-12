@@ -1,4 +1,7 @@
 {
+  "_comment": "This file is NO LONGER USED - Project is now deployed on single VPS",
+  "_note": "Frontend and backend are served from the same VPS server",
+  "_deployment": "See README.md for VPS deployment instructions",
   "buildCommand": "npm run build",
   "outputDirectory": "dist",
   "framework": "vite",

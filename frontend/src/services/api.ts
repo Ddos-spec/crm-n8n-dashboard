@@ -1,7 +1,12 @@
 import axios from 'axios';
 
 // Vite uses import.meta.env for environment variables
-const BASE_URL = import.meta.env.REACT_APP_API_BASE_URL || 'http://localhost:4444/api';
+// For same-VPS deployment: use relative path /api (works in production)
+// For development: use localhost:4444
+// For separate deployment: set REACT_APP_API_BASE_URL in .env
+const isDevelopment = import.meta.env.DEV;
+const BASE_URL = import.meta.env.REACT_APP_API_BASE_URL ||
+  (isDevelopment ? 'http://localhost:4444/api' : '/api');
 
 const api = axios.create({
   baseURL: BASE_URL,

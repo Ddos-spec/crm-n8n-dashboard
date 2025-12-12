@@ -1,0 +1,68 @@
+version: '3.8'
+
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:15-alpine
+    container_name: crm-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: CRM
+      POSTGRES_USER: crmuser
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-changeme}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - crm-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U crmuser -d CRM"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # CRM Application (Frontend + Backend)
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: crm-app
+    restart: unless-stopped
+    ports:
+      - "4444:4444"
+    environment:
+      # Application
+      NODE_ENV: production
+      PORT: 4444
+      PUBLIC_URL: ${PUBLIC_URL:-http://localhost:4444}
+
+      # Database (connects to postgres service)
+      DATABASE_URL: postgresql://crmuser:${DB_PASSWORD:-changeme}@postgres:5432/CRM?sslmode=disable
+
+      # Security
+      JWT_SECRET: ${JWT_SECRET:-please-generate-a-secure-jwt-secret-with-openssl-rand-hex-64}
+
+      # CORS (optional for same-server deployment)
+      CORS_ORIGIN: ${CORS_ORIGIN:-*}
+
+      # WhatsApp Integration
+      WHATSAPP_API_URL: ${WHATSAPP_API_URL:-https://app.notif.my.id/api/v2/send-message}
+      WHATSAPP_API_KEY: ${WHATSAPP_API_KEY:-your-api-key}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - crm-network
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:4444/api/health', (r) => {process.exit(r.statusCode === 200 ? 0 : 1)})"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+volumes:
+  postgres_data:
+    driver: local
+
+networks:
+  crm-network:
+    driver: bridge
