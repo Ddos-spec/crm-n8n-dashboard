@@ -2,7 +2,6 @@
   "name": "crm-frontend",
   "version": "1.0.0",
   "private": true,
-  "homepage": "https://ddos-spec.github.io/crm-n8n-dashboard",
   "dependencies": {
     "autoprefixer": "^10.4.21",
     "axios": "^1.6.2",
