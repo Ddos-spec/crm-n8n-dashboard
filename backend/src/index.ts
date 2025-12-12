@@ -11,7 +11,7 @@ const app = express();
 // Middleware
 app.use(express.json());
 app.use(corsMiddleware());
-app.options('*', corsMiddleware()); // Preflight
+// Preflight handled by corsMiddleware above automatically
 
 // Health Check
 app.get('/api/health', async (req, res) => {
