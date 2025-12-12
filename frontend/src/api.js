@@ -1,12 +1,29 @@
 import axios from 'axios';
 
-// Base URL: Menggunakan Environment Variable (untuk Prod) atau Localhost (untuk Dev)
-// Di GitHub Actions, variable ini akan diisi lewat Secrets
-// Note: Jangan tambahkan trailing slash di environment variable
-const baseUrl = process.env.REACT_APP_API_BASE_URL || 'http://localhost:8001';
+// Base URL Logic:
+// 1. If REACT_APP_API_BASE_URL is set, use it.
+// 2. If running locally (localhost), use localhost:3000 (standardized port).
+// 3. If in production (Vercel), use '' (empty string) to leverage Vercel Rewrites (Proxy).
+let baseUrl = '';
+
+if (process.env.REACT_APP_API_BASE_URL) {
+  baseUrl = process.env.REACT_APP_API_BASE_URL;
+} else if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+  baseUrl = 'http://localhost:3000';
+} else {
+  // Production on Vercel: Use relative path so vercel.json rewrites kick in
+  baseUrl = ''; 
+}
+
 // Remove trailing slash and add /api if not already present
 const cleanUrl = baseUrl.replace(/\/$/, '');
-const API_BASE_URL = cleanUrl.endsWith('/api') ? cleanUrl : cleanUrl + '/api';
+const API_BASE_URL = cleanUrl.endsWith('/api') ? cleanUrl : (cleanUrl ? cleanUrl + '/api' : '/api');
+
+console.log('🔗 API Configuration:', {
+  envBaseUrl: process.env.REACT_APP_API_BASE_URL,
+  hostname: window.location.hostname,
+  finalApiUrl: API_BASE_URL
+});
 
 // Helper untuk handle response
 const handleResponse = (response) => {
