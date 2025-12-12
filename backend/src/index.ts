@@ -55,11 +55,31 @@ app.use('/api/knowledge', knowledgeRoutes);
 app.use('/api/whatsapp', whatsappRoutes);
 app.use('/api/analytics', analyticsRoutes);
 
+import path from 'path';
+
+// ... (imports remain)
+
 // Error Handling
 import { errorHandler } from './middleware/errorHandler';
-app.use(errorHandler);
+// app.use(errorHandler); // Move this to bottom
 
 const PORT = env.PORT;
+
+// --- SERVE FRONTEND STATIC FILES ---
+// Pastikan folder 'public' ada di root backend (sejajar dengan package.json)
+// atau sesuaikan path-nya.
+app.use(express.static(path.join(__dirname, '../public')));
+
+// Handle React Routing (SPA) - Send index.html for any unknown route
+// KECUALI route yang diawali /api (biar error API tetap return JSON, bukan HTML)
+app.get('*', (req, res, next) => {
+  if (req.path.startsWith('/api')) {
+    return next();
+  }
+  res.sendFile(path.join(__dirname, '../public/index.html'));
+});
+
+app.use(errorHandler); // Error handler ditaruh paling bawah
 
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
