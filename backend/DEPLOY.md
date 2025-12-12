@@ -19,12 +19,12 @@ docker compose logs --tail=50 backend
 ```
 
 Konfigurasi:
-- `docker-compose.yml` mengikat port host 4321 ke port app 3000.
-- `env_file: .env` gunakan variabel: `DATABASE_URL`, `JWT_SECRET`, `CORS_ORIGIN`, `PORT=3000` (opsional; default 3000), `NODE_ENV=production`.
+- `docker-compose.yml` mengikat port host 4444 ke port app 4444 (sesuaikan jika ganti PORT).
+- `env_file: .env` gunakan variabel: `DATABASE_URL`, `JWT_SECRET`, `CORS_ORIGIN`, `PORT` (contoh 4444), `NODE_ENV=production`.
 
 Health check:
 ```sh
-curl http://localhost:4321/health
+curl http://localhost:4444/health
 ```
 
-Catatan: jika port host ingin berbeda, ubah mapping pada `ports` di `docker-compose.yml`.
+Catatan: jika port host ingin berbeda, ubah mapping pada `ports` di `docker-compose.yml` agar selaras dengan `PORT` aplikasi.
