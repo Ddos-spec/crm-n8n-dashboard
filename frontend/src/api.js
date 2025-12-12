@@ -4,7 +4,9 @@ import axios from 'axios';
 // Di GitHub Actions, variable ini akan diisi lewat Secrets
 // Note: Jangan tambahkan trailing slash di environment variable
 const baseUrl = process.env.REACT_APP_API_BASE_URL || 'http://localhost:8001';
-const API_BASE_URL = baseUrl.replace(/\/$/, '') + '/api'; // Remove trailing slash and add /api
+// Remove trailing slash and add /api if not already present
+const cleanUrl = baseUrl.replace(/\/$/, '');
+const API_BASE_URL = cleanUrl.endsWith('/api') ? cleanUrl : cleanUrl + '/api';
 
 // Helper untuk handle response
 const handleResponse = (response) => {
