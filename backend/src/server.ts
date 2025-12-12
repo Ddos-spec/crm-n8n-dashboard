@@ -9,11 +9,17 @@ import { checkDbConnection } from './lib/db';
 
 dotenv.config();
 
+process.on('unhandledRejection', (reason) => {
+  console.error('[UNHANDLED_REJECTION]', reason);
+});
+
+process.on('uncaughtException', (error) => {
+  console.error('[UNCAUGHT_EXCEPTION]', error);
+});
+
 const app = express();
 
-const allowedOrigins = process.env.CORS_ORIGIN
-  ? process.env.CORS_ORIGIN.split(',').map((o) => o.trim())
-  : ['http://localhost:5173'];
+const allowedOrigins = config.corsOrigins;
 
 app.use(
   cors({
@@ -90,6 +96,25 @@ app.use((err: unknown, _req: express.Request, res: express.Response, _next: expr
 
 const port = config.port;
 
-app.listen(port, () => {
-  console.log(`Server running on port ${port} (${config.nodeEnv})`);
-});
+const start = async () => {
+  try {
+    console.log(`[BOOT] env=${config.nodeEnv} port=${port}`);
+    console.log(`[BOOT] CORS origins: ${allowedOrigins.join(', ')}`);
+    console.log('[BOOT] Checking database connectivity...');
+    const dbOk = await checkDbConnection();
+    if (!dbOk) {
+      console.error('[BOOT] Database unreachable (check credentials/host)');
+      process.exit(1);
+    }
+    console.log('[BOOT] Database reachable, starting HTTP server');
+
+    app.listen(port, () => {
+      console.log(`Server running on port ${port} (${config.nodeEnv})`);
+    });
+  } catch (err) {
+    console.error('[BOOT] Failed to start server', err);
+    process.exit(1);
+  }
+};
+
+void start();
