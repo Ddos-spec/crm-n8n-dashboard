@@ -10,24 +10,31 @@ const app = express();
 const PORT = process.env.PORT || 8001;
 
 // CORS Configuration
+// Read allowed origins from environment variable or use defaults
+const frontendUrls = process.env.FRONTEND_URL
+  ? process.env.FRONTEND_URL.split(',').map(url => url.trim())
+  : ['https://ddos-spec.github.io'];
+
+const allowedOrigins = [
+  ...frontendUrls,
+  'http://localhost:3000',
+  'http://localhost:5173',
+  'http://127.0.0.1:3000',
+  'http://127.0.0.1:5173'
+];
+
+console.log('🔐 Allowed CORS Origins:', allowedOrigins);
+
 const corsOptions = {
   origin: function (origin, callback) {
-    const allowedOrigins = [
-      'https://ddos-spec.github.io',
-      'http://localhost:3000',
-      'http://localhost:5173',
-      'http://127.0.0.1:3000',
-      'http://127.0.0.1:5173'
-    ];
-
-    // Allow requests with no origin (like mobile apps or curl requests)
+    // Allow requests with no origin (like mobile apps, curl, Postman)
     if (!origin) return callback(null, true);
 
     if (allowedOrigins.indexOf(origin) !== -1) {
       callback(null, true);
     } else {
-      console.log('CORS blocked origin:', origin);
-      callback(null, true); // Allow all origins for now, log for debugging
+      console.log('⚠️ CORS blocked origin:', origin);
+      callback(null, true); // Allow all for now, will log for debugging
     }
   },
   credentials: true,
@@ -661,8 +668,8 @@ async function startServer() {
     const dbConnected = await testConnection();
 
     if (!dbConnected) {
-      console.error('❌ Database connection failed. Please check your configuration.');
-      process.exit(1);
+      console.error('❌ Database connection failed. The server will start, but DB features will be unavailable.');
+      // Do not exit, allow server to start so we can get CORS headers and debug info
     }
 
     app.listen(PORT, '0.0.0.0', () => {
