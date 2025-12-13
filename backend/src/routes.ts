@@ -70,7 +70,6 @@ router.get('/api/stats', async (_req, res) => {
     const totalChatRes = await pool.query('SELECT COUNT(*)::int as count FROM chat_history');
     const chatTrendStats = await getMonthCount('chat_history', 'created_at');
     const chatTrend = calcTrend(chatTrendStats.curr, chatTrendStats.prev);
-    const chatTrend = calcTrend(chatTrendStats.curr, chatTrendStats.prev);
 
     // 3. Open Escalations (Current Snapshot) + Trend (New Escalations Month vs Month)
     const openEscRes = await pool.query("SELECT COUNT(*)::int as count FROM escalations WHERE status = 'open'");
