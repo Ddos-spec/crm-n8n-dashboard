@@ -110,4 +110,18 @@ export default function CustomerService() {
     if (!contactList.length) return;
     const headers = ['Name', 'Phone', 'Status', 'Last Contact'];
     const rows = contactList.map(c => [
-      `"${c.name.replace(/
+      `"${c.name.replace(/"/g, '""')}"`,
+      `"${c.phone}"`,
+      c.status,
+      c.lastContact
+    ]);
+    const csvContent = [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.setAttribute('href', url);
+    link.setAttribute('download', `customers_export_${new Date().toISOString().split('T')[0]}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
