@@ -55,7 +55,7 @@ export const api = {
   getEscalations: () => getJson<{ data: Escalation[] }>('/api/escalations'),
   getChatHistory: (customerId: number) =>
     getJson<{ data: ChatMessage[] }>(`/api/chat-history?customerId=${customerId}`),
-  getCampaigns: () => getJson<{ data: Campaign[] }>('/api/campaigns'),
+  getCampaigns: () => getJson<{ data: Campaign[] }>('/api/marketing'),
   sendMessage: (body: {
     mtype: string;
     receiver: string;

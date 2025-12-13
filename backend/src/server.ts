@@ -184,6 +184,31 @@ app.get('/api/campaigns', async (_req, res) => {
   }
 });
 
+app.get('/api/marketing', async (_req, res) => {
+  try {
+    const result = await pool.query(
+      `SELECT campaign_batch AS name,
+              COUNT(*) AS total_leads,
+              COUNT(CASE WHEN message_sent = true THEN 1 END) AS contacted,
+              COUNT(CASE WHEN status = 'invalid_whatsapp' THEN 1 END) AS invalid,
+              AVG(lead_score) AS avg_lead_score,
+              MAX(created_at) AS batch_date
+       FROM businesses
+       GROUP BY campaign_batch
+       ORDER BY batch_date DESC NULLS LAST
+       LIMIT 50`,
+    );
+    return res.json({ data: result.rows, meta: buildMeta(res.locals.requestId) });
+  } catch (error) {
+    console.error('[GET /api/marketing]', error);
+    return res.status(500).json({
+      error: 'Internal server error',
+      code: 'MARKETING_FETCH_FAILED',
+      meta: buildMeta(res.locals.requestId),
+    });
+  }
+});
+
 app.post('/api/send-message', async (req, res) => {
   try {
     if (!config.whatsappUrl || !config.whatsappApiKey) {
