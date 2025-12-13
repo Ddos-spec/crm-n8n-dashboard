@@ -69,7 +69,7 @@ export type DashboardStats = {
   totalChats: number;
   openEscalations: number;
   leadsThisMonth: number;
-  
+
   customerTrend: string;
   customerTrendStatus: 'up' | 'down';
   chatTrend: string;
@@ -79,6 +79,18 @@ export type DashboardStats = {
   escTrendInverted?: boolean;
   leadsTrend: string;
   leadsTrendStatus: 'up' | 'down';
+};
+
+export type Notification = {
+  id: string;
+  type: 'escalation' | 'chat' | 'lead';
+  title: string;
+  message: string;
+  time: string;
+  read: boolean;
+  link: string;
+  customerId?: number;
+  businessId?: number;
 };
 
 export const api = {
@@ -117,4 +129,11 @@ export const api = {
     url?: string;
     filename?: string;
   }) => fetch(buildUrl('/api/send-message'), { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }),
+  getNotifications: () => getJson<{ data: Notification[] }>('/api/notifications'),
+  updateBusiness: (id: number, body: { status?: string; message_sent?: boolean }) =>
+    fetch(buildUrl(`/api/businesses/${id}`), {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    }),
 };
