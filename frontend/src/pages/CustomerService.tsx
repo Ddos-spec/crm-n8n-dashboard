@@ -46,6 +46,20 @@ const getAvatarGradient = (name: string) => {
   return gradients[hash % gradients.length];
 };
 
+// Memoized message component for better performance
+const ChatMessageItem = React.memo(({ msg }: { msg: { id: number; message_type: string; content: string; created_at: string } }) => {
+  const isOutgoing = ['out', 'outbound', 'agent'].includes(msg.message_type);
+  return (
+    <div className={`message ${isOutgoing ? 'outgoing' : 'incoming'}`}>
+      <div className="message-text">{msg.content}</div>
+      <div className="message-time">
+        {new Date(msg.created_at).toLocaleString([], { hour: '2-digit', minute: '2-digit' })}
+      </div>
+    </div>
+  );
+});
+ChatMessageItem.displayName = 'ChatMessageItem';
+
 export default function CustomerService() {
   const [searchTerm, setSearchTerm] = useState('');
   // Use debounce for search to prevent excessive API calls
@@ -72,9 +86,18 @@ export default function CustomerService() {
 
   const [selected, setSelected] = useState<Contact | null>(null);
   const { focusName, setFocusName } = useCustomerContext();
-  const { data: chatMessages, loading: chatLoading } = useChat(selected?.id);
+  const { data: chatMessages, loading: chatLoading, hasMore: hasMoreMessages, loadMore: loadMoreMessages } = useChat(selected?.id);
   const [textMessage, setTextMessage] = useState('');
-  
+  const chatMessagesEndRef = useRef<HTMLDivElement>(null);
+  const chatMessagesContainerRef = useRef<HTMLDivElement>(null);
+
+  // Auto scroll to bottom when new messages arrive or customer changes
+  useEffect(() => {
+    if (chatMessages.length > 0 && !chatLoading) {
+      chatMessagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }
+  }, [chatMessages, chatLoading, selected?.id]);
+
   // Logic for handling focus from other pages
   useEffect(() => {
     if (focusName && contactList.length) {
@@ -238,25 +261,47 @@ export default function CustomerService() {
               </div>
 
               {/* Messages Area */}
-              <div className="chat-messages">
-                {chatLoading && <div className="muted" style={{textAlign: 'center', marginTop: 20}}>Memuat chat...</div>}
+              <div className="chat-messages" ref={chatMessagesContainerRef}>
+                {/* Load Older Messages Button */}
+                {hasMoreMessages && !chatLoading && chatMessages.length > 0 && (
+                  <div style={{ textAlign: 'center', padding: '12px 0', marginBottom: 8 }}>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={loadMoreMessages}
+                      style={{ fontSize: 12 }}
+                    >
+                      Muat pesan lebih lama
+                    </Button>
+                  </div>
+                )}
+
+                {chatLoading && chatMessages.length === 0 && (
+                  <div className="muted" style={{textAlign: 'center', marginTop: 20}}>Memuat chat...</div>
+                )}
+
                 {!chatLoading && chatMessages.length === 0 && (
                   <div className="empty-state">
                     <div className="empty-state-icon"><Phone size={32}/></div>
                     <p>Belum ada riwayat percakapan</p>
                   </div>
                 )}
-                {chatMessages.map((msg) => {
-                  const isOutgoing = ['out', 'outbound', 'agent'].includes(msg.message_type);
-                  return (
-                    <div key={msg.id} className={`message ${isOutgoing ? 'outgoing' : 'incoming'}`}>
-                      <div className="message-text">{msg.content}</div>
-                      <div className="message-time">
-                        {new Date(msg.created_at).toLocaleString([], { hour: '2-digit', minute: '2-digit' })}
-                      </div>
-                    </div>
-                  );
-                })}
+
+                {/* Chat Messages */}
+                {chatMessages.map((msg) => (
+                  <ChatMessageItem key={msg.id} msg={msg} />
+                ))}
+
+                {/* Loading indicator for pagination */}
+                {chatLoading && chatMessages.length > 0 && (
+                  <div style={{textAlign: 'center', padding: '8px 0', color: 'var(--text-muted)', fontSize: 12}}>
+                    <div className="spinner" style={{display:'inline-block', width: 12, height: 12, border: '2px solid var(--text-muted)', borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 1s linear infinite', marginRight: 6}}></div>
+                    Memuat pesan...
+                  </div>
+                )}
+
+                {/* Scroll anchor for auto-scroll to bottom */}
+                <div ref={chatMessagesEndRef} />
               </div>
 
               {/* Input Area */}

@@ -55,7 +55,7 @@ export function useCustomers(search?: string) {
   const [loading, setLoading] = useState(true);
   const [hasMore, setHasMore] = useState(true);
   const [offset, setOffset] = useState(0);
-  const LIMIT = 20;
+  const LIMIT = 500; // Increased from 20 to 500 to load more customers at once
 
   // Reset when search changes
   useEffect(() => {
@@ -164,14 +164,37 @@ export function useBusinesses(params?: { status?: string; search?: string }) {
 export function useChat(customerId?: number) {
   const [data, setData] = useState<ChatMessage[]>([]);
   const [loading, setLoading] = useState(false);
+  const [hasMore, setHasMore] = useState(true);
+  const [offset, setOffset] = useState(0);
+  const LIMIT = 50; // Load 50 messages at a time for better performance
 
+  // Reset when customer changes
+  useEffect(() => {
+    setData([]);
+    setOffset(0);
+    setHasMore(true);
+  }, [customerId]);
+
+  // Load chat messages
   useEffect(() => {
     if (!customerId) return;
+
     const load = async () => {
+      if (!hasMore && offset > 0) return; // Don't load if no more data
+
       setLoading(true);
       try {
-        const res = await api.getChatHistory(customerId);
-        setData(res.data);
+        const res = await api.getChatHistory(customerId, { limit: LIMIT, offset });
+        const newMessages = res.data;
+
+        if (newMessages.length < LIMIT) {
+          setHasMore(false);
+        }
+
+        setData((prev) => {
+          // If offset is 0, replace data (new customer). Else prepend older messages.
+          return offset === 0 ? newMessages : [...newMessages, ...prev];
+        });
       } catch (err) {
         console.error('load chat', err);
       } finally {
@@ -179,7 +202,13 @@ export function useChat(customerId?: number) {
       }
     };
     void load();
-  }, [customerId]);
+  }, [customerId, offset]);
 
-  return { data, loading };
+  const loadMore = () => {
+    if (!loading && hasMore) {
+      setOffset((prev) => prev + LIMIT);
+    }
+  };
+
+  return { data, loading, hasMore, loadMore };
 }

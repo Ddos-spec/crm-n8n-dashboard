@@ -90,8 +90,13 @@ export const api = {
     return getJson<{ data: Customer[] }>(`/api/customers?${query.toString()}`);
   },
   getEscalations: () => getJson<{ data: Escalation[] }>('/api/escalations'),
-  getChatHistory: (customerId: number) =>
-    getJson<{ data: ChatMessage[] }>(`/api/chat-history?customerId=${customerId}`),
+  getChatHistory: (customerId: number, params?: { limit?: number; offset?: number }) => {
+    const query = new URLSearchParams();
+    query.append('customerId', String(customerId));
+    if (params?.limit) query.append('limit', String(params.limit));
+    if (params?.offset) query.append('offset', String(params.offset));
+    return getJson<{ data: ChatMessage[] }>(`/api/chat-history?${query.toString()}`);
+  },
   getCampaigns: () => getJson<{ data: Campaign[] }>('/api/marketing'),
   getDashboardStats: () => getJson<{ data: DashboardStats }>('/api/stats'),
   getBusinesses: (params?: { limit?: number; offset?: number; status?: string; search?: string }) => {
