@@ -76,6 +76,8 @@ export function useCustomers(search?: string) {
         const res = await api.getCustomers({ limit: LIMIT, offset, search });
         const newData = res.data;
         
+        console.log('[DEBUG Frontend] Received customers:', newData.length, newData); // DEBUG LOG
+
         if (newData.length < LIMIT) {
           setHasMore(false);
         }
