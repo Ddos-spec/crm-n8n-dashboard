@@ -1,113 +1,103 @@
-import { useState } from 'react';
-import { useCampaigns } from '../hooks/useData';
+import { useMemo, useState } from 'react';
+import { useBusinesses, useCampaigns } from '../hooks/useData';
 
-const formatNumber = (num: number) => num.toLocaleString('id-ID');
+const statusColor = (status: string) => {
+  if (status === 'escalation' || status === 'invalid_whatsapp') return 'pill danger';
+  if (status === 'pending' || status === 'contacted') return 'pill warning';
+  return 'pill success';
+};
+
+const statusLabel = (status: string) => {
+  if (status === 'invalid_whatsapp') return 'invalid';
+  return status || 'unknown';
+};
+
+const formatNumber = (num?: number | null) => (typeof num === 'number' ? num.toLocaleString('id-ID') : '-');
 
 export default function Marketing() {
-  const { data: campaigns, loading } = useCampaigns();
-  const [selected, setSelected] = useState<number>(0);
-  const [audience, setAudience] = useState('Semua pelanggan');
+  const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [search, setSearch] = useState('');
+  const { data: campaigns, loading: campaignsLoading } = useCampaigns();
+  const { data: businesses, loading: bizLoading } = useBusinesses({
+    status: statusFilter === 'all' ? undefined : statusFilter,
+    search: search || undefined,
+  });
 
-  const hasData = campaigns.length > 0;
-  const current = hasData ? campaigns[selected] : undefined;
+  const summary = useMemo(() => {
+    const total = businesses.length;
+    const contacted = businesses.filter((b) => b.message_sent).length;
+    const invalid = businesses.filter((b) => b.status === 'invalid_whatsapp').length;
+    return { total, contacted, invalid };
+  }, [businesses]);
 
   return (
     <div className="stack">
       <header className="hero">
         <div>
           <p className="eyebrow">Marketing</p>
-          <h1>Performa Kampanye</h1>
-          <p className="lede">
-            Lihat performa campaign lintas kanal dan siapkan sinkronisasi ke n8n untuk follow-up otomatis.
-          </p>
+          <h1>Leads dari Businesses</h1>
+          <p className="lede">Data langsung dari tabel businesses; filter status atau cari nama/nomor.</p>
+          <div className="pill-row" style={{ marginTop: 10 }}>
+            <button
+              className={statusFilter === 'all' ? 'chip active' : 'chip'}
+              type="button"
+              onClick={() => setStatusFilter('all')}
+            >
+              Semua
+            </button>
+            <button
+              className={statusFilter === 'pending' ? 'chip active' : 'chip'}
+              type="button"
+              onClick={() => setStatusFilter('pending')}
+            >
+              Pending
+            </button>
+            <button
+              className={statusFilter === 'active' ? 'chip active' : 'chip'}
+              type="button"
+              onClick={() => setStatusFilter('active')}
+            >
+              Active
+            </button>
+            <button
+              className={statusFilter === 'escalation' ? 'chip active' : 'chip'}
+              type="button"
+              onClick={() => setStatusFilter('escalation')}
+            >
+              Eskalasi
+            </button>
+          </div>
+          <input
+            className="input"
+            placeholder="Cari nama atau nomor..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            style={{ marginTop: 8, maxWidth: 360 }}
+          />
+        </div>
+        <div className="card">
+          <div className="stats-grid">
+            <div className="summary-card">
+              <div className="summary-title">Total Leads</div>
+              <div className="summary-value">{summary.total}</div>
+              <div className="muted">Dari tabel businesses</div>
+            </div>
+            <div className="summary-card">
+              <div className="summary-title">Contacted</div>
+              <div className="summary-value">{summary.contacted}</div>
+              <div className="muted">message_sent = true</div>
+            </div>
+            <div className="summary-card">
+              <div className="summary-title">Invalid</div>
+              <div className="summary-value">{summary.invalid}</div>
+              <div className="muted">status invalid_whatsapp</div>
+            </div>
+          </div>
         </div>
       </header>
 
-      <section className="grid two">
-        <div className="card">
-          <div className="card-title">Ringkasan Kampanye</div>
-          <div className="table">
-            <div className="table-head">
-              <span>Nama</span>
-              <span>Kanal</span>
-              <span>Dikirim</span>
-              <span>Contacted</span>
-              <span>Invalid</span>
-              <span>Avg score</span>
-            </div>
-            {loading && <div className="muted">Memuat kampanye...</div>}
-            {!loading && campaigns.length === 0 && <div className="muted">Belum ada data kampanye.</div>}
-            {!loading && campaigns.map((c, idx) => (
-              <button
-                key={c.name}
-                className={selected === idx ? 'table-row selectable selected' : 'table-row selectable'}
-                type="button"
-                onClick={() => setSelected(idx)}
-              >
-                <span>{c.name}</span>
-                <span>WhatsApp</span>
-                <span>{formatNumber(c.total_leads)}</span>
-                <span>{formatNumber(c.contacted)}</span>
-                <span>{formatNumber(c.invalid)}</span>
-                <span>{c.avg_lead_score.toFixed(0)}</span>
-              </button>
-            ))}
-          </div>
-        </div>
-
-        <div className="card">
-          <div className="card-title">Detail & Aksi</div>
-          <p className="muted">Pilih kampanye untuk lihat detail dan jalankan aksi dummy.</p>
-          {current ? (
-            <div className="summary-card">
-              <div className="summary-title">{current.name}</div>
-              <div className="muted">WhatsApp</div>
-            <div className="metrics">
-              <div>
-                <div className="summary-value">{formatNumber(current.total_leads)}</div>
-                <div className="muted">Dikirim</div>
-              </div>
-              <div>
-                <div className="summary-value">{formatNumber(current.contacted)}</div>
-                <div className="muted">Contacted</div>
-              </div>
-              <div>
-                <div className="summary-value">{formatNumber(current.invalid)}</div>
-                <div className="muted">Invalid</div>
-              </div>
-              <div>
-                <div className="summary-value">{current.avg_lead_score.toFixed(0)}</div>
-                <div className="muted">Avg score</div>
-              </div>
-            </div>
-          </div>
-          ) : (
-            <div className="muted">{loading ? 'Memuat kampanye...' : 'Pilih kampanye.'}</div>
-          )}
-          <div className="stack" style={{ marginTop: 12 }}>
-            <label className="label" htmlFor="audience">
-              Audiens
-            </label>
-            <select id="audience" className="input" value={audience} onChange={(e) => setAudience(e.target.value)}>
-              <option>Semua pelanggan</option>
-              <option>Prioritas tinggi</option>
-              <option>Pending follow-up</option>
-              <option>Churn risk</option>
-            </select>
-            <div className="pill-row">
-              <button className="button" type="button" onClick={() => alert(`Sync ke n8n (${audience})`)}>
-                Sinkron ke n8n
-              </button>
-              <button className="button ghost" type="button" onClick={() => alert('Kirim ulang (dummy)')}>
-                Kirim ulang
-              </button>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <section className="card">
-        <div className="card-title">Batch Performance</div>
+      <section className="section">
+        <h2>Batch Campaign (campaign_performance)</h2>
         <div className="table">
           <div className="table-head">
             <span>Batch</span>
@@ -117,16 +107,46 @@ export default function Marketing() {
             <span>Avg Score</span>
             <span>Last Batch</span>
           </div>
-          {campaigns.map((row) => (
-            <div key={row.name} className="table-row">
-              <span>{row.name}</span>
-              <span>{formatNumber(row.total_leads)}</span>
-              <span>{formatNumber(row.contacted)}</span>
-              <span>{row.invalid}</span>
-              <span>{row.avg_lead_score.toFixed(0)}</span>
-              <span>{row.batch_date ? new Date(row.batch_date).toLocaleDateString('id-ID') : '-'}</span>
-            </div>
-          ))}
+          {campaignsLoading && <div className="muted">Memuat batch...</div>}
+          {!campaignsLoading && campaigns.length === 0 && <div className="muted">Belum ada data batch.</div>}
+          {!campaignsLoading &&
+            campaigns.map((row) => (
+              <div key={row.name} className="table-row">
+                <span>{row.name}</span>
+                <span>{formatNumber(row.total_leads)}</span>
+                <span>{formatNumber(row.contacted)}</span>
+                <span>{row.invalid}</span>
+                <span>{row.avg_lead_score.toFixed(0)}</span>
+                <span>{row.batch_date ? new Date(row.batch_date).toLocaleDateString('id-ID') : '-'}</span>
+              </div>
+            ))}
+        </div>
+      </section>
+
+      <section className="section">
+        <h2>Leads Businesses</h2>
+        <div className="table">
+          <div className="table-head">
+            <span>Nama</span>
+            <span>Status</span>
+            <span>Campaign</span>
+            <span>Lead Score</span>
+            <span>Lokasi</span>
+            <span>Created</span>
+          </div>
+          {bizLoading && <div className="muted">Memuat leads...</div>}
+          {!bizLoading && businesses.length === 0 && <div className="muted">Tidak ada data (periksa filter).</div>}
+          {!bizLoading &&
+            businesses.map((b) => (
+              <div key={b.id} className="table-row">
+                <span>{b.name ?? 'Tanpa nama'}</span>
+                <span className={statusColor(b.status)}>{statusLabel(b.status)}</span>
+                <span>{b.campaign_batch ?? '-'}</span>
+                <span>{b.lead_score ?? '-'}</span>
+                <span>{b.location ?? '-'}</span>
+                <span>{new Date(b.created_at).toLocaleDateString('id-ID')}</span>
+              </div>
+            ))}
         </div>
       </section>
     </div>

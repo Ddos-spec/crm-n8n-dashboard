@@ -41,6 +41,20 @@ export type Campaign = {
   batch_date: string | null;
 };
 
+export type Business = {
+  id: number;
+  name: string | null;
+  phone: string;
+  status: string;
+  campaign_batch: string | null;
+  lead_score: number | null;
+  location: string | null;
+  market_segment: string | null;
+  has_phone: boolean;
+  message_sent: boolean;
+  created_at: string;
+};
+
 export type ChatMessage = {
   id: number;
   customer_id: number;
@@ -56,6 +70,17 @@ export const api = {
   getChatHistory: (customerId: number) =>
     getJson<{ data: ChatMessage[] }>(`/api/chat-history?customerId=${customerId}`),
   getCampaigns: () => getJson<{ data: Campaign[] }>('/api/marketing'),
+  getBusinesses: (params?: { limit?: number; offset?: number; status?: string; search?: string }) => {
+    const query = new URLSearchParams();
+    if (params?.limit) query.append('limit', String(params.limit));
+    if (params?.offset) query.append('offset', String(params.offset));
+    if (params?.status) query.append('status', params.status);
+    if (params?.search) query.append('search', params.search);
+    const q = query.toString();
+    return getJson<{ data: Business[]; meta: { total: number; limit: number; offset: number; requestId: string } }>(
+      `/api/businesses${q ? `?${q}` : ''}`,
+    );
+  },
   sendMessage: (body: {
     mtype: string;
     receiver: string;

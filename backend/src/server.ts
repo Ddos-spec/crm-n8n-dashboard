@@ -184,6 +184,53 @@ app.get('/api/campaigns', async (_req, res) => {
   }
 });
 
+app.get('/api/businesses', async (req, res) => {
+  try {
+    const limit = Math.min(parseInt(String(req.query.limit ?? '50'), 10) || 50, 200);
+    const offset = Math.max(parseInt(String(req.query.offset ?? '0'), 10) || 0, 0);
+    const status = req.query.status ? String(req.query.status) : null;
+    const search = req.query.search ? String(req.query.search) : null;
+
+    const where: string[] = [];
+    const params: Array<string | number> = [];
+    if (status) {
+      params.push(status);
+      where.push(`status = $${params.length}`);
+    }
+    if (search) {
+      params.push(`%${search}%`);
+      where.push(`(name ILIKE $${params.length} OR phone ILIKE $${params.length})`);
+    }
+    const whereClause = where.length ? `WHERE ${where.join(' AND ')}` : '';
+
+    const countRes = await pool.query(`SELECT COUNT(*)::int AS total FROM businesses ${whereClause}`, params);
+    const total = countRes.rows[0]?.total ?? 0;
+
+    params.push(limit);
+    params.push(offset);
+    const rowsRes = await pool.query(
+      `SELECT id, name, phone, status, campaign_batch, lead_score, location, market_segment, has_phone, message_sent, created_at
+       FROM businesses
+       ${whereClause}
+       ORDER BY created_at DESC
+       LIMIT $${params.length - 1} OFFSET $${params.length}`,
+      params,
+    );
+
+    return res.json({
+      data: rowsRes.rows,
+      meta: { total, limit, offset, requestId: buildMeta(res.locals.requestId).requestId },
+    });
+  } catch (error) {
+    console.error('[GET /api/businesses]', error);
+    return res.status(500).json({
+      error: 'Internal server error',
+      code: 'BUSINESSES_FETCH_FAILED',
+      meta: buildMeta(res.locals.requestId),
+    });
+  }
+});
+
 app.get('/api/marketing', async (_req, res) => {
   try {
     const result = await pool.query(

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { api, Campaign, Customer, Escalation, ChatMessage } from '../lib/api';
+import { api, Campaign, Customer, Escalation, ChatMessage, Business } from '../lib/api';
 
 export function useCustomers() {
   const [data, setData] = useState<Customer[]>([]);
@@ -55,6 +55,25 @@ export function useCampaigns() {
     };
     void load();
   }, []);
+  return { data, loading };
+}
+
+export function useBusinesses(params?: { status?: string; search?: string }) {
+  const [data, setData] = useState<Business[]>([]);
+  const [loading, setLoading] = useState(true);
+  useEffect(() => {
+    const load = async () => {
+      try {
+        const res = await api.getBusinesses({ limit: 100, ...params });
+        setData(res.data);
+      } catch (err) {
+        console.error('load businesses', err);
+      } finally {
+        setLoading(false);
+      }
+    };
+    void load();
+  }, [params?.search, params?.status]);
   return { data, loading };
 }
 
