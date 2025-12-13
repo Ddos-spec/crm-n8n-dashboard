@@ -141,6 +141,8 @@ router.get('/api/customers', async (req, res) => {
        LIMIT $1 OFFSET $2`,
       params
     );
+
+    console.log(`[DEBUG API] Customers request: Limit=${limit}, Offset=${offset}, Search=${search || 'None'}. Found=${result.rows.length} rows.`); // DEBUG LOG
     
     // Get total count for meta info (optional but good practice)
     // const countRes = await pool.query('SELECT COUNT(*)::int as count FROM customers');
