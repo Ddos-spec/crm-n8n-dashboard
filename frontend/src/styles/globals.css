@@ -669,6 +669,8 @@ tr:last-child td {
   display: flex;
   flex-direction: column;
   background: var(--bg-secondary);
+  height: 100%;
+  overflow: hidden;
 }
 
 .chat-header {
@@ -752,6 +754,8 @@ tr:last-child td {
   padding: 20px 24px;
   background: var(--bg-card);
   border-top: 1px solid var(--border);
+  z-index: 10;
+  position: relative;
 }
 
 .chat-input-wrapper {
