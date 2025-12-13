@@ -1,24 +1,3 @@
-informasi kredensial database 
-# Database Connection Details
-User: postgres
-Password: a0bd3b3c1d54b7833014
-Database Name: CRM
-Internal Host: postgres_scrapdatan8n
-Internal Port: 5432
-
-# Internal Connection URL (untuk backend di EasyPanel)
-postgres://postgres:a0bd3b3c1d54b7833014@postgres_scrapdatan8n:5432/CRM?sslmode=disable
-
-# External Connection Details (untuk akses dari local/tools eksternal)
-External Host: 163.61.44.41
-External Port: 5432
-
-# External Connection URL (untuk DBeaver, pgAdmin, atau development local)
-postgres://postgres:a0bd3b3c1d54b7833014@163.61.44.41:5432/CRM?sslmode=disable
-
-
-database saat ini bentuknya kaya gini
-
 CREATE TABLE "public"."businesses" ( 
   "id" SERIAL,
   "place_id" VARCHAR(255) NULL,
@@ -62,6 +41,29 @@ CREATE TABLE "public"."chat_history" (
   CONSTRAINT "chat_history_pkey" PRIMARY KEY ("id"),
   CONSTRAINT "chat_history_message_id_key" UNIQUE ("message_id")
 );
+CREATE TABLE "public"."customers" ( 
+  "id" SERIAL,
+  "phone" VARCHAR(25) NOT NULL,
+  "name" VARCHAR(100) NULL,
+  "location" VARCHAR(100) NULL,
+  "material" VARCHAR(100) NULL,
+  "product_type" VARCHAR(100) NULL,
+  "status" VARCHAR(20) NULL DEFAULT 'active'::character varying ,
+  "has_size_info" BOOLEAN NULL DEFAULT false ,
+  "has_image" BOOLEAN NULL DEFAULT false ,
+  "customer_priority" VARCHAR(20) NULL DEFAULT 'normal'::character varying ,
+  "last_interaction" TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP ,
+  "created_at" TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP ,
+  "updated_at" TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP ,
+  "last_message_at" TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP ,
+  "total_messages" INTEGER NULL DEFAULT 0 ,
+  "company" VARCHAR(100) NULL,
+  "thickness" VARCHAR(20) NULL,
+  "size" VARCHAR(100) NULL,
+  "is_owner" BOOLEAN NULL DEFAULT false ,
+  CONSTRAINT "customers_pkey" PRIMARY KEY ("id"),
+  CONSTRAINT "customers_phone_key" UNIQUE ("phone")
+);
 CREATE TABLE "public"."escalations" ( 
   "id" SERIAL,
   "customer_id" INTEGER NOT NULL,
@@ -74,48 +76,9 @@ CREATE TABLE "public"."escalations" (
   "response_time_minutes" INTEGER NULL,
   "resolved_at" TIMESTAMP NULL,
   "created_at" TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP ,
+  "expired_at" TIMESTAMP NULL,
+  "snapshot_data" JSONB NULL,
   CONSTRAINT "escalations_pkey" PRIMARY KEY ("id")
-);
-CREATE TABLE "public"."customers" ( 
-  "id" SERIAL,
-  "phone" VARCHAR(25) NOT NULL,
-  "name" VARCHAR(100) NULL,
-  "location" VARCHAR(100) NULL,
-  "material" VARCHAR(100) NULL,
-  "product_type" VARCHAR(100) NULL,
-  "status" VARCHAR(20) NULL DEFAULT 'active'::character varying ,
-  "has_size_info" BOOLEAN NULL DEFAULT false ,
-  "has_image" BOOLEAN NULL DEFAULT false ,
-  "conversation_stage" VARCHAR(50) NULL DEFAULT 'greeting'::character varying ,
-  "last_classification" VARCHAR(50) NULL,
-  "customer_priority" VARCHAR(20) NULL DEFAULT 'normal'::character varying ,
-  "last_interaction" TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP ,
-  "created_at" TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP ,
-  "updated_at" TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP ,
-  "last_message_at" TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP ,
-  "cooldown_until" TIMESTAMP NULL,
-  "message_count_today" INTEGER NULL DEFAULT 0 ,
-  "is_cooldown_active" BOOLEAN NULL DEFAULT false ,
-  "last_ai_response" TEXT NULL,
-  "conversation_quality_score" INTEGER NULL DEFAULT 0 ,
-  "total_messages" INTEGER NULL DEFAULT 0 ,
-  CONSTRAINT "customers_pkey" PRIMARY KEY ("id"),
-  CONSTRAINT "customers_phone_key" UNIQUE ("phone")
-);
-CREATE TABLE "public"."knowledge_ai" ( 
-  "id" SERIAL,
-  "category" VARCHAR(100) NOT NULL,
-  "keywords" ARRAY NULL,
-  "question_pattern" TEXT NOT NULL,
-  "answer_template" TEXT NOT NULL,
-  "context" VARCHAR(200) NULL,
-  "priority" INTEGER NULL DEFAULT 50 ,
-  "usage_count" INTEGER NULL DEFAULT 0 ,
-  "last_used" TIMESTAMP NULL,
-  "is_active" BOOLEAN NULL DEFAULT true ,
-  "created_at" TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP ,
-  "updated_at" TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP ,
-  CONSTRAINT "knowledge_ai_pkey" PRIMARY KEY ("id")
 );
 CREATE INDEX "idx_businesses_created_at" 
 ON "public"."businesses" (
@@ -145,40 +108,9 @@ CREATE INDEX "idx_chat_created_at"
 ON "public"."chat_history" (
   "created_at" DESC
 );
-CREATE INDEX "idx_escalations_type" 
-ON "public"."escalations" (
-  "escalation_type" ASC
-);
-CREATE INDEX "idx_escalations_priority" 
-ON "public"."escalations" (
-  "priority_level" ASC
-);
-CREATE INDEX "idx_escalations_status" 
-ON "public"."escalations" (
-  "status" ASC
-);
-CREATE INDEX "idx_escalations_created" 
-ON "public"."escalations" (
-  "created_at" DESC
-);
-CREATE INDEX "idx_customers_classification" 
-ON "public"."customers" (
-  "last_classification" ASC
-);
-CREATE INDEX "idx_customers_cooldown" 
-ON "public"."customers" (
-  "cooldown_until" ASC,
-  "is_cooldown_active" ASC
-);
 CREATE INDEX "idx_customers_phone" 
 ON "public"."customers" (
   "phone" ASC
-);
-CREATE INDEX "idx_customers_active_cooldown" 
-ON "public"."customers" (
-  "phone" ASC,
-  "is_cooldown_active" ASC,
-  "cooldown_until" ASC
 );
 CREATE INDEX "idx_customers_priority" 
 ON "public"."customers" (
@@ -192,21 +124,41 @@ CREATE INDEX "idx_customers_interaction"
 ON "public"."customers" (
   "last_interaction" ASC
 );
-CREATE INDEX "idx_knowledge_category" 
-ON "public"."knowledge_ai" (
-  "category" ASC
+CREATE INDEX "idx_customers_escalation_lookup" 
+ON "public"."customers" (
+  "phone" ASC,
+  "status" ASC,
+  "last_interaction" ASC
 );
-CREATE INDEX "idx_knowledge_priority" 
-ON "public"."knowledge_ai" (
-  "priority" DESC
+CREATE INDEX "idx_customers_name" 
+ON "public"."customers" (
+  "name" ASC
 );
-CREATE INDEX "idx_knowledge_active" 
-ON "public"."knowledge_ai" (
-  "is_active" ASC
+CREATE INDEX "idx_escalations_status" 
+ON "public"."escalations" (
+  "status" ASC
 );
-CREATE INDEX "idx_knowledge_keywords" 
-ON "public"."knowledge_ai" (
-  "keywords" ASC
+CREATE INDEX "idx_escalations_created" 
+ON "public"."escalations" (
+  "created_at" DESC
+);
+CREATE INDEX "idx_escalations_type" 
+ON "public"."escalations" (
+  "escalation_type" ASC
+);
+CREATE INDEX "idx_escalations_priority" 
+ON "public"."escalations" (
+  "priority_level" ASC
+);
+CREATE INDEX "idx_escalations_cooldown" 
+ON "public"."escalations" (
+  "customer_id" ASC,
+  "status" ASC,
+  "expired_at" ASC
+);
+CREATE INDEX "idx_escalations_snapshot" 
+ON "public"."escalations" (
+  "snapshot_data" ASC
 );
 ALTER TABLE "public"."chat_history" ADD CONSTRAINT "chat_history_customer_id_fkey" FOREIGN KEY ("customer_id") REFERENCES "public"."customers" ("id") ON DELETE CASCADE ON UPDATE NO ACTION;
 ALTER TABLE "public"."escalations" ADD CONSTRAINT "escalations_customer_id_fkey" FOREIGN KEY ("customer_id") REFERENCES "public"."customers" ("id") ON DELETE CASCADE ON UPDATE NO ACTION;
@@ -255,26 +207,7 @@ AS
         CASE
             WHEN (ch.escalated = true) THEN 1
             ELSE NULL::integer
-        END) AS escalation_count,
-    avg(c.conversation_quality_score) AS avg_quality_score
+        END) AS escalation_count
    FROM (customers c
      LEFT JOIN chat_history ch ON ((c.id = ch.customer_id)))
   GROUP BY c.id;;
-CREATE MATERIALIZED VIEW "public"."campaign_performance"
-AS
- SELECT campaign_batch,
-    count(*) AS total_leads,
-    count(
-        CASE
-            WHEN (message_sent = true) THEN 1
-            ELSE NULL::integer
-        END) AS contacted,
-    count(
-        CASE
-            WHEN ((status)::text = 'invalid_whatsapp'::text) THEN 1
-            ELSE NULL::integer
-        END) AS invalid,
-    avg(lead_score) AS avg_lead_score,
-    max(created_at) AS batch_date
-   FROM businesses
-  GROUP BY campaign_batch;;
