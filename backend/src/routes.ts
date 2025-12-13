@@ -63,11 +63,15 @@ router.get('/api/stats', async (_req, res) => {
 
     // 1. Total Customers (All Time) + Trend (Active Monthly)
     const totalCustRes = await pool.query('SELECT COUNT(*)::int as count FROM customers');
+    console.log('[DEBUG stats] Total Customers Query Result:', totalCustRes.rows); // DEBUG LOG
+
     const custTrendStats = await getMonthCount('customers', 'last_message_at'); 
     const custTrend = calcTrend(custTrendStats.curr, custTrendStats.prev);
 
     // 2. Total Chats (All Time) + Trend (Monthly Volume)
     const totalChatRes = await pool.query('SELECT COUNT(*)::int as count FROM chat_history');
+    console.log('[DEBUG stats] Total Chats Query Result:', totalChatRes.rows); // DEBUG LOG
+
     const chatTrendStats = await getMonthCount('chat_history', 'created_at');
     const chatTrend = calcTrend(chatTrendStats.curr, chatTrendStats.prev);
 

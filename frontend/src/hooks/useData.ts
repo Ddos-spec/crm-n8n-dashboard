@@ -22,7 +22,22 @@ export function useDashboardStats() {
     const load = async () => {
       try {
         const res = await api.getDashboardStats();
-        setData(res.data);
+        // Sanitize data to ensure numbers
+        const sanitized = {
+          totalCustomers: parseInt(String(res.data.totalCustomers || 0)),
+          totalChats: parseInt(String(res.data.totalChats || 0)),
+          openEscalations: parseInt(String(res.data.openEscalations || 0)),
+          leadsThisMonth: parseInt(String(res.data.leadsThisMonth || 0)),
+          customerTrend: res.data.customerTrend || '0%',
+          customerTrendStatus: res.data.customerTrendStatus || 'up',
+          chatTrend: res.data.chatTrend || '0%',
+          chatTrendStatus: res.data.chatTrendStatus || 'up',
+          escTrend: res.data.escTrend || '0%',
+          escTrendStatus: res.data.escTrendStatus || 'down',
+          leadsTrend: res.data.leadsTrend || '0%',
+          leadsTrendStatus: res.data.leadsTrendStatus || 'up',
+        };
+        setData(sanitized);
       } catch (err) {
         console.error('load stats', err);
       } finally {
