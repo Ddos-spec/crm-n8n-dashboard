@@ -1,13 +1,26 @@
-const formatUptime = (seconds: number) => {
-  const hrs = Math.floor(seconds / 3600);
-  const mins = Math.floor((seconds % 3600) / 60);
-  const secs = Math.floor(seconds % 60);
-  return `${hrs}h ${mins}m ${secs}s`;
-};
+import { campaigns, customers, escalations } from '../data/mock';
+
+const cards = [
+  {
+    title: 'Customers',
+    value: `${customers.length}`,
+    detail: 'Pelanggan aktif & pending',
+  },
+  {
+    title: 'Eskalasi',
+    value: `${escalations.length}`,
+    detail: 'Kasus perlu respon',
+  },
+  {
+    title: 'Campaign',
+    value: `${campaigns.length}`,
+    detail: 'Marketing aktif',
+  },
+];
 
 const mockHealth = {
   status: 'ok',
-  uptime: 86400 + 3600 + 42,
+  uptime: '99.9% (dummy)',
   requestId: 'dummy-request-id',
   timestamp: new Date().toISOString(),
 };
@@ -18,31 +31,22 @@ export default function Dashboard() {
       <header className="hero">
         <div>
           <p className="eyebrow">Dashboard</p>
-          <h1>Status Backend & Integrasi</h1>
+          <h1>Snapshot Operasional</h1>
           <p className="lede">
-            Dummy view untuk pantau kesehatan API. Hubungkan ke backend nanti dengan VITE_API_URL jika sudah siap.
+            Ringkasan cepat dari Customer Service dan Marketing. Data dummy untuk alur awal, siap dihubungkan ke API.
           </p>
         </div>
         <div className="card">
-          <div className="card-title">Health Check (Dummy)</div>
-          <p className="muted">Data statis agar sederhana (KISS). Integrasi API bisa ditambahkan belakangan.</p>
-          <div className="status-grid">
-            <div className="status-row">
-              <span>Status</span>
-              <span className="status-badge success">{mockHealth.status}</span>
-            </div>
-            <div className="status-row">
-              <span>Uptime</span>
-              <span>{formatUptime(mockHealth.uptime)}</span>
-            </div>
-            <div className="status-row">
-              <span>Request ID</span>
-              <span className="mono">{mockHealth.requestId}</span>
-            </div>
-            <div className="status-row">
-              <span>Timestamp</span>
-              <span>{new Date(mockHealth.timestamp).toLocaleString()}</span>
-            </div>
+          <div className="card-title">Ringkasan Dummy</div>
+          <p className="muted">Gunakan untuk validasi UI; nanti diisi data API.</p>
+          <div className="grid three">
+            {cards.map((card) => (
+              <div key={card.title} className="summary-card">
+                <div className="summary-title">{card.title}</div>
+                <div className="summary-value">{card.value}</div>
+                <div className="muted">{card.detail}</div>
+              </div>
+            ))}
           </div>
         </div>
       </header>
@@ -52,7 +56,7 @@ export default function Dashboard() {
         <ol className="list">
           <li>Set `VITE_API_URL` nanti saat integrasi backend.</li>
           <li>Pastikan CORS memuat domain Vercel dan EasyPanel.</li>
-          <li>Gunakan data dummy ini untuk validasi UI dulu.</li>
+          <li>Sinkronkan CS & Marketing data ke API saat backend siap.</li>
         </ol>
       </section>
     </div>

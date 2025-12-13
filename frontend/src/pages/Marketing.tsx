@@ -1,17 +1,4 @@
-type Campaign = {
-  name: string;
-  channel: 'WhatsApp' | 'Email' | 'SMS';
-  sent: number;
-  openRate: number;
-  ctr: number;
-  revenue: number;
-};
-
-const campaigns: Campaign[] = [
-  { name: 'Flash Sale 12.12', channel: 'WhatsApp', sent: 1800, openRate: 0.78, ctr: 0.31, revenue: 42000000 },
-  { name: 'Re-activate churn', channel: 'Email', sent: 1200, openRate: 0.42, ctr: 0.12, revenue: 9000000 },
-  { name: 'COD Reminder', channel: 'SMS', sent: 800, openRate: 0.55, ctr: 0.09, revenue: 5000000 },
-];
+import { campaigns } from '../data/mock';
 
 const formatNumber = (num: number) => num.toLocaleString('id-ID');
 
