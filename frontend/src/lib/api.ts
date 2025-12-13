@@ -64,12 +64,30 @@ export type ChatMessage = {
   escalated: boolean;
 };
 
+export type DashboardStats = {
+  totalCustomers: number;
+  totalChats: number;
+  openEscalations: number;
+  leadsThisMonth: number;
+  
+  customerTrend: string;
+  customerTrendStatus: 'up' | 'down';
+  chatTrend: string;
+  chatTrendStatus: 'up' | 'down';
+  escTrend: string;
+  escTrendStatus: 'up' | 'down'; // In backend logic we might invert this for display color
+  escTrendInverted?: boolean;
+  leadsTrend: string;
+  leadsTrendStatus: 'up' | 'down';
+};
+
 export const api = {
   getCustomers: () => getJson<{ data: Customer[] }>('/api/customers'),
   getEscalations: () => getJson<{ data: Escalation[] }>('/api/escalations'),
   getChatHistory: (customerId: number) =>
     getJson<{ data: ChatMessage[] }>(`/api/chat-history?customerId=${customerId}`),
   getCampaigns: () => getJson<{ data: Campaign[] }>('/api/marketing'),
+  getDashboardStats: () => getJson<{ data: DashboardStats }>('/api/stats'),
   getBusinesses: (params?: { limit?: number; offset?: number; status?: string; search?: string }) => {
     const query = new URLSearchParams();
     if (params?.limit) query.append('limit', String(params.limit));

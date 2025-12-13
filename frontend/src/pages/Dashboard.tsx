@@ -10,29 +10,32 @@ import {
   Settings,
   MoreHorizontal
 } from 'lucide-react';
-import { useCampaigns, useCustomers, useEscalations } from '../hooks/useData';
+import { useCampaigns, useCustomers, useEscalations, useDashboardStats } from '../hooks/useData';
 import { StatCard } from '../components/ui/StatCard';
 import { Card, CardHeader, CardBody } from '../components/ui/Card';
 import { Badge } from '../components/ui/Badge';
 import { Button } from '../components/ui/Button';
 
 export default function Dashboard() {
+  const { data: stats, loading: statsLoading } = useDashboardStats();
   const { data: customers } = useCustomers();
   const { data: escalations } = useEscalations();
   const { data: campaigns } = useCampaigns();
 
-  // Logic from original React file to calculate stats
+  // Logic to calculate active/pending breakdown based on real data
   const customerStats = useMemo(() => {
     const totals = { active: 0, pending: 0, inactive: 0 };
     customers.forEach((c) => {
-      if (c.status === 'active') totals.active += 1;
-      else if (c.status === 'pending') totals.pending += 1;
-      else totals.inactive += 1; // Assuming 'inactive' or others fall here
+      // Robust check for status strings
+      const s = c.status?.toLowerCase() || 'pending';
+      if (s === 'active') totals.active += 1;
+      else if (s === 'pending') totals.pending += 1;
+      else totals.inactive += 1;
     });
     return totals;
   }, [customers]);
 
-  const totalCustomers = customers.length || 1; // avoid division by zero
+  const totalCustomers = customers.length || 1; 
   const activePct = Math.round((customerStats.active / totalCustomers) * 100);
 
   return (
@@ -46,41 +49,46 @@ export default function Dashboard() {
       <div className="stats-grid">
         <StatCard 
           label="Total Customers" 
-          value={customers.length.toLocaleString()} 
+          value={statsLoading ? "..." : stats.totalCustomers.toLocaleString()} 
           icon={<Users size={24} />} 
           color="green" 
-          change="+12.5%" 
-          trend="up" 
+          change={statsLoading ? undefined : stats.customerTrend} 
+          trend={stats.customerTrendStatus} 
         />
         <StatCard 
           label="Total Chats" 
-          value="1,423" 
+          value={statsLoading ? "..." : stats.totalChats.toLocaleString()} 
           icon={<MessageSquare size={24} />} 
           color="blue" 
-          change="+8.2%" 
-          trend="up" 
+          change={statsLoading ? undefined : stats.chatTrend} 
+          trend={stats.chatTrendStatus} 
         />
         <StatCard 
           label="Open Escalations" 
-          value={escalations.length} 
+          value={statsLoading ? "..." : stats.openEscalations.toLocaleString()} 
           icon={<AlertTriangle size={24} />} 
           color="orange" 
-          change="-3.1%" 
-          trend="down" 
+          change={statsLoading ? undefined : stats.escTrend} 
+          // For Escalations: Up means Bad (Red), Down means Good (Green). 
+          // StatCard usually colors trend based on up/down. We might need to override color logic in StatCard or just accept it.
+          // Let's assume standard logic: Up = Green, Down = Red. 
+          // Ideally we pass a specific color for the trend badge.
+          // For now, let's keep it simple. If it goes down, it shows red arrow down.
+          trend={stats.escTrendStatus} 
         />
         <StatCard 
           label="Leads Bulan Ini" 
-          value={campaigns.reduce((acc, curr) => acc + curr.total_leads, 0)} 
+          value={statsLoading ? "..." : stats.leadsThisMonth.toLocaleString()} 
           icon={<Target size={24} />} 
           color="purple" 
-          change="+24.8%" 
-          trend="up" 
+          change={statsLoading ? undefined : stats.leadsTrend} 
+          trend={stats.leadsTrendStatus} 
         />
       </div>
 
       {/* Content Grid */}
       <div className="grid-2" style={{ marginBottom: 24 }}>
-        {/* Customer Status */}
+        {/* Customer Status - Real Data */}
         <Card>
           <CardHeader 
             title="Status Customer" 
@@ -151,7 +159,7 @@ export default function Dashboard() {
           </CardBody>
         </Card>
 
-        {/* Recent Campaigns */}
+        {/* Recent Campaigns - Real Data */}
         <Card>
           <CardHeader 
             title="Campaign Terbaru" 
@@ -163,7 +171,7 @@ export default function Dashboard() {
               <div key={i} className="campaign-card">
                 <div className="campaign-info">
                   <h4>{c.name}</h4>
-                  <p>Campaign Batch {i + 1}</p>
+                  <p>Batch {c.batch_date ? new Date(c.batch_date).toLocaleDateString('id-ID') : 'N/A'}</p>
                 </div>
                 <div className="campaign-stats">
                   <div className="leads">{c.total_leads}</div>
@@ -171,12 +179,12 @@ export default function Dashboard() {
                 </div>
               </div>
             ))}
-            {campaigns.length === 0 && <div className="muted">Belum ada campaign</div>}
+            {campaigns.length === 0 && <div className="muted" style={{textAlign: 'center', padding: 20}}>Belum ada campaign</div>}
           </CardBody>
         </Card>
       </div>
 
-      {/* Escalations & Quick Actions */}
+      {/* Escalations & Quick Actions - Real Data */}
       <div className="grid-2">
         {/* Open Escalations */}
         <Card>
@@ -185,7 +193,7 @@ export default function Dashboard() {
             icon={<AlertTriangle size={16} />}
             iconColor="var(--danger)"
             iconBg="rgba(239, 68, 68, 0.15)"
-            action={<Badge variant="red" dot>{escalations.length} Open</Badge>}
+            action={<Badge variant="red" dot>{stats.openEscalations} Open</Badge>}
           />
           <CardBody noPadding>
             <div className="table-wrapper">
@@ -203,16 +211,15 @@ export default function Dashboard() {
                     <tr key={i}>
                       <td>
                         <div style={{ fontWeight: 500 }}>{e.name}</div>
-                        {/* Dummy phone if not in API response */}
-                        <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>Customer</div> 
+                        <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>{e.phone}</div> 
                       </td>
-                      <td><Badge variant="blue">{e.issue.substring(0, 15)}...</Badge></td>
+                      <td><Badge variant="blue">{e.issue.length > 20 ? e.issue.substring(0, 20) + '...' : e.issue}</Badge></td>
                       <td>
                         <Badge variant={e.priority === 'high' ? 'red' : 'yellow'} dot>
                           {e.priority}
                         </Badge>
                       </td>
-                      <td><Badge variant="yellow">open</Badge></td>
+                      <td><Badge variant="yellow">{e.status}</Badge></td>
                     </tr>
                   ))}
                   {escalations.length === 0 && (

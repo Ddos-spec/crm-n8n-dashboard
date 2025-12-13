@@ -22,7 +22,7 @@ export function Header() {
     <>
       <header className="header">
         <div className="logo">
-          <div className="logo-icon">TL</div>
+          <img src="/logo.ico" alt="Logo" style={{ width: 45, height: 45, objectFit: 'contain' }} />
           <div className="logo-text">Tepat<span>Laser</span> CRM</div>
         </div>
 

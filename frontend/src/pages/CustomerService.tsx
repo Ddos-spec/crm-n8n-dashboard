@@ -5,7 +5,8 @@ import {
   Send, 
   MoreVertical, 
   Phone,
-  AlertTriangle 
+  AlertTriangle,
+  Download
 } from 'lucide-react';
 import { useCustomerContext } from '../context/customer';
 import { useChat, useCustomers } from '../hooks/useData';
@@ -95,6 +96,38 @@ export default function CustomerService() {
     }
   };
 
+  const handleExportCSV = () => {
+    if (!contactList.length) return;
+
+    // CSV Header
+    const headers = ['Name', 'Phone', 'Status', 'Last Contact'];
+    
+    // CSV Rows
+    const rows = contactList.map(c => [
+      `"${c.name.replace(/"/g, '""')}"`, // Escape quotes
+      `"${c.phone}"`,
+      c.status,
+      c.lastContact
+    ]);
+
+    // Combine
+    const csvContent = [
+      headers.join(','), 
+      ...rows.map(r => r.join(','))
+    ].join('\n');
+
+    // Create Blob and Download
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.setAttribute('href', url);
+    link.setAttribute('download', `customers_export_${new Date().toISOString().split('T')[0]}.csv`);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
   return (
     <div className="page active" id="customer-service">
       <div className="page-header">
@@ -106,7 +139,18 @@ export default function CustomerService() {
         {/* Sidebar Contact List */}
         <div className="contact-list">
           <div className="contact-list-header">
-            <div className="contact-list-title">Kontak</div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+              <div className="contact-list-title" style={{ marginBottom: 0 }}>Kontak</div>
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                onClick={handleExportCSV} 
+                title="Export to CSV"
+                style={{ padding: 6 }}
+              >
+                <Download size={16} />
+              </Button>
+            </div>
             <Input 
               placeholder="Cari customer..." 
               icon={<Search size={16} />}

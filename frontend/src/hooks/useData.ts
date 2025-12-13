@@ -1,5 +1,39 @@
 import { useEffect, useState } from 'react';
-import { api, Campaign, Customer, Escalation, ChatMessage, Business } from '../lib/api';
+import { api, Campaign, Customer, Escalation, ChatMessage, Business, DashboardStats } from '../lib/api';
+
+export function useDashboardStats() {
+  const [data, setData] = useState<DashboardStats>({
+    totalCustomers: 0,
+    totalChats: 0,
+    openEscalations: 0,
+    leadsThisMonth: 0,
+    customerTrend: '0%',
+    customerTrendStatus: 'up',
+    chatTrend: '0%',
+    chatTrendStatus: 'up',
+    escTrend: '0%',
+    escTrendStatus: 'down',
+    leadsTrend: '0%',
+    leadsTrendStatus: 'up'
+  });
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const load = async () => {
+      try {
+        const res = await api.getDashboardStats();
+        setData(res.data);
+      } catch (err) {
+        console.error('load stats', err);
+      } finally {
+        setLoading(false);
+      }
+    };
+    void load();
+  }, []);
+
+  return { data, loading };
+}
 
 export function useCustomers() {
   const [data, setData] = useState<Customer[]>([]);

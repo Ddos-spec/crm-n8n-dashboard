@@ -41,6 +41,82 @@ router.get('/ping', (_req, res) => {
   });
 });
 
+// Dashboard Stats
+router.get('/api/stats', async (_req, res) => {
+  try {
+    const calcTrend = (current: number, previous: number) => {
+      if (previous === 0) return current > 0 ? 100 : 0;
+      return Math.round(((current - previous) / previous) * 100);
+    };
+
+    const getMonthCount = async (table: string, dateCol: string, where = '') => {
+      const q = `
+        SELECT 
+          COUNT(*) FILTER (WHERE date_trunc('month', ${dateCol}) = date_trunc('month', CURRENT_DATE))::int as curr,
+          COUNT(*) FILTER (WHERE date_trunc('month', ${dateCol}) = date_trunc('month', CURRENT_DATE - INTERVAL '1 month'))::int as prev
+        FROM ${table}
+        ${where ? 'WHERE ' + where : ''}
+      `;
+      const res = await pool.query(q);
+      return { curr: res.rows[0].curr, prev: res.rows[0].prev };
+    };
+
+    // 1. Total Customers (All Time) + Trend (Active Monthly)
+    const totalCustRes = await pool.query('SELECT COUNT(*)::int as count FROM customers');
+    const custTrendStats = await getMonthCount('customers', 'last_message_at'); 
+    const custTrend = calcTrend(custTrendStats.curr, custTrendStats.prev);
+
+    // 2. Total Chats (All Time) + Trend (Monthly Volume)
+    const totalChatRes = await pool.query('SELECT COUNT(*)::int as count FROM chat_history');
+    const chatTrendStats = await getMonthCount('chat_history', 'created_at');
+    const chatTrend = calcTrend(chatTrendStats.curr, chatTrendStats.prev);
+
+    // 3. Open Escalations (Current Snapshot) + Trend (New Escalations Month vs Month)
+    const openEscRes = await pool.query("SELECT COUNT(*)::int as count FROM escalations WHERE status = 'open'");
+    const escTrendStats = await getMonthCount('escalations', 'created_at'); // Trend of NEW escalations
+    const escTrend = calcTrend(escTrendStats.curr, escTrendStats.prev);
+
+    // 4. Leads (This Month) + Trend (vs Last Month)
+    const leadsTrendStats = await getMonthCount('businesses', 'created_at');
+    const leadsTrend = calcTrend(leadsTrendStats.curr, leadsTrendStats.prev);
+
+    return res.json({
+      data: {
+        // Values
+        totalCustomers: totalCustRes.rows[0]?.count || 0,
+        totalChats: totalChatRes.rows[0]?.count || 0,
+        openEscalations: openEscRes.rows[0]?.count || 0,
+        leadsThisMonth: leadsTrendStats.curr || 0, // Specifically "This Month"
+
+        // Trends
+        customerTrend: `${custTrend > 0 ? '+' : ''}${custTrend}%`,
+        customerTrendStatus: custTrend >= 0 ? 'up' : 'down',
+
+        chatTrend: `${chatTrend > 0 ? '+' : ''}${chatTrend}%`,
+        chatTrendStatus: chatTrend >= 0 ? 'up' : 'down',
+
+        escTrend: `${escTrend > 0 ? '+' : ''}${escTrend}%`,
+        escTrendStatus: escTrend <= 0 ? 'up' : 'down', // For escalations, down is usually "good" (green), but UI expects 'up'='green'. Let's stick to trend direction.
+        // Wait, UI uses 'up' -> Green, 'down' -> Red. 
+        // For escalations, Increase -> Red (Bad), Decrease -> Green (Good).
+        // Let's invert the status for logic: if trend > 0 (Increase), status = 'down' (Red).
+        escTrendInverted: true, 
+
+        leadsTrend: `${leadsTrend > 0 ? '+' : ''}${leadsTrend}%`,
+        leadsTrendStatus: leadsTrend >= 0 ? 'up' : 'down',
+      },
+      meta: buildMeta(res.locals.requestId),
+    });
+  } catch (error) {
+    console.error('[GET /api/stats]', error);
+    return res.status(500).json({
+      error: 'Internal server error',
+      code: 'STATS_FETCH_FAILED',
+      meta: buildMeta(res.locals.requestId),
+    });
+  }
+});
+
 // Customers
 router.get('/api/customers', async (_req, res) => {
   try {
