@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { useBusinesses, useCampaigns } from '../hooks/useData';
+import { useBusinesses } from '../hooks/useData';
 
 const statusColor = (status: string) => {
   if (status === 'escalation' || status === 'invalid_whatsapp') return 'pill danger';
@@ -21,7 +21,6 @@ const formatScore = (v: unknown) => {
 export default function Marketing() {
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [search, setSearch] = useState('');
-  const { data: campaigns, loading: campaignsLoading } = useCampaigns();
   const { data: businesses, loading: bizLoading } = useBusinesses({
     status: statusFilter === 'all' ? undefined : statusFilter,
     search: search || undefined,
@@ -30,8 +29,7 @@ export default function Marketing() {
   const summary = useMemo(() => {
     const total = businesses.length;
     const contacted = businesses.filter((b) => b.message_sent).length;
-    const invalid = businesses.filter((b) => b.status === 'invalid_whatsapp').length;
-    return { total, contacted, invalid };
+    return { total, contacted };
   }, [businesses]);
 
   return (
@@ -92,40 +90,13 @@ export default function Marketing() {
               <div className="muted">message_sent = true</div>
             </div>
             <div className="summary-card">
-              <div className="summary-title">Invalid</div>
-              <div className="summary-value">{summary.invalid}</div>
-              <div className="muted">status invalid_whatsapp</div>
+              <div className="summary-title">Leads Businesses</div>
+              <div className="summary-value">{summary.total}</div>
+              <div className="muted">Siap dihubungi</div>
             </div>
           </div>
         </div>
       </header>
-
-      <section className="section">
-        <h2>Batch Campaign (campaign_performance)</h2>
-        <div className="table">
-          <div className="table-head">
-            <span>Batch</span>
-            <span>Total Leads</span>
-            <span>Contacted</span>
-            <span>Invalid</span>
-            <span>Avg Score</span>
-            <span>Last Batch</span>
-          </div>
-          {campaignsLoading && <div className="muted">Memuat batch...</div>}
-          {!campaignsLoading && campaigns.length === 0 && <div className="muted">Belum ada data batch.</div>}
-          {!campaignsLoading &&
-            campaigns.map((row) => (
-              <div key={row.name} className="table-row">
-                <span>{row.name}</span>
-                <span>{formatNumber(row.total_leads)}</span>
-                <span>{formatNumber(row.contacted)}</span>
-                <span>{row.invalid}</span>
-                <span>{formatScore(row.avg_lead_score)}</span>
-                <span>{row.batch_date ? new Date(row.batch_date).toLocaleDateString('id-ID') : '-'}</span>
-              </div>
-            ))}
-        </div>
-      </section>
 
       <section className="section">
         <h2>Leads Businesses</h2>
