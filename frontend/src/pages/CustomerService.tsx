@@ -1,7 +1,18 @@
-import { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
+import { 
+  Search, 
+  Paperclip, 
+  Send, 
+  MoreVertical, 
+  Phone,
+  AlertTriangle 
+} from 'lucide-react';
 import { useCustomerContext } from '../context/customer';
 import { useChat, useCustomers } from '../hooks/useData';
 import { api } from '../lib/api';
+import { Input } from '../components/ui/Input';
+import { Badge } from '../components/ui/Badge';
+import { Button } from '../components/ui/Button';
 
 type Contact = {
   name: string;
@@ -11,10 +22,27 @@ type Contact = {
   id: number;
 };
 
-const statusClass = {
-  active: 'pill success',
-  pending: 'pill warning',
-  escalation: 'pill danger',
+// Helper to get initials for avatar
+const getInitials = (name: string) => {
+  return name
+    .split(' ')
+    .map((n) => n[0])
+    .join('')
+    .substring(0, 2)
+    .toUpperCase();
+};
+
+// Helper to generate consistent gradient based on name char code
+const getAvatarGradient = (name: string) => {
+  const hash = name.charCodeAt(0);
+  const gradients = [
+    'linear-gradient(135deg, var(--accent), var(--cyan))',
+    'linear-gradient(135deg, var(--info), var(--purple))',
+    'linear-gradient(135deg, var(--warning), var(--pink))',
+    'linear-gradient(135deg, var(--purple), var(--pink))',
+    'linear-gradient(135deg, var(--danger), var(--warning))',
+  ];
+  return gradients[hash % gradients.length];
 };
 
 export default function CustomerService() {
@@ -25,20 +53,18 @@ export default function CustomerService() {
         id: c.id,
         name: c.name ?? 'Tanpa nama',
         phone: c.phone,
-        status: c.status === 'active' || c.status === 'pending' || c.status === 'escalation' ? c.status : 'pending',
-        lastContact: c.last_message_at ?? 'N/A',
+        status: (['active', 'pending', 'escalation'].includes(c.status) ? c.status : 'pending') as any,
+        lastContact: c.last_message_at ? new Date(c.last_message_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : 'N/A',
       })),
     [customers],
   );
+
   const [selected, setSelected] = useState<Contact | null>(null);
   const { focusName, setFocusName } = useCustomerContext();
   const { data: chatMessages, loading: chatLoading } = useChat(selected?.id);
   const [textMessage, setTextMessage] = useState('');
-  const [mediaUrl, setMediaUrl] = useState('');
-  const [mediaType, setMediaType] = useState<'image' | 'video' | 'audio' | 'document' | 'sticker'>('image');
-  const [sending, setSending] = useState(false);
-  const [sendStatus, setSendStatus] = useState<string | null>(null);
-
+  
+  // Logic for handling focus from other pages
   useEffect(() => {
     if (focusName && contactList.length) {
       const found = contactList.find((c) => c.name === focusName);
@@ -53,154 +79,147 @@ export default function CustomerService() {
     }
   }, [focusName, contactList, setFocusName, selected]);
 
-  useEffect(() => {
-    if (contactList.length && !selected) {
-      setSelected(contactList[0]);
-    }
-  }, [contactList, selected]);
-
   const handleSend = async () => {
-    if (!selected) return;
-    const tasks: Array<() => Promise<Response>> = [];
-    if (textMessage.trim()) {
-      tasks.push(() =>
-        api.sendMessage({
-          mtype: 'text',
-          receiver: selected.phone,
-          text: textMessage.trim(),
-        }),
-      );
-    }
-    if (mediaUrl.trim()) {
-      tasks.push(() =>
-        api.sendMessage({
-          mtype: mediaType,
-          receiver: selected.phone,
-          url: mediaUrl.trim(),
-        }),
-      );
-    }
-    if (tasks.length === 0) {
-      setSendStatus('Isi teks atau URL media terlebih dahulu');
-      return;
-    }
-    setSending(true);
-    setSendStatus(null);
+    if (!selected || !textMessage.trim()) return;
     try {
-      for (const send of tasks) {
-        const res = await send();
-        if (!res.ok) {
-          const errJson = await res.json().catch(() => ({}));
-          throw new Error(errJson.error || 'Gagal mengirim pesan');
-        }
-      }
-      setSendStatus('Terkirim');
+      await api.sendMessage({
+        mtype: 'text',
+        receiver: selected.phone,
+        text: textMessage.trim(),
+      });
       setTextMessage('');
-      setMediaUrl('');
+      // In a real app, we'd optimistically update the UI or refetch
     } catch (err) {
-      setSendStatus(err instanceof Error ? err.message : 'Gagal mengirim');
-    } finally {
-      setSending(false);
+      console.error('Failed to send message', err);
+      alert('Gagal mengirim pesan');
     }
   };
 
   return (
-    <div className="cs-layout">
-      <aside className="cs-sidebar">
-        <div className="cs-header">
-          <div>
-            <div className="eyebrow">Kontak</div>
-            <div className="cs-title">Customer Service</div>
-          </div>
-        </div>
-        <div className="cs-contacts">
-          {loading && <div className="muted">Memuat kontak...</div>}
-          {!loading &&
-            contactList.map((c) => (
-              <button
-                key={c.phone}
-                className={selected?.phone === c.phone ? 'contact active' : 'contact'}
-                type="button"
-                onClick={() => setSelected(c)}
-              >
-                <div className="contact-top">
-                  <span className="contact-name">{c.name}</span>
-                  <span className={statusClass[c.status]}>{c.status}</span>
-                </div>
-                <div className="contact-bottom">
-                  <span className="mono">{c.phone}</span>
-                  <span className="muted">{c.lastContact}</span>
-                </div>
-              </button>
-            ))}
-        </div>
-      </aside>
+    <div className="page active" id="customer-service">
+      <div className="page-header">
+        <h1 className="page-title">Customer Service</h1>
+        <p className="page-subtitle">Kelola percakapan dan eskalasi customer</p>
+      </div>
 
-      <main className="cs-chat">
-        <div className="cs-chat-header">
-          <div>
-            <div className="cs-title">{selected?.name ?? 'Memuat...'}</div>
-            <div className="muted">{selected?.phone ?? ''}</div>
-          </div>
-          {selected ? <div className={statusClass[selected.status]}>{selected.status}</div> : null}
-        </div>
-
-        <div className="chat-window">
-          {chatLoading && <div className="muted">Memuat chat...</div>}
-          {!chatLoading &&
-            chatMessages.map((c) => {
-              const align = ['out', 'outbound', 'agent'].includes(c.message_type) ? 'right' : 'left';
-              return (
-                <div key={c.id} className={align === 'right' ? 'bubble right' : 'bubble left'}>
-                <div className="bubble-meta">
-                  <span>{selected?.name ?? 'Customer'}</span>
-                  <span className="muted">
-                    {c.message_type} | {new Date(c.created_at).toLocaleString()}
-                  </span>
-                </div>
-                <div className="bubble-text">{c.content}</div>
-              </div>
-              );
-            })}
-        </div>
-
-        <div className="cs-input">
-          <textarea
-            className="input"
-            placeholder="Ketik pesan teks (opsional)"
-            value={textMessage}
-            onChange={(e) => setTextMessage(e.target.value)}
-            rows={2}
-          />
-          <div className="stack" style={{ marginTop: 8 }}>
-            <label className="label" htmlFor="mediaType">
-              Jenis media
-            </label>
-            <select
-              id="mediaType"
-              className="input"
-              value={mediaType}
-              onChange={(e) => setMediaType(e.target.value as typeof mediaType)}
-            >
-              <option value="image">Gambar</option>
-              <option value="video">Video</option>
-              <option value="audio">Audio</option>
-              <option value="document">Dokumen</option>
-              <option value="sticker">Sticker</option>
-            </select>
-            <input
-              className="input"
-              placeholder="URL media (opsional)"
-              value={mediaUrl}
-              onChange={(e) => setMediaUrl(e.target.value)}
+      <div className="chat-layout">
+        {/* Sidebar Contact List */}
+        <div className="contact-list">
+          <div className="contact-list-header">
+            <div className="contact-list-title">Kontak</div>
+            <Input 
+              placeholder="Cari customer..." 
+              icon={<Search size={16} />}
             />
-            <button className="button" type="button" disabled={sending} onClick={handleSend}>
-              {sending ? 'Mengirim...' : 'Kirim'}
-            </button>
-            {sendStatus && <div className="muted">{sendStatus}</div>}
+          </div>
+          <div className="contact-list-body">
+            {contactList.map((contact) => (
+              <div 
+                key={contact.id}
+                className={`contact-item ${selected?.id === contact.id ? 'active' : ''}`}
+                onClick={() => setSelected(contact)}
+              >
+                <div 
+                  className="contact-avatar"
+                  style={{ background: getAvatarGradient(contact.name) }}
+                >
+                  {getInitials(contact.name)}
+                </div>
+                <div className="contact-info">
+                  <div className="contact-name">
+                    {contact.name}
+                    <Badge variant="green" className="badge-sm" style={{padding: '2px 8px', fontSize: 10}}>{contact.status}</Badge>
+                  </div>
+                  <div className="contact-phone">{contact.phone}</div>
+                  <div className="contact-preview">Click to view chat history...</div>
+                </div>
+              </div>
+            ))}
+            {contactList.length === 0 && !loading && (
+              <div style={{padding: 20, textAlign: 'center', color: 'var(--text-muted)'}}>Tidak ada kontak</div>
+            )}
           </div>
         </div>
-      </main>
+
+        {/* Main Chat Panel */}
+        <div className="chat-panel">
+          {selected ? (
+            <>
+              {/* Chat Header */}
+              <div className="chat-header">
+                <div className="chat-user">
+                  <div 
+                    className="contact-avatar"
+                    style={{ background: getAvatarGradient(selected.name) }}
+                  >
+                    {getInitials(selected.name)}
+                  </div>
+                  <div className="chat-user-info">
+                    <h3>{selected.name}</h3>
+                    <p>{selected.phone}</p>
+                  </div>
+                </div>
+                <div className="chat-actions">
+                  <Badge variant="green" dot>Active</Badge>
+                  <Button variant="secondary" size="sm" icon={<AlertTriangle size={14}/>}>
+                    Escalate
+                  </Button>
+                  <Button variant="ghost" size="sm">
+                    <MoreVertical size={16} />
+                  </Button>
+                </div>
+              </div>
+
+              {/* Messages Area */}
+              <div className="chat-messages">
+                {chatLoading && <div className="muted" style={{textAlign: 'center', marginTop: 20}}>Memuat chat...</div>}
+                {!chatLoading && chatMessages.length === 0 && (
+                  <div className="empty-state">
+                    <div className="empty-state-icon"><Phone size={32}/></div>
+                    <p>Belum ada riwayat percakapan</p>
+                  </div>
+                )}
+                {chatMessages.map((msg) => {
+                  const isOutgoing = ['out', 'outbound', 'agent'].includes(msg.message_type);
+                  return (
+                    <div key={msg.id} className={`message ${isOutgoing ? 'outgoing' : 'incoming'}`}>
+                      <div className="message-text">{msg.content}</div>
+                      <div className="message-time">
+                        {new Date(msg.created_at).toLocaleString([], { hour: '2-digit', minute: '2-digit' })}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Input Area */}
+              <div className="chat-input-area">
+                <div className="chat-input-wrapper">
+                  <Button variant="ghost">
+                    <Paperclip size={20} />
+                  </Button>
+                  <input 
+                    type="text" 
+                    className="chat-input" 
+                    placeholder="Ketik pesan..."
+                    value={textMessage}
+                    onChange={(e) => setTextMessage(e.target.value)}
+                    onKeyDown={(e) => e.key === 'Enter' && handleSend()}
+                  />
+                  <Button onClick={handleSend} icon={<Send size={18} />}>
+                    Kirim
+                  </Button>
+                </div>
+              </div>
+            </>
+          ) : (
+            <div className="empty-state">
+              <h3>Pilih Customer</h3>
+              <p>Pilih salah satu kontak di sebelah kiri untuk memulai chat</p>
+            </div>
+          )}
+        </div>
+      </div>
     </div>
   );
 }

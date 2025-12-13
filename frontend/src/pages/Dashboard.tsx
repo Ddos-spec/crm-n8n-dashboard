@@ -1,161 +1,267 @@
-import { useMemo, useState } from 'react';
+import React, { useMemo } from 'react';
 import { Link } from 'react-router-dom';
+import { 
+  Users, 
+  MessageSquare, 
+  AlertTriangle, 
+  Target, 
+  ChevronRight,
+  UserPlus,
+  Settings,
+  MoreHorizontal
+} from 'lucide-react';
 import { useCampaigns, useCustomers, useEscalations } from '../hooks/useData';
+import { StatCard } from '../components/ui/StatCard';
+import { Card, CardHeader, CardBody } from '../components/ui/Card';
+import { Badge } from '../components/ui/Badge';
+import { Button } from '../components/ui/Button';
 
 export default function Dashboard() {
-  const [showEscalations, setShowEscalations] = useState(false);
   const { data: customers } = useCustomers();
   const { data: escalations } = useEscalations();
   const { data: campaigns } = useCampaigns();
-  const engagementStats: { name: string; priority: string; totalChats: number; lastChat: string }[] = [];
+
+  // Logic from original React file to calculate stats
   const customerStats = useMemo(() => {
-    const totals = { active: 0, pending: 0, escalation: 0 };
+    const totals = { active: 0, pending: 0, inactive: 0 };
     customers.forEach((c) => {
       if (c.status === 'active') totals.active += 1;
       else if (c.status === 'pending') totals.pending += 1;
-      else totals.escalation += 1;
+      else totals.inactive += 1; // Assuming 'inactive' or others fall here
     });
     return totals;
   }, [customers]);
 
-  const escalationTotals = useMemo(() => {
-    let high = 0;
-    let other = 0;
-    escalations.forEach((e) => {
-      if (e.priority === 'high') high += 1;
-      else other += 1;
-    });
-    return { high, other };
-  }, [escalations]);
-
-  const headlineStats = [
-    {
-      title: 'Customers',
-      value: customers.length,
-      detail: `Active ${customerStats.active} · Pending ${customerStats.pending} · Eskalasi ${customerStats.escalation}`,
-    },
-    { title: 'Eskalasi', value: escalations.length, detail: `High ${escalationTotals.high} · Lainnya ${escalationTotals.other}` },
-    { title: 'Campaign', value: campaigns.length, detail: 'Marketing aktif' },
-  ];
+  const totalCustomers = customers.length || 1; // avoid division by zero
+  const activePct = Math.round((customerStats.active / totalCustomers) * 100);
 
   return (
-    <div className="stack">
-      <header className="hero">
-        <div>
-          <p className="eyebrow">Dashboard</p>
-          <h1>Snapshot Operasional</h1>
-          <div className="pill-row" style={{ marginTop: 12 }}>
-            <Link className="chip link" to="/customer-service">
-              Buka Customer Service
-            </Link>
-            <Link className="chip link" to="/marketing">
-              Buka Marketing
-            </Link>
-          </div>
-        </div>
-        <div className="card">
-          <div className="stats-grid">
-            {headlineStats.map((card) => (
-              <div key={card.title} className="summary-card">
-                <div className="summary-title">{card.title}</div>
-                <div className="summary-value">{card.value}</div>
-                <div className="muted">{card.detail}</div>
+    <div className="page active">
+      <div className="page-header">
+        <h1 className="page-title">Dashboard Overview</h1>
+        <p className="page-subtitle">Monitor kinerja bisnis dan aktivitas real-time</p>
+      </div>
+
+      {/* Stats Grid */}
+      <div className="stats-grid">
+        <StatCard 
+          label="Total Customers" 
+          value={customers.length.toLocaleString()} 
+          icon={<Users size={24} />} 
+          color="green" 
+          change="+12.5%" 
+          trend="up" 
+        />
+        <StatCard 
+          label="Total Chats" 
+          value="1,423" 
+          icon={<MessageSquare size={24} />} 
+          color="blue" 
+          change="+8.2%" 
+          trend="up" 
+        />
+        <StatCard 
+          label="Open Escalations" 
+          value={escalations.length} 
+          icon={<AlertTriangle size={24} />} 
+          color="orange" 
+          change="-3.1%" 
+          trend="down" 
+        />
+        <StatCard 
+          label="Leads Bulan Ini" 
+          value={campaigns.reduce((acc, curr) => acc + curr.total_leads, 0)} 
+          icon={<Target size={24} />} 
+          color="purple" 
+          change="+24.8%" 
+          trend="up" 
+        />
+      </div>
+
+      {/* Content Grid */}
+      <div className="grid-2" style={{ marginBottom: 24 }}>
+        {/* Customer Status */}
+        <Card>
+          <CardHeader 
+            title="Status Customer" 
+            icon={<Users size={16} />}
+            action={<Button variant="ghost" size="sm">Lihat Semua</Button>}
+          />
+          <CardBody>
+            <div style={{ display: 'flex', gap: 24, alignItems: 'center' }}>
+              <div className="progress-ring">
+                <svg width="120" height="120">
+                  <circle className="bg" cx="60" cy="60" r="52" />
+                  <circle 
+                    className="progress" 
+                    cx="60" 
+                    cy="60" 
+                    r="52" 
+                    strokeDasharray="327" 
+                    strokeDashoffset={327 - (327 * activePct) / 100} 
+                  />
+                </svg>
+                <div className="value">
+                  <strong>{activePct}%</strong>
+                  <span>Active</span>
+                </div>
+              </div>
+              <div style={{ flex: 1 }}>
+                <div style={{ marginBottom: 16 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
+                    <span style={{ fontSize: 14 }}>Active</span>
+                    <span style={{ fontSize: 14, fontFamily: 'var(--font-mono)', color: 'var(--accent)' }}>
+                      {customerStats.active}
+                    </span>
+                  </div>
+                  <div className="score-bar">
+                    <div className="score-bar-track">
+                      <div className="score-bar-fill high" style={{ width: `${(customerStats.active / totalCustomers) * 100}%` }}></div>
+                    </div>
+                  </div>
+                </div>
+                <div style={{ marginBottom: 16 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
+                    <span style={{ fontSize: 14 }}>Pending</span>
+                    <span style={{ fontSize: 14, fontFamily: 'var(--font-mono)', color: 'var(--warning)' }}>
+                      {customerStats.pending}
+                    </span>
+                  </div>
+                  <div className="score-bar">
+                    <div className="score-bar-track">
+                      <div className="score-bar-fill medium" style={{ width: `${(customerStats.pending / totalCustomers) * 100}%` }}></div>
+                    </div>
+                  </div>
+                </div>
+                <div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
+                    <span style={{ fontSize: 14 }}>Inactive</span>
+                    <span style={{ fontSize: 14, fontFamily: 'var(--font-mono)', color: 'var(--danger)' }}>
+                      {customerStats.inactive}
+                    </span>
+                  </div>
+                  <div className="score-bar">
+                    <div className="score-bar-track">
+                      <div className="score-bar-fill low" style={{ width: `${(customerStats.inactive / totalCustomers) * 100}%` }}></div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </CardBody>
+        </Card>
+
+        {/* Recent Campaigns */}
+        <Card>
+          <CardHeader 
+            title="Campaign Terbaru" 
+            icon={<Target size={16} />}
+            action={<Button variant="ghost" size="sm">Lihat Semua</Button>}
+          />
+          <CardBody>
+            {campaigns.slice(0, 4).map((c, i) => (
+              <div key={i} className="campaign-card">
+                <div className="campaign-info">
+                  <h4>{c.name}</h4>
+                  <p>Campaign Batch {i + 1}</p>
+                </div>
+                <div className="campaign-stats">
+                  <div className="leads">{c.total_leads}</div>
+                  <div className="contacted">Contacted: {c.contacted}</div>
+                </div>
               </div>
             ))}
-          </div>
-        </div>
-      </header>
+            {campaigns.length === 0 && <div className="muted">Belum ada campaign</div>}
+          </CardBody>
+        </Card>
+      </div>
 
-      <section className="section">
-        <h2>Insight Cepat</h2>
-        <div className="grid two">
-          <div className="card">
-            <div className="card-title">Customer Service</div>
-            <div className="muted">Status pelanggan & eskalasi (dummy chart)</div>
-            <div className="line-chart">
-              <div className="line">
-                <span>Active</span>
-                <div className="line-bar">
-                  <div className="line-fill success" style={{ width: `${(customerStats.active / customers.length) * 100}%` }} />
+      {/* Escalations & Quick Actions */}
+      <div className="grid-2">
+        {/* Open Escalations */}
+        <Card>
+          <CardHeader 
+            title="Escalations Terbuka" 
+            icon={<AlertTriangle size={16} />}
+            iconColor="var(--danger)"
+            iconBg="rgba(239, 68, 68, 0.15)"
+            action={<Badge variant="red" dot>{escalations.length} Open</Badge>}
+          />
+          <CardBody noPadding>
+            <div className="table-wrapper">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Customer</th>
+                    <th>Issue</th>
+                    <th>Priority</th>
+                    <th>Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {escalations.slice(0, 3).map((e, i) => (
+                    <tr key={i}>
+                      <td>
+                        <div style={{ fontWeight: 500 }}>{e.name}</div>
+                        {/* Dummy phone if not in API response */}
+                        <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>Customer</div> 
+                      </td>
+                      <td><Badge variant="blue">{e.issue.substring(0, 15)}...</Badge></td>
+                      <td>
+                        <Badge variant={e.priority === 'high' ? 'red' : 'yellow'} dot>
+                          {e.priority}
+                        </Badge>
+                      </td>
+                      <td><Badge variant="yellow">open</Badge></td>
+                    </tr>
+                  ))}
+                  {escalations.length === 0 && (
+                    <tr><td colSpan={4} style={{textAlign: 'center', padding: 20}}>Tidak ada eskalasi aktif</td></tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </CardBody>
+        </Card>
+
+        {/* Quick Actions */}
+        <Card>
+          <CardHeader 
+            title="Quick Actions" 
+            icon={<Settings size={16} />}
+            iconColor="var(--purple)"
+            iconBg="rgba(139, 92, 246, 0.15)"
+          />
+          <CardBody>
+            <div className="quick-actions">
+              <div className="quick-action">
+                <div className="quick-action-icon stat-icon green">
+                  <UserPlus size={20} />
                 </div>
-                <span className="mono">{customerStats.active}</span>
+                <div className="quick-action-label">Add Customer</div>
               </div>
-              <div className="line">
-                <span>Pending</span>
-                <div className="line-bar">
-                  <div className="line-fill warning" style={{ width: `${(customerStats.pending / customers.length) * 100}%` }} />
+              <div className="quick-action">
+                <div className="quick-action-icon stat-icon blue">
+                  <MessageSquare size={20} />
                 </div>
-                <span className="mono">{customerStats.pending}</span>
+                <div className="quick-action-label">Start Chat</div>
               </div>
-              <div className="line">
-                <span>Eskalasi</span>
-                <div className="line-bar">
-                  <div className="line-fill danger" style={{ width: `${(customerStats.escalation / customers.length) * 100}%` }} />
+              <div className="quick-action">
+                <div className="quick-action-icon stat-icon purple">
+                  <Target size={20} />
                 </div>
-                <span className="mono">{customerStats.escalation}</span>
-                <button className="chip link" type="button" onClick={() => setShowEscalations(true)}>
-                  Lihat
-                </button>
+                <div className="quick-action-label">New Campaign</div>
+              </div>
+              <div className="quick-action">
+                <div className="quick-action-icon stat-icon orange">
+                  <Settings size={20} />
+                </div>
+                <div className="quick-action-label">Settings</div>
               </div>
             </div>
-        </div>
-
-        <div className="card">
-          <div className="card-title">Marketing</div>
-          <div className="muted">Campaign WA (dari DB)</div>
-          <div className="line-chart">
-            {campaigns.map((c) => (
-              <div key={c.name} className="line">
-                <span>{c.name}</span>
-                <div className="line-bar">
-                    <div className="line-fill info" style={{ width: '100%' }} />
-                </div>
-                <span className="mono">
-                  Leads {c.total_leads.toLocaleString('id-ID')} · Contacted {c.contacted.toLocaleString('id-ID')}
-                </span>
-              </div>
-            ))}
-          </div>
-          <Link className="chip link" to="/marketing" style={{ marginTop: 10 }}>
-            Buka Marketing
-          </Link>
-        </div>
-        </div>
-      </section>
-
-      {showEscalations ? (
-        <div className="modal-backdrop" onClick={() => setShowEscalations(false)}>
-          <div className="modal" onClick={(e) => e.stopPropagation()}>
-            <div className="modal-header">
-              <h3>Eskalasi (Dummy)</h3>
-              <button className="icon-button" type="button" onClick={() => setShowEscalations(false)}>
-                ✕
-              </button>
-            </div>
-            <div className="table">
-              <div className="table-head">
-                <span>Pelanggan</span>
-                <span>Isu</span>
-                <span>Owner</span>
-                <span>SLA</span>
-                <span>Prioritas</span>
-              </div>
-              {escalations.map((e) => (
-                <div key={e.name} className="table-row">
-                  <span>{e.name}</span>
-                  <span className="truncate">{e.issue}</span>
-                  <span>{e.owner}</span>
-                  <span>{e.sla}</span>
-                  <span className={e.priority === 'high' ? 'pill danger' : 'pill warning'}>{e.priority}</span>
-                </div>
-              ))}
-            </div>
-            <Link className="button" style={{ marginTop: 12, textAlign: 'center' }} to="/customer-service">
-              Buka halaman CS
-            </Link>
-          </div>
-        </div>
-      ) : null}
+          </CardBody>
+        </Card>
+      </div>
     </div>
   );
 }

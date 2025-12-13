@@ -1,122 +1,59 @@
-import { useEffect, useState } from 'react';
-import { HashRouter, Link, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
-import Dashboard from './pages/Dashboard';
-import CustomerService from './pages/CustomerService';
-import Marketing from './pages/Marketing';
+import { Suspense, lazy } from 'react';
+import { HashRouter, Route, Routes } from 'react-router-dom';
 import { CustomerContextProvider } from './context/customer';
-import { api, Escalation } from './lib/api';
-import { useCustomerContext } from './context/customer';
+import { ThemeProvider } from './context/ThemeContext';
+import { Layout } from './components/layout/Layout';
 
-const links = [
-  { to: '/', label: 'Dashboard' },
-  { to: '/customer-service', label: 'Customer Service' },
-  { to: '/marketing', label: 'Marketing' },
-];
+// Lazy load pages for performance optimization
+const Dashboard = lazy(() => import('./pages/Dashboard'));
+const CustomerService = lazy(() => import('./pages/CustomerService'));
+const Marketing = lazy(() => import('./pages/Marketing'));
 
-function Layout() {
-  const location = useLocation();
-  const navigate = useNavigate();
-  const [showBell, setShowBell] = useState(false);
-  const [escData, setEscData] = useState<Escalation[]>([]);
-  const hasEscalation = escData.length > 0;
-  const { setFocusName } = useCustomerContext();
-
-  useEffect(() => {
-    const loadEsc = async () => {
-      try {
-        const { data } = await api.getEscalations();
-        setEscData(data);
-      } catch (err) {
-        console.error('Failed fetch escalations', err);
-      }
-    };
-    void loadEsc();
-  }, []);
-
-  return (
-    <div className="page">
-      <nav className="nav">
-        <div className="brand">
-          <span className="brand-dot" />
-          Customer Service Tepat Laser
-        </div>
-        <div className="nav-links">
-          {links.map((link) => (
-            <Link
-              key={link.to}
-              to={link.to}
-              className={location.pathname === link.to ? 'nav-link active' : 'nav-link'}
-            >
-              {link.label}
-            </Link>
-          ))}
-          <button
-            className={hasEscalation ? 'icon-button danger' : 'icon-button'}
-            type="button"
-              onClick={() => setShowBell((p) => !p)}
-              aria-label="Lihat eskalasi"
-            >
-              🔔
-              {hasEscalation ? <span className="badge">{escalations.length}</span> : null}
-            </button>
-          </div>
-          {showBell ? (
-            <div className="bell-panel">
-              <div className="bell-header">
-                <span>Eskalasi perlu respon</span>
-                <button className="icon-button" type="button" onClick={() => setShowBell(false)}>
-                  ✕
-                </button>
-              </div>
-            {escData.map((e) => (
-              <div
-                key={e.name}
-                className="bell-row"
-                onClick={() => {
-                  setShowBell(false);
-                  setFocusName(e.name ?? null);
-                  navigate('/customer-service');
-                }}
-              >
-                <div>
-                  <div className="status-title">{e.name}</div>
-                  <div className="muted truncate">{e.issue}</div>
-                </div>
-                <span className={e.priority === 'high' ? 'pill danger' : 'pill warning'}>
-                  {e.priority === 'high' ? 'eskalasi' : 'pending'}
-                </span>
-              </div>
-            ))}
-            <button
-              className="button"
-              type="button"
-              onClick={() => {
-                setShowBell(false);
-                navigate('/customer-service');
-              }}
-            >
-              Buka Customer Service
-            </button>
-          </div>
-        ) : null}
-      </nav>
-
-      <Routes>
-        <Route path="/" element={<Dashboard />} />
-        <Route path="/customer-service" element={<CustomerService />} />
-        <Route path="/marketing" element={<Marketing />} />
-        <Route path="*" element={<Dashboard />} />
-      </Routes>
-    </div>
-  );
-}
+// Simple Loading Spinner for Suspense fallback
+const PageLoader = () => (
+  <div style={{ 
+    display: 'flex', 
+    justifyContent: 'center', 
+    alignItems: 'center', 
+    height: '100%', 
+    minHeight: '400px',
+    color: 'var(--text-muted)' 
+  }}>
+    Loading...
+  </div>
+);
 
 export default function App() {
   return (
     <HashRouter>
-      <CustomerContextProvider>
-        <Layout />
-      </CustomerContextProvider>
+      <ThemeProvider>
+        <CustomerContextProvider>
+          <Routes>
+            <Route element={<Layout />}>
+              <Route path="/" element={
+                <Suspense fallback={<PageLoader />}>
+                  <Dashboard />
+                </Suspense>
+              } />
+              <Route path="/customer-service" element={
+                <Suspense fallback={<PageLoader />}>
+                  <CustomerService />
+                </Suspense>
+              } />
+              <Route path="/marketing" element={
+                <Suspense fallback={<PageLoader />}>
+                  <Marketing />
+                </Suspense>
+              } />
+              <Route path="*" element={
+                <Suspense fallback={<PageLoader />}>
+                  <Dashboard />
+                </Suspense>
+              } />
+            </Route>
+          </Routes>
+        </CustomerContextProvider>
+      </ThemeProvider>
     </HashRouter>
   );
 }

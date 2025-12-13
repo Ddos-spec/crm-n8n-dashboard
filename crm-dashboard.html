@@ -32,6 +32,42 @@
       --font-sans: 'Plus Jakarta Sans', sans-serif;
     }
 
+    /* Light Mode */
+    body.light-mode {
+      --bg-primary: #f8fafc;
+      --bg-secondary: #f1f5f9;
+      --bg-tertiary: #e2e8f0;
+      --bg-card: #ffffff;
+      --bg-hover: #f1f5f9;
+      --border: #e2e8f0;
+      --text-primary: #0f172a;
+      --text-secondary: #475569;
+      --text-muted: #94a3b8;
+      --accent: #10b981;
+      --accent-hover: #059669;
+      --accent-glow: rgba(16, 185, 129, 0.12);
+      --shadow: 0 4px 24px rgba(0,0,0,0.08);
+    }
+
+    body.light-mode .header {
+      background: rgba(248, 250, 252, 0.9);
+    }
+
+    body.light-mode .contact-avatar,
+    body.light-mode .message.outgoing,
+    body.light-mode .btn-primary,
+    body.light-mode .logo-icon,
+    body.light-mode .nav-tab.active {
+      color: #ffffff;
+    }
+
+    body.light-mode .stat-icon.green { background: rgba(16, 185, 129, 0.12); color: #059669; }
+    body.light-mode .stat-icon.blue { background: rgba(59, 130, 246, 0.12); color: #2563eb; }
+    body.light-mode .stat-icon.purple { background: rgba(139, 92, 246, 0.12); color: #7c3aed; }
+    body.light-mode .stat-icon.orange { background: rgba(245, 158, 11, 0.12); color: #d97706; }
+    body.light-mode .stat-icon.pink { background: rgba(236, 72, 153, 0.12); color: #db2777; }
+    body.light-mode .stat-icon.cyan { background: rgba(6, 182, 212, 0.12); color: #0891b2; }
+
     * {
       margin: 0;
       padding: 0;
@@ -1050,6 +1086,213 @@
         max-height: 300px;
       }
     }
+
+    /* Theme Toggle */
+    .theme-toggle {
+      width: 40px;
+      height: 40px;
+      border-radius: var(--radius-sm);
+      border: 1px solid var(--border);
+      background: var(--bg-tertiary);
+      color: var(--text-secondary);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.3s ease;
+    }
+
+    .theme-toggle:hover {
+      background: var(--bg-hover);
+      color: var(--text-primary);
+      border-color: var(--accent);
+    }
+
+    .theme-toggle .icon-sun,
+    .theme-toggle .icon-moon {
+      transition: all 0.3s ease;
+    }
+
+    body:not(.light-mode) .theme-toggle .icon-sun {
+      display: none;
+    }
+
+    body.light-mode .theme-toggle .icon-moon {
+      display: none;
+    }
+
+    /* Notification Dropdown */
+    .notification-wrapper {
+      position: relative;
+    }
+
+    .notification-dropdown {
+      position: absolute;
+      top: calc(100% + 12px);
+      right: 0;
+      width: 380px;
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      opacity: 0;
+      visibility: hidden;
+      transform: translateY(-10px);
+      transition: all 0.2s ease;
+      z-index: 1000;
+    }
+
+    .notification-dropdown.active {
+      opacity: 1;
+      visibility: visible;
+      transform: translateY(0);
+    }
+
+    .notification-dropdown::before {
+      content: '';
+      position: absolute;
+      top: -6px;
+      right: 16px;
+      width: 12px;
+      height: 12px;
+      background: var(--bg-card);
+      border-left: 1px solid var(--border);
+      border-top: 1px solid var(--border);
+      transform: rotate(45deg);
+    }
+
+    .notification-header {
+      padding: 16px 20px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .notification-header h3 {
+      font-size: 14px;
+      font-weight: 600;
+    }
+
+    .notification-header .mark-read {
+      font-size: 12px;
+      color: var(--accent);
+      background: none;
+      border: none;
+      cursor: pointer;
+      font-family: var(--font-sans);
+    }
+
+    .notification-header .mark-read:hover {
+      text-decoration: underline;
+    }
+
+    .notification-list {
+      max-height: 400px;
+      overflow-y: auto;
+    }
+
+    .notification-item {
+      padding: 16px 20px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      gap: 14px;
+      cursor: pointer;
+      transition: background 0.2s ease;
+    }
+
+    .notification-item:hover {
+      background: var(--bg-hover);
+    }
+
+    .notification-item:last-child {
+      border-bottom: none;
+    }
+
+    .notification-item.unread {
+      background: var(--accent-glow);
+    }
+
+    .notification-item.unread:hover {
+      background: rgba(16, 185, 129, 0.1);
+    }
+
+    .notification-icon {
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+
+    .notification-icon.chat {
+      background: rgba(59, 130, 246, 0.15);
+      color: var(--info);
+    }
+
+    .notification-icon.escalation {
+      background: rgba(239, 68, 68, 0.15);
+      color: var(--danger);
+    }
+
+    .notification-icon.lead {
+      background: rgba(16, 185, 129, 0.15);
+      color: var(--accent);
+    }
+
+    .notification-content {
+      flex: 1;
+      min-width: 0;
+    }
+
+    .notification-content p {
+      font-size: 13px;
+      line-height: 1.4;
+      margin-bottom: 4px;
+    }
+
+    .notification-content p strong {
+      font-weight: 600;
+    }
+
+    .notification-content .time {
+      font-size: 11px;
+      color: var(--text-muted);
+    }
+
+    .notification-footer {
+      padding: 12px 20px;
+      border-top: 1px solid var(--border);
+      text-align: center;
+    }
+
+    .notification-footer a {
+      font-size: 13px;
+      color: var(--accent);
+      text-decoration: none;
+      font-weight: 500;
+    }
+
+    .notification-footer a:hover {
+      text-decoration: underline;
+    }
+
+    /* Overlay for closing dropdown */
+    .dropdown-overlay {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      z-index: 999;
+    }
+
+    .dropdown-overlay.active {
+      display: block;
+    }
   </style>
 </head>
 <body>
@@ -1080,11 +1323,82 @@
         <span class="status-dot"></span>
         Online
       </div>
-      <button class="notification-btn">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
-        <span class="badge">3</span>
+
+      <!-- Theme Toggle -->
+      <button class="theme-toggle" id="themeToggle" title="Toggle Dark/Light Mode">
+        <svg class="icon-moon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+        <svg class="icon-sun" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
       </button>
+
+      <!-- Notification -->
+      <div class="notification-wrapper">
+        <button class="notification-btn" id="notificationBtn">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+          <span class="badge" id="notificationCount">3</span>
+        </button>
+
+        <!-- Notification Dropdown -->
+        <div class="notification-dropdown" id="notificationDropdown">
+          <div class="notification-header">
+            <h3>Notifikasi</h3>
+            <button class="mark-read" id="markAllRead">Tandai semua dibaca</button>
+          </div>
+          <div class="notification-list" id="notificationList">
+            <div class="notification-item unread" data-id="1">
+              <div class="notification-icon escalation">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+              </div>
+              <div class="notification-content">
+                <p><strong>Escalation baru</strong> dari Ceuna mengenai pricing membutuhkan perhatian segera</p>
+                <span class="time">5 menit yang lalu</span>
+              </div>
+            </div>
+            <div class="notification-item unread" data-id="2">
+              <div class="notification-icon chat">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+              </div>
+              <div class="notification-content">
+                <p><strong>Pesan baru</strong> dari Ian Tachy: "Apakah bisa cutting bahan stainless?"</p>
+                <span class="time">12 menit yang lalu</span>
+              </div>
+            </div>
+            <div class="notification-item unread" data-id="3">
+              <div class="notification-icon lead">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="8.5" cy="7" r="4"/><line x1="20" y1="8" x2="20" y2="14"/><line x1="23" y1="11" x2="17" y2="11"/></svg>
+              </div>
+              <div class="notification-content">
+                <p><strong>Lead baru</strong> PT Metalindo Pratama dengan score 92 ditambahkan</p>
+                <span class="time">1 jam yang lalu</span>
+              </div>
+            </div>
+            <div class="notification-item" data-id="4">
+              <div class="notification-icon chat">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+              </div>
+              <div class="notification-content">
+                <p><strong>Tepat Laser</strong> mengirim pesan: "Terima kasih atas informasinya"</p>
+                <span class="time">2 jam yang lalu</span>
+              </div>
+            </div>
+            <div class="notification-item" data-id="5">
+              <div class="notification-icon lead">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+              </div>
+              <div class="notification-content">
+                <p>Campaign <strong>batch_oct_2025_02</strong> berhasil menghubungi 1 lead</p>
+                <span class="time">3 jam yang lalu</span>
+              </div>
+            </div>
+          </div>
+          <div class="notification-footer">
+            <a href="#" id="viewAllNotifications">Lihat semua notifikasi</a>
+          </div>
+        </div>
+      </div>
     </div>
+
+    <!-- Dropdown Overlay -->
+    <div class="dropdown-overlay" id="dropdownOverlay"></div>
   </header>
 
   <!-- Main Content -->
@@ -1830,6 +2144,143 @@
         }, index * 100);
       });
     });
+
+    // =====================
+    // Theme Toggle
+    // =====================
+    const themeToggle = document.getElementById('themeToggle');
+    const body = document.body;
+
+    // Check for saved theme preference
+    const savedTheme = localStorage.getItem('theme');
+    if (savedTheme === 'light') {
+      body.classList.add('light-mode');
+    }
+
+    themeToggle.addEventListener('click', () => {
+      body.classList.toggle('light-mode');
+      
+      // Save preference
+      if (body.classList.contains('light-mode')) {
+        localStorage.setItem('theme', 'light');
+      } else {
+        localStorage.setItem('theme', 'dark');
+      }
+
+      // Add animation
+      themeToggle.style.transform = 'rotate(360deg)';
+      setTimeout(() => {
+        themeToggle.style.transform = 'rotate(0deg)';
+      }, 300);
+    });
+
+    // =====================
+    // Notification Dropdown
+    // =====================
+    const notificationBtn = document.getElementById('notificationBtn');
+    const notificationDropdown = document.getElementById('notificationDropdown');
+    const dropdownOverlay = document.getElementById('dropdownOverlay');
+    const notificationCount = document.getElementById('notificationCount');
+    const markAllRead = document.getElementById('markAllRead');
+    const notificationList = document.getElementById('notificationList');
+
+    // Toggle dropdown
+    notificationBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      notificationDropdown.classList.toggle('active');
+      dropdownOverlay.classList.toggle('active');
+    });
+
+    // Close dropdown when clicking overlay
+    dropdownOverlay.addEventListener('click', () => {
+      notificationDropdown.classList.remove('active');
+      dropdownOverlay.classList.remove('active');
+    });
+
+    // Close dropdown when clicking outside
+    document.addEventListener('click', (e) => {
+      if (!notificationDropdown.contains(e.target) && !notificationBtn.contains(e.target)) {
+        notificationDropdown.classList.remove('active');
+        dropdownOverlay.classList.remove('active');
+      }
+    });
+
+    // Mark all as read
+    markAllRead.addEventListener('click', () => {
+      const unreadItems = notificationList.querySelectorAll('.notification-item.unread');
+      unreadItems.forEach(item => {
+        item.classList.remove('unread');
+      });
+      updateNotificationCount();
+    });
+
+    // Mark individual notification as read
+    notificationList.addEventListener('click', (e) => {
+      const item = e.target.closest('.notification-item');
+      if (item && item.classList.contains('unread')) {
+        item.classList.remove('unread');
+        updateNotificationCount();
+      }
+    });
+
+    // Update notification count
+    function updateNotificationCount() {
+      const unreadCount = notificationList.querySelectorAll('.notification-item.unread').length;
+      notificationCount.textContent = unreadCount;
+      
+      if (unreadCount === 0) {
+        notificationCount.style.display = 'none';
+      } else {
+        notificationCount.style.display = 'flex';
+      }
+    }
+
+    // Simulate new notification (demo)
+    function addNewNotification(type, message, time) {
+      const iconMap = {
+        chat: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>`,
+        escalation: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>`,
+        lead: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="8.5" cy="7" r="4"/><line x1="20" y1="8" x2="20" y2="14"/><line x1="23" y1="11" x2="17" y2="11"/></svg>`
+      };
+
+      const newItem = document.createElement('div');
+      newItem.className = 'notification-item unread';
+      newItem.innerHTML = `
+        <div class="notification-icon ${type}">
+          ${iconMap[type]}
+        </div>
+        <div class="notification-content">
+          <p>${message}</p>
+          <span class="time">${time}</span>
+        </div>
+      `;
+
+      notificationList.insertBefore(newItem, notificationList.firstChild);
+      updateNotificationCount();
+
+      // Shake the bell
+      notificationBtn.style.animation = 'shake 0.5s ease';
+      setTimeout(() => {
+        notificationBtn.style.animation = '';
+      }, 500);
+    }
+
+    // Add shake animation
+    const style = document.createElement('style');
+    style.textContent = `
+      @keyframes shake {
+        0%, 100% { transform: rotate(0); }
+        25% { transform: rotate(-15deg); }
+        50% { transform: rotate(15deg); }
+        75% { transform: rotate(-10deg); }
+      }
+    `;
+    document.head.appendChild(style);
+
+    // Demo: Add notification after 10 seconds
+    setTimeout(() => {
+      addNewNotification('chat', '<strong>Accord Bizpark</strong> mengirim pesan baru tentang batch order', 'Baru saja');
+    }, 10000);
   </script>
 </body>
 </html>
