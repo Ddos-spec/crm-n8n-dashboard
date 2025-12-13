@@ -13,6 +13,10 @@ const statusLabel = (status: string) => {
 };
 
 const formatNumber = (num?: number | null) => (typeof num === 'number' ? num.toLocaleString('id-ID') : '-');
+const formatScore = (v: unknown) => {
+  const n = Number(v);
+  return Number.isFinite(n) ? n.toFixed(0) : '-';
+};
 
 export default function Marketing() {
   const [statusFilter, setStatusFilter] = useState<string>('all');
@@ -116,7 +120,7 @@ export default function Marketing() {
                 <span>{formatNumber(row.total_leads)}</span>
                 <span>{formatNumber(row.contacted)}</span>
                 <span>{row.invalid}</span>
-                <span>{row.avg_lead_score.toFixed(0)}</span>
+                <span>{formatScore(row.avg_lead_score)}</span>
                 <span>{row.batch_date ? new Date(row.batch_date).toLocaleDateString('id-ID') : '-'}</span>
               </div>
             ))}
