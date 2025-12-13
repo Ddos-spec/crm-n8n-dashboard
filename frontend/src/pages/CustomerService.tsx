@@ -90,13 +90,19 @@ export default function CustomerService() {
   const [textMessage, setTextMessage] = useState('');
   const chatMessagesEndRef = useRef<HTMLDivElement>(null);
   const chatMessagesContainerRef = useRef<HTMLDivElement>(null);
+  const previousSelectedId = useRef<number | undefined>(undefined);
 
-  // Auto scroll to bottom when new messages arrive or customer changes
+  // Auto scroll to bottom only when customer changes (first load)
   useEffect(() => {
-    if (chatMessages.length > 0 && !chatLoading) {
-      chatMessagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    // Only scroll if customer changed (not pagination)
+    if (selected?.id !== previousSelectedId.current && chatMessages.length > 0 && !chatLoading) {
+      // Use timeout to ensure DOM is updated
+      setTimeout(() => {
+        chatMessagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+      }, 100);
     }
-  }, [chatMessages, chatLoading, selected?.id]);
+    previousSelectedId.current = selected?.id;
+  }, [selected?.id, chatMessages.length, chatLoading]);
 
   // Logic for handling focus from other pages
   useEffect(() => {
@@ -164,7 +170,6 @@ export default function CustomerService() {
     <div className="page active" id="customer-service">
       <div className="page-header">
         <h1 className="page-title">Customer Service</h1>
-        <p className="page-subtitle">Kelola percakapan dan eskalasi customer</p>
       </div>
 
       <div className="chat-layout">
