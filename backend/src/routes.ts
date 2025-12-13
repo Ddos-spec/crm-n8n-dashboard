@@ -120,7 +120,7 @@ router.get('/api/stats', async (_req, res) => {
 // Customers
 router.get('/api/customers', async (req, res) => {
   try {
-    const limit = Math.min(parseInt(String(req.query.limit ?? '20'), 10) || 20, 100);
+    const limit = Math.min(parseInt(String(req.query.limit ?? '20'), 10) || 20, 1000); // Increased cap from 100 to 1000
     const offset = Math.max(parseInt(String(req.query.offset ?? '0'), 10) || 0, 0);
     const search = req.query.search ? String(req.query.search) : null;
 
@@ -204,7 +204,7 @@ router.get('/api/chat-history', async (req, res) => {
        FROM chat_history
        WHERE customer_id = $1
        ORDER BY created_at DESC
-       LIMIT 50`,
+       LIMIT 1000`, // Increased from 50 to 1000 to show more chat history
       [customerId],
     );
     return res.json({ data: result.rows, meta: buildMeta(res.locals.requestId) });

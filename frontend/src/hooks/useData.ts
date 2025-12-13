@@ -55,7 +55,7 @@ export function useCustomers(search?: string) {
   const [loading, setLoading] = useState(true);
   const [hasMore, setHasMore] = useState(true);
   const [offset, setOffset] = useState(0);
-  const LIMIT = 20;
+  const LIMIT = 500; // Increased from 20 to 500 to load more customers at once
 
   // Reset when search changes
   useEffect(() => {
