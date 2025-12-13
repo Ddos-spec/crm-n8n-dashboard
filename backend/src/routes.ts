@@ -199,15 +199,24 @@ router.get('/api/chat-history', async (req, res) => {
         meta: buildMeta(res.locals.requestId),
       });
     }
+
+    // Support pagination for better performance
+    const limit = Math.min(parseInt(String(req.query.limit ?? '50'), 10) || 50, 200); // Max 200 per request
+    const offset = Math.max(parseInt(String(req.query.offset ?? '0'), 10) || 0, 0);
+
     const result = await pool.query(
       `SELECT id, customer_id, message_type, content, created_at, escalated
        FROM chat_history
        WHERE customer_id = $1
        ORDER BY created_at DESC
-       LIMIT 1000`, // Increased from 50 to 1000 to show more chat history
-      [customerId],
+       LIMIT $2 OFFSET $3`,
+      [customerId, limit, offset],
     );
-    return res.json({ data: result.rows, meta: buildMeta(res.locals.requestId) });
+
+    return res.json({
+      data: result.rows,
+      meta: { ...buildMeta(res.locals.requestId), limit, offset }
+    });
   } catch (error) {
     console.error('[GET /api/chat-history]', error);
     return res.status(500).json({
