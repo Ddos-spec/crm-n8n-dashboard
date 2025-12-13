@@ -597,6 +597,8 @@ tr:last-child td {
 .contact-list-body {
   flex: 1;
   overflow-y: auto;
+  overflow-x: hidden;
+  min-height: 0; /* Fix for flex scroll */
 }
 
 .contact-item {
@@ -709,9 +711,11 @@ tr:last-child td {
   flex: 1;
   padding: 24px;
   overflow-y: auto;
+  overflow-x: hidden;
   display: flex;
   flex-direction: column;
   gap: 16px;
+  min-height: 0; /* Fix for flex scroll */
 }
 
 .message {

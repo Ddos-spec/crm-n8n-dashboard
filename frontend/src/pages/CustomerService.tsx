@@ -111,14 +111,16 @@ export default function CustomerService() {
       if (found) {
         setSelected(found);
         setFocusName(null);
-        return;
       }
     }
-    // Only auto-select first if not searching and list loaded
-    if (!selected && contactList.length > 0 && !loading) {
+  }, [focusName, contactList, setFocusName]);
+
+  // Auto-select first contact on initial load only
+  useEffect(() => {
+    if (!selected && contactList.length > 0 && !loading && !searchTerm) {
       setSelected(contactList[0]);
     }
-  }, [focusName, contactList, setFocusName, selected, loading]);
+  }, [contactList.length, loading, searchTerm]);
 
   const handleSend = async () => {
     if (!selected || !textMessage.trim()) return;
@@ -167,12 +169,8 @@ export default function CustomerService() {
   };
 
   return (
-    <div className="page active" id="customer-service">
-      <div className="page-header">
-        <h1 className="page-title">Customer Service</h1>
-      </div>
-
-      <div className="chat-layout">
+    <div className="page active" id="customer-service" style={{ padding: 0 }}>
+      <div className="chat-layout" style={{ height: '100vh', borderRadius: 0, border: 'none' }}>
         {/* Sidebar Contact List */}
         <div className="contact-list">
           <div className="contact-list-header">
