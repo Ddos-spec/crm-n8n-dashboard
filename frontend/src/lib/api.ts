@@ -56,4 +56,11 @@ export const api = {
   getChatHistory: (customerId: number) =>
     getJson<{ data: ChatMessage[] }>(`/api/chat-history?customerId=${customerId}`),
   getCampaigns: () => getJson<{ data: Campaign[] }>('/api/campaigns'),
+  sendMessage: (body: {
+    mtype: string;
+    receiver: string;
+    text?: string;
+    url?: string;
+    filename?: string;
+  }) => fetch(buildUrl('/api/send-message'), { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }),
 };

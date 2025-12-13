@@ -4,7 +4,7 @@ import { useCampaigns } from '../hooks/useData';
 const formatNumber = (num: number) => num.toLocaleString('id-ID');
 
 export default function Marketing() {
-  const { data: campaigns } = useCampaigns();
+  const { data: campaigns, loading } = useCampaigns();
   const [selected, setSelected] = useState<number>(0);
   const [audience, setAudience] = useState('Semua pelanggan');
 
@@ -35,7 +35,9 @@ export default function Marketing() {
               <span>Invalid</span>
               <span>Avg score</span>
             </div>
-            {campaigns.map((c, idx) => (
+            {loading && <div className="muted">Memuat kampanye...</div>}
+            {!loading && campaigns.length === 0 && <div className="muted">Belum ada data kampanye.</div>}
+            {!loading && campaigns.map((c, idx) => (
               <button
                 key={c.name}
                 className={selected === idx ? 'table-row selectable selected' : 'table-row selectable'}
@@ -80,7 +82,7 @@ export default function Marketing() {
             </div>
           </div>
           ) : (
-            <div className="muted">Pilih kampanye.</div>
+            <div className="muted">{loading ? 'Memuat kampanye...' : 'Pilih kampanye.'}</div>
           )}
           <div className="stack" style={{ marginTop: 12 }}>
             <label className="label" htmlFor="audience">

@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useCustomerContext } from '../context/customer';
 import { useChat, useCustomers } from '../hooks/useData';
+import { api } from '../lib/api';
 
 type Contact = {
   name: string;
@@ -24,7 +25,7 @@ export default function CustomerService() {
         id: c.id,
         name: c.name ?? 'Tanpa nama',
         phone: c.phone,
-        status: c.status,
+        status: c.status === 'active' || c.status === 'pending' || c.status === 'escalation' ? c.status : 'pending',
         lastContact: c.last_message_at ?? 'N/A',
       })),
     [customers],
@@ -32,6 +33,11 @@ export default function CustomerService() {
   const [selected, setSelected] = useState<Contact | null>(null);
   const { focusName, setFocusName } = useCustomerContext();
   const { data: chatMessages, loading: chatLoading } = useChat(selected?.id);
+  const [textMessage, setTextMessage] = useState('');
+  const [mediaUrl, setMediaUrl] = useState('');
+  const [mediaType, setMediaType] = useState<'image' | 'video' | 'audio' | 'document' | 'sticker'>('image');
+  const [sending, setSending] = useState(false);
+  const [sendStatus, setSendStatus] = useState<string | null>(null);
 
   useEffect(() => {
     if (focusName && contactList.length) {
@@ -52,6 +58,51 @@ export default function CustomerService() {
       setSelected(contactList[0]);
     }
   }, [contactList, selected]);
+
+  const handleSend = async () => {
+    if (!selected) return;
+    const tasks: Array<() => Promise<Response>> = [];
+    if (textMessage.trim()) {
+      tasks.push(() =>
+        api.sendMessage({
+          mtype: 'text',
+          receiver: selected.phone,
+          text: textMessage.trim(),
+        }),
+      );
+    }
+    if (mediaUrl.trim()) {
+      tasks.push(() =>
+        api.sendMessage({
+          mtype: mediaType,
+          receiver: selected.phone,
+          url: mediaUrl.trim(),
+        }),
+      );
+    }
+    if (tasks.length === 0) {
+      setSendStatus('Isi teks atau URL media terlebih dahulu');
+      return;
+    }
+    setSending(true);
+    setSendStatus(null);
+    try {
+      for (const send of tasks) {
+        const res = await send();
+        if (!res.ok) {
+          const errJson = await res.json().catch(() => ({}));
+          throw new Error(errJson.error || 'Gagal mengirim pesan');
+        }
+      }
+      setSendStatus('Terkirim');
+      setTextMessage('');
+      setMediaUrl('');
+    } catch (err) {
+      setSendStatus(err instanceof Error ? err.message : 'Gagal mengirim');
+    } finally {
+      setSending(false);
+    }
+  };
 
   return (
     <div className="cs-layout">
@@ -114,10 +165,40 @@ export default function CustomerService() {
         </div>
 
         <div className="cs-input">
-          <input className="input" placeholder="Ketik pesan..." />
-          <button className="button" type="button">
-            Kirim
-          </button>
+          <textarea
+            className="input"
+            placeholder="Ketik pesan teks (opsional)"
+            value={textMessage}
+            onChange={(e) => setTextMessage(e.target.value)}
+            rows={2}
+          />
+          <div className="stack" style={{ marginTop: 8 }}>
+            <label className="label" htmlFor="mediaType">
+              Jenis media
+            </label>
+            <select
+              id="mediaType"
+              className="input"
+              value={mediaType}
+              onChange={(e) => setMediaType(e.target.value as typeof mediaType)}
+            >
+              <option value="image">Gambar</option>
+              <option value="video">Video</option>
+              <option value="audio">Audio</option>
+              <option value="document">Dokumen</option>
+              <option value="sticker">Sticker</option>
+            </select>
+            <input
+              className="input"
+              placeholder="URL media (opsional)"
+              value={mediaUrl}
+              onChange={(e) => setMediaUrl(e.target.value)}
+            />
+            <button className="button" type="button" disabled={sending} onClick={handleSend}>
+              {sending ? 'Mengirim...' : 'Kirim'}
+            </button>
+            {sendStatus && <div className="muted">{sendStatus}</div>}
+          </div>
         </div>
       </main>
     </div>

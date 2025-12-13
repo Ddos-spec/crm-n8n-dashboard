@@ -170,7 +170,6 @@ app.get('/api/campaigns', async (_req, res) => {
               avg_lead_score,
               batch_date
        FROM campaign_performance
-       WHERE campaign_batch ILIKE 'WA%'
        ORDER BY batch_date DESC NULLS LAST
        LIMIT 50`,
     );
@@ -180,6 +179,98 @@ app.get('/api/campaigns', async (_req, res) => {
     return res.status(500).json({
       error: 'Internal server error',
       code: 'CAMPAIGNS_FETCH_FAILED',
+      meta: buildMeta(res.locals.requestId),
+    });
+  }
+});
+
+app.post('/api/send-message', async (req, res) => {
+  try {
+    if (!config.whatsappUrl || !config.whatsappApiKey) {
+      return res.status(500).json({
+        error: 'WhatsApp gateway not configured',
+        code: 'WHATSAPP_CONFIG_MISSING',
+        meta: buildMeta(res.locals.requestId),
+      });
+    }
+
+    const { mtype, receiver, text, url, filename } = req.body as {
+      mtype?: string;
+      receiver?: string;
+      text?: string;
+      url?: string;
+      filename?: string;
+    };
+
+    const allowedTypes = ['text', 'image', 'video', 'audio', 'audioconvert', 'document', 'sticker', 'stickerconvert'];
+
+    if (!mtype || !allowedTypes.includes(mtype)) {
+      return res.status(400).json({
+        error: 'Invalid mtype',
+        code: 'INVALID_MTYPE',
+        meta: buildMeta(res.locals.requestId),
+      });
+    }
+
+    if (!receiver) {
+      return res.status(400).json({
+        error: 'receiver is required',
+        code: 'INVALID_RECEIVER',
+        meta: buildMeta(res.locals.requestId),
+      });
+    }
+
+    if (mtype === 'text' && !text) {
+      return res.status(400).json({
+        error: 'text is required for mtype=text',
+        code: 'INVALID_TEXT',
+        meta: buildMeta(res.locals.requestId),
+      });
+    }
+
+    if (mtype !== 'text' && !url) {
+      return res.status(400).json({
+        error: 'url is required for media message',
+        code: 'INVALID_URL',
+        meta: buildMeta(res.locals.requestId),
+      });
+    }
+
+    const payload = {
+      apikey: config.whatsappApiKey,
+      mtype,
+      receiver,
+      text,
+      url,
+      filename,
+    };
+
+    const gwRes = await fetch(config.whatsappUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+
+    const gwJson = await gwRes.json().catch(() => ({}));
+
+    if (!gwRes.ok) {
+      return res.status(502).json({
+        error: 'Gateway error',
+        code: 'WHATSAPP_GATEWAY_FAILED',
+        details: gwJson,
+        meta: buildMeta(res.locals.requestId),
+      });
+    }
+
+    return res.status(200).json({
+      data: gwJson,
+      meta: buildMeta(res.locals.requestId),
+    });
+  } catch (error) {
+    console.error('[POST /api/send-message]', error);
+    return res.status(500).json({
+      error: 'Internal server error',
+      code: 'SEND_MESSAGE_FAILED',
       meta: buildMeta(res.locals.requestId),
     });
   }
