@@ -1,0 +1,1835 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Tepat Laser CRM</title>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg-primary: #0a0a0b;
+      --bg-secondary: #111113;
+      --bg-tertiary: #18181b;
+      --bg-card: #1c1c1f;
+      --bg-hover: #27272a;
+      --border: #2e2e32;
+      --text-primary: #fafafa;
+      --text-secondary: #a1a1aa;
+      --text-muted: #71717a;
+      --accent: #10b981;
+      --accent-hover: #059669;
+      --accent-glow: rgba(16, 185, 129, 0.15);
+      --warning: #f59e0b;
+      --danger: #ef4444;
+      --info: #3b82f6;
+      --purple: #8b5cf6;
+      --pink: #ec4899;
+      --cyan: #06b6d4;
+      --radius: 12px;
+      --radius-sm: 8px;
+      --shadow: 0 4px 24px rgba(0,0,0,0.4);
+      --font-mono: 'JetBrains Mono', monospace;
+      --font-sans: 'Plus Jakarta Sans', sans-serif;
+    }
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: var(--font-sans);
+      background: var(--bg-primary);
+      color: var(--text-primary);
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+
+    /* Scrollbar */
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: var(--bg-secondary);
+    }
+    ::-webkit-scrollbar-thumb {
+      background: var(--border);
+      border-radius: 3px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: var(--text-muted);
+    }
+
+    /* Header */
+    .header {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 64px;
+      background: rgba(10, 10, 11, 0.8);
+      backdrop-filter: blur(20px);
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 24px;
+      z-index: 100;
+    }
+
+    .logo {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .logo-icon {
+      width: 36px;
+      height: 36px;
+      background: linear-gradient(135deg, var(--accent), var(--cyan));
+      border-radius: var(--radius-sm);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 700;
+      font-size: 14px;
+      color: var(--bg-primary);
+    }
+
+    .logo-text {
+      font-weight: 700;
+      font-size: 18px;
+      letter-spacing: -0.5px;
+    }
+
+    .logo-text span {
+      color: var(--accent);
+    }
+
+    /* Navigation */
+    .nav-tabs {
+      display: flex;
+      gap: 4px;
+      background: var(--bg-tertiary);
+      padding: 4px;
+      border-radius: var(--radius);
+    }
+
+    .nav-tab {
+      padding: 10px 20px;
+      border-radius: var(--radius-sm);
+      border: none;
+      background: transparent;
+      color: var(--text-secondary);
+      font-family: var(--font-sans);
+      font-size: 14px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .nav-tab:hover {
+      color: var(--text-primary);
+      background: var(--bg-hover);
+    }
+
+    .nav-tab.active {
+      background: var(--accent);
+      color: var(--bg-primary);
+    }
+
+    .nav-tab svg {
+      width: 16px;
+      height: 16px;
+    }
+
+    /* Header Right */
+    .header-right {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+
+    .status-badge {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 12px;
+      background: var(--accent-glow);
+      border: 1px solid var(--accent);
+      border-radius: 20px;
+      font-size: 12px;
+      font-weight: 500;
+      color: var(--accent);
+    }
+
+    .status-dot {
+      width: 8px;
+      height: 8px;
+      background: var(--accent);
+      border-radius: 50%;
+      animation: pulse 2s infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.5; }
+    }
+
+    .notification-btn {
+      width: 40px;
+      height: 40px;
+      border-radius: var(--radius-sm);
+      border: 1px solid var(--border);
+      background: var(--bg-tertiary);
+      color: var(--text-secondary);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+      transition: all 0.2s ease;
+    }
+
+    .notification-btn:hover {
+      background: var(--bg-hover);
+      color: var(--text-primary);
+    }
+
+    .notification-btn .badge {
+      position: absolute;
+      top: -4px;
+      right: -4px;
+      width: 18px;
+      height: 18px;
+      background: var(--danger);
+      border-radius: 50%;
+      font-size: 10px;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    /* Main Content */
+    .main {
+      padding-top: 88px;
+      padding-bottom: 40px;
+      min-height: 100vh;
+    }
+
+    .container {
+      max-width: 1400px;
+      margin: 0 auto;
+      padding: 0 24px;
+    }
+
+    /* Page */
+    .page {
+      display: none;
+      animation: fadeIn 0.3s ease;
+    }
+
+    .page.active {
+      display: block;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    /* Page Header */
+    .page-header {
+      margin-bottom: 32px;
+    }
+
+    .page-title {
+      font-size: 28px;
+      font-weight: 700;
+      letter-spacing: -0.5px;
+      margin-bottom: 8px;
+    }
+
+    .page-subtitle {
+      color: var(--text-secondary);
+      font-size: 15px;
+    }
+
+    /* Stats Grid */
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 16px;
+      margin-bottom: 32px;
+    }
+
+    .stat-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 24px;
+      position: relative;
+      overflow: hidden;
+      transition: all 0.3s ease;
+    }
+
+    .stat-card:hover {
+      border-color: var(--accent);
+      transform: translateY(-2px);
+      box-shadow: var(--shadow), 0 0 40px var(--accent-glow);
+    }
+
+    .stat-card::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 3px;
+      background: linear-gradient(90deg, var(--accent), var(--cyan));
+      opacity: 0;
+      transition: opacity 0.3s ease;
+    }
+
+    .stat-card:hover::before {
+      opacity: 1;
+    }
+
+    .stat-icon {
+      width: 48px;
+      height: 48px;
+      border-radius: var(--radius-sm);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-bottom: 16px;
+    }
+
+    .stat-icon.green { background: rgba(16, 185, 129, 0.15); color: var(--accent); }
+    .stat-icon.blue { background: rgba(59, 130, 246, 0.15); color: var(--info); }
+    .stat-icon.purple { background: rgba(139, 92, 246, 0.15); color: var(--purple); }
+    .stat-icon.orange { background: rgba(245, 158, 11, 0.15); color: var(--warning); }
+    .stat-icon.pink { background: rgba(236, 72, 153, 0.15); color: var(--pink); }
+    .stat-icon.cyan { background: rgba(6, 182, 212, 0.15); color: var(--cyan); }
+
+    .stat-value {
+      font-size: 32px;
+      font-weight: 700;
+      font-family: var(--font-mono);
+      margin-bottom: 4px;
+    }
+
+    .stat-label {
+      color: var(--text-secondary);
+      font-size: 14px;
+      margin-bottom: 12px;
+    }
+
+    .stat-change {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      font-size: 12px;
+      font-weight: 500;
+      padding: 4px 8px;
+      border-radius: 4px;
+    }
+
+    .stat-change.up {
+      background: rgba(16, 185, 129, 0.15);
+      color: var(--accent);
+    }
+
+    .stat-change.down {
+      background: rgba(239, 68, 68, 0.15);
+      color: var(--danger);
+    }
+
+    /* Cards */
+    .card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      overflow: hidden;
+    }
+
+    .card-header {
+      padding: 20px 24px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .card-title {
+      font-size: 16px;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .card-title-icon {
+      width: 32px;
+      height: 32px;
+      border-radius: var(--radius-sm);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: var(--accent-glow);
+      color: var(--accent);
+    }
+
+    .card-body {
+      padding: 24px;
+    }
+
+    .card-body.no-padding {
+      padding: 0;
+    }
+
+    /* Grid Layouts */
+    .grid-2 {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 24px;
+    }
+
+    .grid-3 {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 24px;
+    }
+
+    .grid-sidebar {
+      display: grid;
+      grid-template-columns: 380px 1fr;
+      gap: 24px;
+    }
+
+    /* Tables */
+    .table-wrapper {
+      overflow-x: auto;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+
+    th, td {
+      text-align: left;
+      padding: 14px 16px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    th {
+      font-size: 12px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: var(--text-muted);
+      background: var(--bg-tertiary);
+    }
+
+    td {
+      font-size: 14px;
+    }
+
+    tr:hover td {
+      background: var(--bg-hover);
+    }
+
+    tr:last-child td {
+      border-bottom: none;
+    }
+
+    /* Badge */
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 10px;
+      border-radius: 20px;
+      font-size: 12px;
+      font-weight: 500;
+    }
+
+    .badge.green { background: rgba(16, 185, 129, 0.15); color: var(--accent); }
+    .badge.yellow { background: rgba(245, 158, 11, 0.15); color: var(--warning); }
+    .badge.red { background: rgba(239, 68, 68, 0.15); color: var(--danger); }
+    .badge.blue { background: rgba(59, 130, 246, 0.15); color: var(--info); }
+    .badge.purple { background: rgba(139, 92, 246, 0.15); color: var(--purple); }
+    .badge.gray { background: var(--bg-tertiary); color: var(--text-secondary); }
+
+    .badge-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: currentColor;
+    }
+
+    /* Score Bar */
+    .score-bar {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .score-bar-track {
+      flex: 1;
+      height: 6px;
+      background: var(--bg-tertiary);
+      border-radius: 3px;
+      overflow: hidden;
+    }
+
+    .score-bar-fill {
+      height: 100%;
+      border-radius: 3px;
+      transition: width 0.5s ease;
+    }
+
+    .score-bar-fill.high { background: var(--accent); }
+    .score-bar-fill.medium { background: var(--warning); }
+    .score-bar-fill.low { background: var(--danger); }
+
+    .score-value {
+      font-family: var(--font-mono);
+      font-size: 13px;
+      font-weight: 500;
+      min-width: 32px;
+    }
+
+    /* Buttons */
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      padding: 10px 18px;
+      border-radius: var(--radius-sm);
+      font-family: var(--font-sans);
+      font-size: 14px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      border: none;
+    }
+
+    .btn-primary {
+      background: var(--accent);
+      color: var(--bg-primary);
+    }
+
+    .btn-primary:hover {
+      background: var(--accent-hover);
+      transform: translateY(-1px);
+      box-shadow: 0 4px 12px var(--accent-glow);
+    }
+
+    .btn-secondary {
+      background: var(--bg-tertiary);
+      color: var(--text-primary);
+      border: 1px solid var(--border);
+    }
+
+    .btn-secondary:hover {
+      background: var(--bg-hover);
+      border-color: var(--text-muted);
+    }
+
+    .btn-ghost {
+      background: transparent;
+      color: var(--text-secondary);
+    }
+
+    .btn-ghost:hover {
+      background: var(--bg-tertiary);
+      color: var(--text-primary);
+    }
+
+    .btn-sm {
+      padding: 6px 12px;
+      font-size: 12px;
+    }
+
+    /* Input */
+    .input-group {
+      position: relative;
+    }
+
+    .input-icon {
+      position: absolute;
+      left: 14px;
+      top: 50%;
+      transform: translateY(-50%);
+      color: var(--text-muted);
+    }
+
+    .input {
+      width: 100%;
+      padding: 12px 14px;
+      padding-left: 42px;
+      background: var(--bg-tertiary);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      color: var(--text-primary);
+      font-family: var(--font-sans);
+      font-size: 14px;
+      transition: all 0.2s ease;
+    }
+
+    .input:focus {
+      outline: none;
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px var(--accent-glow);
+    }
+
+    .input::placeholder {
+      color: var(--text-muted);
+    }
+
+    /* Customer Service - Chat */
+    .chat-layout {
+      display: grid;
+      grid-template-columns: 360px 1fr;
+      gap: 0;
+      height: calc(100vh - 180px);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      overflow: hidden;
+    }
+
+    .contact-list {
+      background: var(--bg-card);
+      border-right: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+    }
+
+    .contact-list-header {
+      padding: 20px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .contact-list-title {
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--text-secondary);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 16px;
+    }
+
+    .contact-list-body {
+      flex: 1;
+      overflow-y: auto;
+    }
+
+    .contact-item {
+      padding: 16px 20px;
+      border-bottom: 1px solid var(--border);
+      cursor: pointer;
+      transition: all 0.2s ease;
+      display: flex;
+      gap: 14px;
+    }
+
+    .contact-item:hover {
+      background: var(--bg-hover);
+    }
+
+    .contact-item.active {
+      background: var(--accent-glow);
+      border-left: 3px solid var(--accent);
+    }
+
+    .contact-avatar {
+      width: 44px;
+      height: 44px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, var(--accent), var(--cyan));
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 600;
+      font-size: 16px;
+      color: var(--bg-primary);
+      flex-shrink: 0;
+    }
+
+    .contact-info {
+      flex: 1;
+      min-width: 0;
+    }
+
+    .contact-name {
+      font-weight: 600;
+      font-size: 14px;
+      margin-bottom: 2px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .contact-phone {
+      font-size: 12px;
+      color: var(--text-muted);
+      font-family: var(--font-mono);
+      margin-bottom: 4px;
+    }
+
+    .contact-preview {
+      font-size: 13px;
+      color: var(--text-secondary);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .contact-time {
+      font-size: 11px;
+      color: var(--text-muted);
+    }
+
+    .chat-panel {
+      display: flex;
+      flex-direction: column;
+      background: var(--bg-secondary);
+    }
+
+    .chat-header {
+      padding: 20px 24px;
+      background: var(--bg-card);
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .chat-user {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+    }
+
+    .chat-user-info h3 {
+      font-size: 16px;
+      font-weight: 600;
+      margin-bottom: 2px;
+    }
+
+    .chat-user-info p {
+      font-size: 13px;
+      color: var(--text-muted);
+      font-family: var(--font-mono);
+    }
+
+    .chat-actions {
+      display: flex;
+      gap: 8px;
+    }
+
+    .chat-messages {
+      flex: 1;
+      padding: 24px;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .message {
+      max-width: 70%;
+      padding: 14px 18px;
+      border-radius: var(--radius);
+      position: relative;
+    }
+
+    .message.incoming {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      align-self: flex-start;
+      border-bottom-left-radius: 4px;
+    }
+
+    .message.outgoing {
+      background: linear-gradient(135deg, var(--accent), var(--cyan));
+      color: var(--bg-primary);
+      align-self: flex-end;
+      border-bottom-right-radius: 4px;
+    }
+
+    .message-text {
+      font-size: 14px;
+      line-height: 1.5;
+      margin-bottom: 6px;
+    }
+
+    .message-time {
+      font-size: 11px;
+      opacity: 0.7;
+    }
+
+    .message.incoming .message-time {
+      color: var(--text-muted);
+    }
+
+    .chat-input-area {
+      padding: 20px 24px;
+      background: var(--bg-card);
+      border-top: 1px solid var(--border);
+    }
+
+    .chat-input-wrapper {
+      display: flex;
+      gap: 12px;
+    }
+
+    .chat-input {
+      flex: 1;
+      padding: 14px 18px;
+      background: var(--bg-tertiary);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      color: var(--text-primary);
+      font-family: var(--font-sans);
+      font-size: 14px;
+      resize: none;
+    }
+
+    .chat-input:focus {
+      outline: none;
+      border-color: var(--accent);
+    }
+
+    /* Campaign Cards */
+    .campaign-card {
+      background: var(--bg-tertiary);
+      border-radius: var(--radius-sm);
+      padding: 16px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 12px;
+      transition: all 0.2s ease;
+    }
+
+    .campaign-card:hover {
+      background: var(--bg-hover);
+    }
+
+    .campaign-info h4 {
+      font-size: 14px;
+      font-weight: 600;
+      margin-bottom: 4px;
+      font-family: var(--font-mono);
+    }
+
+    .campaign-info p {
+      font-size: 12px;
+      color: var(--text-muted);
+    }
+
+    .campaign-stats {
+      text-align: right;
+    }
+
+    .campaign-stats .leads {
+      font-size: 18px;
+      font-weight: 700;
+      font-family: var(--font-mono);
+      color: var(--accent);
+    }
+
+    .campaign-stats .contacted {
+      font-size: 12px;
+      color: var(--text-muted);
+    }
+
+    /* Quick Actions */
+    .quick-actions {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 12px;
+    }
+
+    .quick-action {
+      padding: 16px;
+      background: var(--bg-tertiary);
+      border-radius: var(--radius-sm);
+      text-align: center;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      border: 1px solid transparent;
+    }
+
+    .quick-action:hover {
+      background: var(--bg-hover);
+      border-color: var(--accent);
+      transform: translateY(-2px);
+    }
+
+    .quick-action-icon {
+      width: 40px;
+      height: 40px;
+      margin: 0 auto 10px;
+      border-radius: var(--radius-sm);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .quick-action-label {
+      font-size: 13px;
+      font-weight: 500;
+    }
+
+    /* Filter Pills */
+    .filter-pills {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 20px;
+      flex-wrap: wrap;
+    }
+
+    .filter-pill {
+      padding: 8px 16px;
+      background: var(--bg-tertiary);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--text-secondary);
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+
+    .filter-pill:hover {
+      border-color: var(--text-muted);
+      color: var(--text-primary);
+    }
+
+    .filter-pill.active {
+      background: var(--accent);
+      border-color: var(--accent);
+      color: var(--bg-primary);
+    }
+
+    /* Progress Ring */
+    .progress-ring {
+      position: relative;
+      width: 120px;
+      height: 120px;
+      margin: 0 auto;
+    }
+
+    .progress-ring svg {
+      transform: rotate(-90deg);
+    }
+
+    .progress-ring circle {
+      fill: none;
+      stroke-width: 8;
+    }
+
+    .progress-ring .bg {
+      stroke: var(--bg-tertiary);
+    }
+
+    .progress-ring .progress {
+      stroke: var(--accent);
+      stroke-linecap: round;
+      transition: stroke-dashoffset 0.5s ease;
+    }
+
+    .progress-ring .value {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      text-align: center;
+    }
+
+    .progress-ring .value strong {
+      display: block;
+      font-size: 28px;
+      font-weight: 700;
+      font-family: var(--font-mono);
+    }
+
+    .progress-ring .value span {
+      font-size: 12px;
+      color: var(--text-muted);
+    }
+
+    /* Mini Chart */
+    .mini-chart {
+      height: 60px;
+      display: flex;
+      align-items: flex-end;
+      gap: 4px;
+      margin-top: 16px;
+    }
+
+    .mini-chart-bar {
+      flex: 1;
+      background: var(--accent);
+      border-radius: 2px;
+      opacity: 0.7;
+      transition: all 0.3s ease;
+    }
+
+    .mini-chart-bar:hover {
+      opacity: 1;
+    }
+
+    /* Empty State */
+    .empty-state {
+      text-align: center;
+      padding: 60px 20px;
+    }
+
+    .empty-state-icon {
+      width: 80px;
+      height: 80px;
+      margin: 0 auto 20px;
+      background: var(--bg-tertiary);
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--text-muted);
+    }
+
+    .empty-state h3 {
+      font-size: 18px;
+      margin-bottom: 8px;
+    }
+
+    .empty-state p {
+      color: var(--text-secondary);
+      font-size: 14px;
+    }
+
+    /* Responsive */
+    @media (max-width: 1200px) {
+      .stats-grid {
+        grid-template-columns: repeat(2, 1fr);
+      }
+      .grid-2, .grid-3 {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    @media (max-width: 768px) {
+      .header {
+        padding: 0 16px;
+      }
+      .nav-tabs {
+        display: none;
+      }
+      .container {
+        padding: 0 16px;
+      }
+      .stats-grid {
+        grid-template-columns: 1fr;
+      }
+      .chat-layout {
+        grid-template-columns: 1fr;
+        height: auto;
+      }
+      .contact-list {
+        max-height: 300px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <!-- Header -->
+  <header class="header">
+    <div class="logo">
+      <div class="logo-icon">TL</div>
+      <div class="logo-text">Tepat<span>Laser</span> CRM</div>
+    </div>
+
+    <nav class="nav-tabs">
+      <button class="nav-tab active" data-page="dashboard">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+        Dashboard
+      </button>
+      <button class="nav-tab" data-page="customer-service">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+        Customer Service
+      </button>
+      <button class="nav-tab" data-page="marketing">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+        Marketing
+      </button>
+    </nav>
+
+    <div class="header-right">
+      <div class="status-badge">
+        <span class="status-dot"></span>
+        Online
+      </div>
+      <button class="notification-btn">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+        <span class="badge">3</span>
+      </button>
+    </div>
+  </header>
+
+  <!-- Main Content -->
+  <main class="main">
+    <div class="container">
+      <!-- Dashboard Page -->
+      <div class="page active" id="dashboard">
+        <div class="page-header">
+          <h1 class="page-title">Dashboard Overview</h1>
+          <p class="page-subtitle">Monitor kinerja bisnis dan aktivitas real-time</p>
+        </div>
+
+        <!-- Stats -->
+        <div class="stats-grid">
+          <div class="stat-card">
+            <div class="stat-icon green">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+            </div>
+            <div class="stat-value">2,847</div>
+            <div class="stat-label">Total Customers</div>
+            <span class="stat-change up">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/></svg>
+              +12.5%
+            </span>
+          </div>
+
+          <div class="stat-card">
+            <div class="stat-icon blue">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+            </div>
+            <div class="stat-value">1,423</div>
+            <div class="stat-label">Total Chats</div>
+            <span class="stat-change up">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/></svg>
+              +8.2%
+            </span>
+          </div>
+
+          <div class="stat-card">
+            <div class="stat-icon orange">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+            </div>
+            <div class="stat-value">24</div>
+            <div class="stat-label">Open Escalations</div>
+            <span class="stat-change down">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 18 13.5 8.5 8.5 13.5 1 6"/></svg>
+              -3.1%
+            </span>
+          </div>
+
+          <div class="stat-card">
+            <div class="stat-icon purple">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+            </div>
+            <div class="stat-value">156</div>
+            <div class="stat-label">Leads Bulan Ini</div>
+            <span class="stat-change up">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/></svg>
+              +24.8%
+            </span>
+          </div>
+        </div>
+
+        <!-- Content Grid -->
+        <div class="grid-2" style="margin-bottom: 24px;">
+          <!-- Customer Status -->
+          <div class="card">
+            <div class="card-header">
+              <div class="card-title">
+                <div class="card-title-icon">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>
+                </div>
+                Status Customer
+              </div>
+              <button class="btn btn-ghost btn-sm">Lihat Semua</button>
+            </div>
+            <div class="card-body">
+              <div style="display: flex; gap: 24px; align-items: center;">
+                <div class="progress-ring">
+                  <svg width="120" height="120">
+                    <circle class="bg" cx="60" cy="60" r="52"/>
+                    <circle class="progress" cx="60" cy="60" r="52" stroke-dasharray="327" stroke-dashoffset="82"/>
+                  </svg>
+                  <div class="value">
+                    <strong>75%</strong>
+                    <span>Active</span>
+                  </div>
+                </div>
+                <div style="flex: 1;">
+                  <div style="margin-bottom: 16px;">
+                    <div style="display: flex; justify-content: space-between; margin-bottom: 6px;">
+                      <span style="font-size: 14px;">Active</span>
+                      <span style="font-size: 14px; font-family: var(--font-mono); color: var(--accent);">2,135</span>
+                    </div>
+                    <div class="score-bar">
+                      <div class="score-bar-track">
+                        <div class="score-bar-fill high" style="width: 75%;"></div>
+                      </div>
+                    </div>
+                  </div>
+                  <div style="margin-bottom: 16px;">
+                    <div style="display: flex; justify-content: space-between; margin-bottom: 6px;">
+                      <span style="font-size: 14px;">Pending</span>
+                      <span style="font-size: 14px; font-family: var(--font-mono); color: var(--warning);">512</span>
+                    </div>
+                    <div class="score-bar">
+                      <div class="score-bar-track">
+                        <div class="score-bar-fill medium" style="width: 18%;"></div>
+                      </div>
+                    </div>
+                  </div>
+                  <div>
+                    <div style="display: flex; justify-content: space-between; margin-bottom: 6px;">
+                      <span style="font-size: 14px;">Inactive</span>
+                      <span style="font-size: 14px; font-family: var(--font-mono); color: var(--danger);">200</span>
+                    </div>
+                    <div class="score-bar">
+                      <div class="score-bar-track">
+                        <div class="score-bar-fill low" style="width: 7%;"></div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Recent Campaigns -->
+          <div class="card">
+            <div class="card-header">
+              <div class="card-title">
+                <div class="card-title-icon">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+                </div>
+                Campaign Terbaru
+              </div>
+              <button class="btn btn-ghost btn-sm">Lihat Semua</button>
+            </div>
+            <div class="card-body">
+              <div class="campaign-card">
+                <div class="campaign-info">
+                  <h4>2025-10-23</h4>
+                  <p>Jakarta Selatan Area</p>
+                </div>
+                <div class="campaign-stats">
+                  <div class="leads">10</div>
+                  <div class="contacted">Contacted: 0</div>
+                </div>
+              </div>
+              <div class="campaign-card">
+                <div class="campaign-info">
+                  <h4>batch_oct_2025_02</h4>
+                  <p>Industrial Zone</p>
+                </div>
+                <div class="campaign-stats">
+                  <div class="leads">2</div>
+                  <div class="contacted">Contacted: 1</div>
+                </div>
+              </div>
+              <div class="campaign-card">
+                <div class="campaign-info">
+                  <h4>batch_oct_2025_01</h4>
+                  <p>Manufacturing Leads</p>
+                </div>
+                <div class="campaign-stats">
+                  <div class="leads">3</div>
+                  <div class="contacted">Contacted: 2</div>
+                </div>
+              </div>
+              <div class="campaign-card">
+                <div class="campaign-info">
+                  <h4>2025-10-20</h4>
+                  <p>Bekasi Industrial</p>
+                </div>
+                <div class="campaign-stats">
+                  <div class="leads">22</div>
+                  <div class="contacted">Contacted: 0</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Escalations & Quick Actions -->
+        <div class="grid-2">
+          <!-- Open Escalations -->
+          <div class="card">
+            <div class="card-header">
+              <div class="card-title">
+                <div class="card-title-icon" style="background: rgba(239, 68, 68, 0.15); color: var(--danger);">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/></svg>
+                </div>
+                Escalations Terbuka
+              </div>
+              <span class="badge red"><span class="badge-dot"></span>24 Open</span>
+            </div>
+            <div class="card-body no-padding">
+              <div class="table-wrapper">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Customer</th>
+                      <th>Type</th>
+                      <th>Priority</th>
+                      <th>Status</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td>
+                        <div style="font-weight: 500;">Ceuna</div>
+                        <div style="font-size: 12px; color: var(--text-muted);">6281316500589</div>
+                      </td>
+                      <td><span class="badge blue">pricing</span></td>
+                      <td><span class="badge red"><span class="badge-dot"></span>High</span></td>
+                      <td><span class="badge yellow">open</span></td>
+                    </tr>
+                    <tr>
+                      <td>
+                        <div style="font-weight: 500;">Ian Tachy</div>
+                        <div style="font-size: 12px; color: var(--text-muted);">628999392230</div>
+                      </td>
+                      <td><span class="badge purple">technical</span></td>
+                      <td><span class="badge yellow"><span class="badge-dot"></span>Normal</span></td>
+                      <td><span class="badge yellow">open</span></td>
+                    </tr>
+                    <tr>
+                      <td>
+                        <div style="font-weight: 500;">Tepat Laser</div>
+                        <div style="font-size: 12px; color: var(--text-muted);">6285165693179</div>
+                      </td>
+                      <td><span class="badge green">inquiry</span></td>
+                      <td><span class="badge gray"><span class="badge-dot"></span>Low</span></td>
+                      <td><span class="badge green">resolved</span></td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+
+          <!-- Quick Actions -->
+          <div class="card">
+            <div class="card-header">
+              <div class="card-title">
+                <div class="card-title-icon" style="background: rgba(139, 92, 246, 0.15); color: var(--purple);">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+                </div>
+                Quick Actions
+              </div>
+            </div>
+            <div class="card-body">
+              <div class="quick-actions">
+                <div class="quick-action">
+                  <div class="quick-action-icon stat-icon green">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="8.5" cy="7" r="4"/><line x1="20" y1="8" x2="20" y2="14"/><line x1="23" y1="11" x2="17" y2="11"/></svg>
+                  </div>
+                  <div class="quick-action-label">Add Customer</div>
+                </div>
+                <div class="quick-action">
+                  <div class="quick-action-icon stat-icon blue">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+                  </div>
+                  <div class="quick-action-label">Start Chat</div>
+                </div>
+                <div class="quick-action">
+                  <div class="quick-action-icon stat-icon purple">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+                  </div>
+                  <div class="quick-action-label">New Campaign</div>
+                </div>
+                <div class="quick-action">
+                  <div class="quick-action-icon stat-icon orange">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+                  </div>
+                  <div class="quick-action-label">Settings</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Customer Service Page -->
+      <div class="page" id="customer-service">
+        <div class="page-header">
+          <h1 class="page-title">Customer Service</h1>
+          <p class="page-subtitle">Kelola percakapan dan eskalasi customer</p>
+        </div>
+
+        <div class="chat-layout">
+          <!-- Contact List -->
+          <div class="contact-list">
+            <div class="contact-list-header">
+              <div class="contact-list-title">Kontak</div>
+              <div class="input-group">
+                <svg class="input-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                <input type="text" class="input" placeholder="Cari customer...">
+              </div>
+            </div>
+            <div class="contact-list-body">
+              <div class="contact-item active">
+                <div class="contact-avatar">CE</div>
+                <div class="contact-info">
+                  <div class="contact-name">
+                    Ceuna
+                    <span class="badge green" style="padding: 2px 8px; font-size: 10px;">Active</span>
+                  </div>
+                  <div class="contact-phone">6281316500589</div>
+                  <div class="contact-preview">Halo, saya ingin konsultasi mengenai laser cutting</div>
+                </div>
+              </div>
+              <div class="contact-item">
+                <div class="contact-avatar" style="background: linear-gradient(135deg, var(--info), var(--purple));">IT</div>
+                <div class="contact-info">
+                  <div class="contact-name">
+                    Ian Tachy
+                    <span class="badge green" style="padding: 2px 8px; font-size: 10px;">Active</span>
+                  </div>
+                  <div class="contact-phone">628999392230</div>
+                  <div class="contact-preview">Apakah bisa cutting bahan stainless?</div>
+                </div>
+              </div>
+              <div class="contact-item">
+                <div class="contact-avatar" style="background: linear-gradient(135deg, var(--warning), var(--pink));">TL</div>
+                <div class="contact-info">
+                  <div class="contact-name">
+                    Tepat Laser
+                    <span class="badge green" style="padding: 2px 8px; font-size: 10px;">Active</span>
+                  </div>
+                  <div class="contact-phone">6285165693179</div>
+                  <div class="contact-preview">Terima kasih atas informasinya</div>
+                </div>
+              </div>
+              <div class="contact-item">
+                <div class="contact-avatar" style="background: linear-gradient(135deg, var(--purple), var(--pink));">AB</div>
+                <div class="contact-info">
+                  <div class="contact-name">
+                    Accord Bizpark
+                    <span class="badge green" style="padding: 2px 8px; font-size: 10px;">Active</span>
+                  </div>
+                  <div class="contact-phone">628877778288</div>
+                  <div class="contact-preview">Mau tanya harga untuk batch order</div>
+                </div>
+              </div>
+              <div class="contact-item">
+                <div class="contact-avatar" style="background: linear-gradient(135deg, var(--danger), var(--warning));">IH</div>
+                <div class="contact-info">
+                  <div class="contact-name">
+                    Intan Hertikasari
+                    <span class="badge green" style="padding: 2px 8px; font-size: 10px;">Active</span>
+                  </div>
+                  <div class="contact-phone">6281399088211</div>
+                  <div class="contact-preview">Kapan bisa mulai produksi?</div>
+                </div>
+              </div>
+              <div class="contact-item">
+                <div class="contact-avatar" style="background: linear-gradient(135deg, var(--cyan), var(--accent));">YD</div>
+                <div class="contact-info">
+                  <div class="contact-name">
+                    Yaman Doman
+                    <span class="badge green" style="padding: 2px 8px; font-size: 10px;">Active</span>
+                  </div>
+                  <div class="contact-phone">6285890002305</div>
+                  <div class="contact-preview">Baik, saya tunggu quotation-nya</div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Chat Panel -->
+          <div class="chat-panel">
+            <div class="chat-header">
+              <div class="chat-user">
+                <div class="contact-avatar">CE</div>
+                <div class="chat-user-info">
+                  <h3>Ceuna</h3>
+                  <p>6281316500589</p>
+                </div>
+              </div>
+              <div class="chat-actions">
+                <span class="badge green"><span class="badge-dot"></span>Active</span>
+                <button class="btn btn-secondary btn-sm">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/></svg>
+                  Escalate
+                </button>
+                <button class="btn btn-ghost btn-sm">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="1"/><circle cx="12" cy="5" r="1"/><circle cx="12" cy="19" r="1"/></svg>
+                </button>
+              </div>
+            </div>
+
+            <div class="chat-messages">
+              <div class="message incoming">
+                <div class="message-text">Halo, saya ingin konsultasi mengenai laser cutting</div>
+                <div class="message-time">11/11/2025, 11:30 PM</div>
+              </div>
+              <div class="message outgoing">
+                <div class="message-text">Halo! Terima kasih sudah menghubungi Tepat Laser. Ada yang bisa kami bantu mengenai kebutuhan laser cutting Anda?</div>
+                <div class="message-time">11/11/2025, 11:31 PM</div>
+              </div>
+              <div class="message incoming">
+                <div class="message-text">Saya mau tanya untuk cutting stainless steel tebal 3mm, bisa tidak ya?</div>
+                <div class="message-time">11/11/2025, 11:33 PM</div>
+              </div>
+              <div class="message outgoing">
+                <div class="message-text">Bisa, Kak! Kami bisa cutting stainless steel hingga tebal 20mm. Untuk 3mm sangat bisa dengan hasil presisi. Boleh tahu berapa ukuran dan kuantitasnya?</div>
+                <div class="message-time">11/11/2025, 11:34 PM</div>
+              </div>
+              <div class="message incoming">
+                <div class="message-text">Wah bagus kalau gitu. Ukurannya 50x100cm, butuh 20 pieces. Kira-kira berapa harganya?</div>
+                <div class="message-time">11/11/2025, 11:36 PM</div>
+              </div>
+            </div>
+
+            <div class="chat-input-area">
+              <div class="chat-input-wrapper">
+                <button class="btn btn-ghost">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
+                </button>
+                <input type="text" class="chat-input" placeholder="Ketik pesan...">
+                <button class="btn btn-primary">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+                  Kirim
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Marketing Page -->
+      <div class="page" id="marketing">
+        <div class="page-header">
+          <h1 class="page-title">Marketing & Leads</h1>
+          <p class="page-subtitle">Kelola leads dan campaign WhatsApp</p>
+        </div>
+
+        <!-- Stats -->
+        <div class="stats-grid">
+          <div class="stat-card">
+            <div class="stat-icon cyan">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="9" y1="21" x2="9" y2="9"/></svg>
+            </div>
+            <div class="stat-value">1,847</div>
+            <div class="stat-label">Total Leads</div>
+            <div class="mini-chart">
+              <div class="mini-chart-bar" style="height: 40%;"></div>
+              <div class="mini-chart-bar" style="height: 60%;"></div>
+              <div class="mini-chart-bar" style="height: 35%;"></div>
+              <div class="mini-chart-bar" style="height: 80%;"></div>
+              <div class="mini-chart-bar" style="height: 55%;"></div>
+              <div class="mini-chart-bar" style="height: 90%;"></div>
+              <div class="mini-chart-bar" style="height: 70%;"></div>
+            </div>
+          </div>
+
+          <div class="stat-card">
+            <div class="stat-icon green">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+            </div>
+            <div class="stat-value">423</div>
+            <div class="stat-label">Contacted</div>
+            <span class="stat-change up">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/></svg>
+              22.9%
+            </span>
+          </div>
+
+          <div class="stat-card">
+            <div class="stat-icon pink">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg>
+            </div>
+            <div class="stat-value">13</div>
+            <div class="stat-label">Active Campaigns</div>
+            <span class="stat-change up">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/></svg>
+              +3 this month
+            </span>
+          </div>
+
+          <div class="stat-card">
+            <div class="stat-icon blue">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20V10"/><path d="M18 20V4"/><path d="M6 20v-4"/></svg>
+            </div>
+            <div class="stat-value">72</div>
+            <div class="stat-label">Avg Lead Score</div>
+            <div class="score-bar" style="margin-top: 16px;">
+              <div class="score-bar-track">
+                <div class="score-bar-fill high" style="width: 72%;"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Filter & Actions -->
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px;">
+          <div class="filter-pills">
+            <button class="filter-pill active">Semua</button>
+            <button class="filter-pill">New</button>
+            <button class="filter-pill">Contacted</button>
+            <button class="filter-pill">Qualified</button>
+            <button class="filter-pill">Invalid</button>
+          </div>
+          <div style="display: flex; gap: 12px;">
+            <button class="btn btn-secondary">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+              Export
+            </button>
+            <button class="btn btn-primary">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+              Add Lead
+            </button>
+          </div>
+        </div>
+
+        <!-- Leads Table -->
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title">
+              <div class="card-title-icon">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="9" y1="21" x2="9" y2="9"/></svg>
+              </div>
+              Leads dari Businesses
+            </div>
+            <div class="input-group" style="width: 280px;">
+              <svg class="input-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+              <input type="text" class="input" placeholder="Cari lead...">
+            </div>
+          </div>
+          <div class="card-body no-padding">
+            <div class="table-wrapper">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Business Name</th>
+                    <th>Phone</th>
+                    <th>Status</th>
+                    <th>Lead Score</th>
+                    <th>Location</th>
+                    <th>Campaign</th>
+                    <th>Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td>
+                      <div style="font-weight: 500;">CV Karya Mandiri Teknik</div>
+                      <div style="font-size: 12px; color: var(--text-muted);">Manufacturing</div>
+                    </td>
+                    <td style="font-family: var(--font-mono); font-size: 13px;">6281234567890</td>
+                    <td><span class="badge green"><span class="badge-dot"></span>new</span></td>
+                    <td>
+                      <div class="score-bar">
+                        <div class="score-bar-track" style="width: 80px;">
+                          <div class="score-bar-fill high" style="width: 85%;"></div>
+                        </div>
+                        <span class="score-value">85</span>
+                      </div>
+                    </td>
+                    <td>Jakarta Selatan</td>
+                    <td><span class="badge gray">2025-10-23</span></td>
+                    <td>
+                      <button class="btn btn-ghost btn-sm">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+                      </button>
+                    </td>
+                  </tr>
+                  <tr>
+                    <td>
+                      <div style="font-weight: 500;">PT Baja Perkasa Indonesia</div>
+                      <div style="font-size: 12px; color: var(--text-muted);">Steel Industry</div>
+                    </td>
+                    <td style="font-family: var(--font-mono); font-size: 13px;">6287654321098</td>
+                    <td><span class="badge blue"><span class="badge-dot"></span>contacted</span></td>
+                    <td>
+                      <div class="score-bar">
+                        <div class="score-bar-track" style="width: 80px;">
+                          <div class="score-bar-fill high" style="width: 78%;"></div>
+                        </div>
+                        <span class="score-value">78</span>
+                      </div>
+                    </td>
+                    <td>Bekasi</td>
+                    <td><span class="badge gray">batch_oct_2025_01</span></td>
+                    <td>
+                      <button class="btn btn-ghost btn-sm">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+                      </button>
+                    </td>
+                  </tr>
+                  <tr>
+                    <td>
+                      <div style="font-weight: 500;">Bengkel Las Jaya Abadi</div>
+                      <div style="font-size: 12px; color: var(--text-muted);">Welding Services</div>
+                    </td>
+                    <td style="font-family: var(--font-mono); font-size: 13px;">6289876543210</td>
+                    <td><span class="badge yellow"><span class="badge-dot"></span>qualified</span></td>
+                    <td>
+                      <div class="score-bar">
+                        <div class="score-bar-track" style="width: 80px;">
+                          <div class="score-bar-fill medium" style="width: 62%;"></div>
+                        </div>
+                        <span class="score-value">62</span>
+                      </div>
+                    </td>
+                    <td>Tangerang</td>
+                    <td><span class="badge gray">2025-10-20</span></td>
+                    <td>
+                      <button class="btn btn-ghost btn-sm">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+                      </button>
+                    </td>
+                  </tr>
+                  <tr>
+                    <td>
+                      <div style="font-weight: 500;">Toko Besi Makmur Sentosa</div>
+                      <div style="font-size: 12px; color: var(--text-muted);">Metal Trading</div>
+                    </td>
+                    <td style="font-family: var(--font-mono); font-size: 13px;">—</td>
+                    <td><span class="badge red"><span class="badge-dot"></span>invalid</span></td>
+                    <td>
+                      <div class="score-bar">
+                        <div class="score-bar-track" style="width: 80px;">
+                          <div class="score-bar-fill low" style="width: 25%;"></div>
+                        </div>
+                        <span class="score-value">25</span>
+                      </div>
+                    </td>
+                    <td>Depok</td>
+                    <td><span class="badge gray">2025-10-04</span></td>
+                    <td>
+                      <button class="btn btn-ghost btn-sm" disabled>
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+                      </button>
+                    </td>
+                  </tr>
+                  <tr>
+                    <td>
+                      <div style="font-weight: 500;">PT Metalindo Pratama</div>
+                      <div style="font-size: 12px; color: var(--text-muted);">Metal Fabrication</div>
+                    </td>
+                    <td style="font-family: var(--font-mono); font-size: 13px;">6281122334455</td>
+                    <td><span class="badge green"><span class="badge-dot"></span>new</span></td>
+                    <td>
+                      <div class="score-bar">
+                        <div class="score-bar-track" style="width: 80px;">
+                          <div class="score-bar-fill high" style="width: 92%;"></div>
+                        </div>
+                        <span class="score-value">92</span>
+                      </div>
+                    </td>
+                    <td>Cikarang</td>
+                    <td><span class="badge gray">2025-09-24</span></td>
+                    <td>
+                      <button class="btn btn-ghost btn-sm">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+                      </button>
+                    </td>
+                  </tr>
+                  <tr>
+                    <td>
+                      <div style="font-weight: 500;">CV Logam Indah</div>
+                      <div style="font-size: 12px; color: var(--text-muted);">Metal Works</div>
+                    </td>
+                    <td style="font-family: var(--font-mono); font-size: 13px;">6285566778899</td>
+                    <td><span class="badge blue"><span class="badge-dot"></span>contacted</span></td>
+                    <td>
+                      <div class="score-bar">
+                        <div class="score-bar-track" style="width: 80px;">
+                          <div class="score-bar-fill medium" style="width: 55%;"></div>
+                        </div>
+                        <span class="score-value">55</span>
+                      </div>
+                    </td>
+                    <td>Bogor</td>
+                    <td><span class="badge gray">2025-09-26</span></td>
+                    <td>
+                      <button class="btn btn-ghost btn-sm">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+                      </button>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <script>
+    // Tab Navigation
+    const tabs = document.querySelectorAll('.nav-tab');
+    const pages = document.querySelectorAll('.page');
+
+    tabs.forEach(tab => {
+      tab.addEventListener('click', () => {
+        // Remove active from all tabs
+        tabs.forEach(t => t.classList.remove('active'));
+        // Add active to clicked tab
+        tab.classList.add('active');
+
+        // Hide all pages
+        pages.forEach(p => p.classList.remove('active'));
+        // Show target page
+        const targetPage = document.getElementById(tab.dataset.page);
+        if (targetPage) {
+          targetPage.classList.add('active');
+        }
+      });
+    });
+
+    // Contact item selection
+    const contactItems = document.querySelectorAll('.contact-item');
+    contactItems.forEach(item => {
+      item.addEventListener('click', () => {
+        contactItems.forEach(c => c.classList.remove('active'));
+        item.classList.add('active');
+      });
+    });
+
+    // Filter pills
+    const filterPills = document.querySelectorAll('.filter-pill');
+    filterPills.forEach(pill => {
+      pill.addEventListener('click', () => {
+        filterPills.forEach(p => p.classList.remove('active'));
+        pill.classList.add('active');
+      });
+    });
+
+    // Animate stats on load
+    document.addEventListener('DOMContentLoaded', () => {
+      const statCards = document.querySelectorAll('.stat-card');
+      statCards.forEach((card, index) => {
+        card.style.opacity = '0';
+        card.style.transform = 'translateY(20px)';
+        setTimeout(() => {
+          card.style.transition = 'all 0.5s ease';
+          card.style.opacity = '1';
+          card.style.transform = 'translateY(0)';
+        }, index * 100);
+      });
+    });
+  </script>
+</body>
+</html>
