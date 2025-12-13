@@ -119,16 +119,37 @@ router.get('/api/stats', async (_req, res) => {
 });
 
 // Customers
-router.get('/api/customers', async (_req, res) => {
+router.get('/api/customers', async (req, res) => {
   try {
-    // Optimized: Select specific columns
+    const limit = Math.min(parseInt(String(req.query.limit ?? '20'), 10) || 20, 100);
+    const offset = Math.max(parseInt(String(req.query.offset ?? '0'), 10) || 0, 0);
+    const search = req.query.search ? String(req.query.search) : null;
+
+    const params: (string | number)[] = [limit, offset];
+    let whereClause = '';
+    
+    if (search) {
+      params.push(`%${search}%`);
+      whereClause = `WHERE name ILIKE $3 OR phone ILIKE $3`;
+    }
+
+    // Optimized: Select specific columns with pagination
     const result = await pool.query(
       `SELECT id, name, phone, status, last_message_at
        FROM customers
+       ${whereClause}
        ORDER BY last_message_at DESC NULLS LAST
-       LIMIT 100`,
+       LIMIT $1 OFFSET $2`,
+      params
     );
-    return res.json({ data: result.rows, meta: buildMeta(res.locals.requestId) });
+    
+    // Get total count for meta info (optional but good practice)
+    // const countRes = await pool.query('SELECT COUNT(*)::int as count FROM customers');
+
+    return res.json({ 
+      data: result.rows, 
+      meta: { ...buildMeta(res.locals.requestId), limit, offset } 
+    });
   } catch (error) {
     console.error('[GET /api/customers]', error);
     return res.status(500).json({

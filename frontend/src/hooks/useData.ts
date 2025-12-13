@@ -50,14 +50,40 @@ export function useDashboardStats() {
   return { data, loading };
 }
 
-export function useCustomers() {
+export function useCustomers(search?: string) {
   const [data, setData] = useState<Customer[]>([]);
   const [loading, setLoading] = useState(true);
+  const [hasMore, setHasMore] = useState(true);
+  const [offset, setOffset] = useState(0);
+  const LIMIT = 20;
+
+  // Reset when search changes
+  useEffect(() => {
+    setData([]);
+    setOffset(0);
+    setHasMore(true);
+    setLoading(true);
+  }, [search]);
+
+  // Load data effect
   useEffect(() => {
     const load = async () => {
+      // Prevent race conditions or loading if no more data
+      if (!hasMore && offset > 0) return; 
+      
       try {
-        const res = await api.getCustomers();
-        setData(res.data);
+        setLoading(true);
+        const res = await api.getCustomers({ limit: LIMIT, offset, search });
+        const newData = res.data;
+        
+        if (newData.length < LIMIT) {
+          setHasMore(false);
+        }
+
+        setData((prev) => {
+          // If offset is 0, replace data (new search/init). Else append.
+          return offset === 0 ? newData : [...prev, ...newData];
+        });
       } catch (err) {
         console.error('load customers', err);
       } finally {
@@ -65,8 +91,15 @@ export function useCustomers() {
       }
     };
     void load();
-  }, []);
-  return { data, loading };
+  }, [offset, search]); // Removed hasMore dependency to avoid loop, controlled by logic inside
+
+  const loadMore = () => {
+    if (!loading && hasMore) {
+      setOffset((prev) => prev + LIMIT);
+    }
+  };
+
+  return { data, loading, hasMore, loadMore };
 }
 
 export function useEscalations() {
