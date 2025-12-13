@@ -1,22 +1,107 @@
-import React, { useState } from 'react';
-import { NavLink, useLocation } from 'react-router-dom';
+import React, { useState, useEffect, useCallback } from 'react';
+import { NavLink, useNavigate } from 'react-router-dom';
 import { useTheme } from '../../context/ThemeContext';
-import { 
-  LayoutDashboard, 
-  MessageSquare, 
-  Target, 
-  Sun, 
-  Moon, 
+import { useCustomerContext } from '../../context/customer';
+import { api, Notification } from '../../lib/api';
+import {
+  LayoutDashboard,
+  MessageSquare,
+  Target,
+  Sun,
+  Moon,
   Bell,
-  Check,
   MessageCircle,
   AlertTriangle,
   UserPlus
 } from 'lucide-react';
 
+// Helper to format time ago
+const formatTimeAgo = (dateStr: string) => {
+  const date = new Date(dateStr);
+  const now = new Date();
+  const diffMs = now.getTime() - date.getTime();
+  const diffMins = Math.floor(diffMs / 60000);
+  const diffHours = Math.floor(diffMs / 3600000);
+  const diffDays = Math.floor(diffMs / 86400000);
+
+  if (diffMins < 1) return 'Baru saja';
+  if (diffMins < 60) return `${diffMins} menit yang lalu`;
+  if (diffHours < 24) return `${diffHours} jam yang lalu`;
+  return `${diffDays} hari yang lalu`;
+};
+
 export function Header() {
   const { theme, toggleTheme } = useTheme();
+  const navigate = useNavigate();
+  const { setFocusName } = useCustomerContext();
   const [isNotifOpen, setIsNotifOpen] = useState(false);
+  const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [loading, setLoading] = useState(false);
+
+  // Fetch notifications
+  const fetchNotifications = useCallback(async () => {
+    try {
+      setLoading(true);
+      const res = await api.getNotifications();
+      setNotifications(res.data);
+    } catch (err) {
+      console.error('Failed to fetch notifications', err);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  // Fetch on mount and when dropdown opens
+  useEffect(() => {
+    fetchNotifications();
+    // Refresh every 2 minutes
+    const interval = setInterval(fetchNotifications, 120000);
+    return () => clearInterval(interval);
+  }, [fetchNotifications]);
+
+  // Handle notification click
+  const handleNotificationClick = useCallback((notif: Notification) => {
+    setIsNotifOpen(false);
+
+    if (notif.type === 'escalation' || notif.type === 'chat') {
+      // Navigate to customer service
+      navigate('/customer-service');
+      // If we have customer info, we could set focus
+    } else if (notif.type === 'lead') {
+      // Navigate to marketing
+      navigate('/marketing');
+    }
+  }, [navigate]);
+
+  // Mark all as read (for now just clears local state since we don't have backend support)
+  const handleMarkAllRead = useCallback(() => {
+    setNotifications(prev => prev.map(n => ({ ...n, read: true })));
+  }, []);
+
+  const unreadCount = notifications.filter(n => !n.read).length;
+
+  const getNotificationIcon = (type: Notification['type']) => {
+    switch (type) {
+      case 'escalation':
+        return (
+          <div className="notification-icon escalation">
+            <AlertTriangle size={18} />
+          </div>
+        );
+      case 'chat':
+        return (
+          <div className="notification-icon chat">
+            <MessageCircle size={18} />
+          </div>
+        );
+      case 'lead':
+        return (
+          <div className="notification-icon lead">
+            <UserPlus size={18} />
+          </div>
+        );
+    }
+  };
 
   return (
     <>
@@ -27,22 +112,22 @@ export function Header() {
         </div>
 
         <nav className="nav-tabs">
-          <NavLink 
-            to="/" 
+          <NavLink
+            to="/"
             className={({ isActive }) => `nav-tab ${isActive ? 'active' : ''}`}
           >
             <LayoutDashboard size={16} />
             Dashboard
           </NavLink>
-          <NavLink 
-            to="/customer-service" 
+          <NavLink
+            to="/customer-service"
             className={({ isActive }) => `nav-tab ${isActive ? 'active' : ''}`}
           >
             <MessageSquare size={16} />
             Customer Service
           </NavLink>
-          <NavLink 
-            to="/marketing" 
+          <NavLink
+            to="/marketing"
             className={({ isActive }) => `nav-tab ${isActive ? 'active' : ''}`}
           >
             <Target size={16} />
@@ -56,8 +141,8 @@ export function Header() {
             Online
           </div>
 
-          <button 
-            className="theme-toggle" 
+          <button
+            className="theme-toggle"
             onClick={toggleTheme}
             title="Toggle Dark/Light Mode"
           >
@@ -65,52 +150,62 @@ export function Header() {
           </button>
 
           <div className="notification-wrapper">
-            <button 
-              className="notification-btn" 
-              onClick={() => setIsNotifOpen(!isNotifOpen)}
+            <button
+              className="notification-btn"
+              onClick={() => {
+                setIsNotifOpen(!isNotifOpen);
+                if (!isNotifOpen) fetchNotifications();
+              }}
             >
               <Bell size={20} />
-              <span className="badge">3</span>
+              {unreadCount > 0 && <span className="badge">{unreadCount > 9 ? '9+' : unreadCount}</span>}
             </button>
 
             {/* Notification Dropdown */}
             <div className={`notification-dropdown ${isNotifOpen ? 'active' : ''}`}>
               <div className="notification-header">
                 <h3>Notifikasi</h3>
-                <button className="mark-read">Tandai semua dibaca</button>
+                <button className="mark-read" onClick={handleMarkAllRead}>Tandai semua dibaca</button>
               </div>
               <div className="notification-list">
-                {/* Dummy Notifications matching HTML */}
-                <div className="notification-item unread">
-                  <div className="notification-icon escalation">
-                    <AlertTriangle size={18} />
+                {loading && notifications.length === 0 && (
+                  <div style={{ padding: 20, textAlign: 'center', color: 'var(--text-muted)' }}>
+                    Memuat...
                   </div>
-                  <div className="notification-content">
-                    <p><strong>Escalation baru</strong> dari Ceuna mengenai pricing membutuhkan perhatian segera</p>
-                    <span className="time">5 menit yang lalu</span>
+                )}
+
+                {!loading && notifications.length === 0 && (
+                  <div style={{ padding: 20, textAlign: 'center', color: 'var(--text-muted)' }}>
+                    Tidak ada notifikasi
                   </div>
-                </div>
-                <div className="notification-item unread">
-                  <div className="notification-icon chat">
-                    <MessageCircle size={18} />
+                )}
+
+                {notifications.map((notif) => (
+                  <div
+                    key={notif.id}
+                    className={`notification-item ${!notif.read ? 'unread' : ''}`}
+                    onClick={() => handleNotificationClick(notif)}
+                    style={{ cursor: 'pointer' }}
+                  >
+                    {getNotificationIcon(notif.type)}
+                    <div className="notification-content">
+                      <p><strong>{notif.title}</strong> {notif.message}</p>
+                      <span className="time">{formatTimeAgo(notif.time)}</span>
+                    </div>
                   </div>
-                  <div className="notification-content">
-                    <p><strong>Pesan baru</strong> dari Ian Tachy: "Apakah bisa cutting bahan stainless?"</p>
-                    <span className="time">12 menit yang lalu</span>
-                  </div>
-                </div>
-                <div className="notification-item unread">
-                  <div className="notification-icon lead">
-                    <UserPlus size={18} />
-                  </div>
-                  <div className="notification-content">
-                    <p><strong>Lead baru</strong> PT Metalindo Pratama dengan score 92 ditambahkan</p>
-                    <span className="time">1 jam yang lalu</span>
-                  </div>
-                </div>
+                ))}
               </div>
               <div className="notification-footer">
-                <a href="#">Lihat semua notifikasi</a>
+                <a
+                  href="#"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    setIsNotifOpen(false);
+                    // Could navigate to a notifications page if one exists
+                  }}
+                >
+                  Lihat semua notifikasi
+                </a>
               </div>
             </div>
           </div>
@@ -119,9 +214,9 @@ export function Header() {
 
       {/* Overlay to close dropdown */}
       {isNotifOpen && (
-        <div 
-          className="dropdown-overlay active" 
-          onClick={() => setIsNotifOpen(false)} 
+        <div
+          className="dropdown-overlay active"
+          onClick={() => setIsNotifOpen(false)}
         />
       )}
     </>

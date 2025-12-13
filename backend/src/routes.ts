@@ -326,6 +326,162 @@ router.get('/api/marketing', async (_req, res) => {
   }
 });
 
+// Notifications (aggregated from escalations, recent chats, and new leads)
+router.get('/api/notifications', async (_req, res) => {
+  try {
+    const notifications: Array<{
+      id: string;
+      type: 'escalation' | 'chat' | 'lead';
+      title: string;
+      message: string;
+      time: string;
+      read: boolean;
+      link: string;
+      customerId?: number;
+      businessId?: number;
+    }> = [];
+
+    // 1. Get recent escalations (last 24 hours)
+    const escalations = await pool.query(
+      `SELECT e.id, c.name, c.id as customer_id, e.escalation_reason, e.chat_summary, e.created_at
+       FROM escalations e
+       JOIN customers c ON c.id = e.customer_id
+       WHERE e.status = 'open' AND e.created_at > NOW() - INTERVAL '24 hours'
+       ORDER BY e.created_at DESC
+       LIMIT 5`
+    );
+
+    for (const esc of escalations.rows) {
+      notifications.push({
+        id: `esc-${esc.id}`,
+        type: 'escalation',
+        title: 'Escalation baru',
+        message: `dari ${esc.name || 'Customer'} ${esc.escalation_reason ? `mengenai ${esc.escalation_reason}` : 'membutuhkan perhatian segera'}`,
+        time: esc.created_at,
+        read: false,
+        link: '/customer-service',
+        customerId: esc.customer_id,
+      });
+    }
+
+    // 2. Get recent incoming messages (last 2 hours)
+    const recentChats = await pool.query(
+      `SELECT ch.id, c.name, c.id as customer_id, ch.content, ch.created_at
+       FROM chat_history ch
+       JOIN customers c ON c.id = ch.customer_id
+       WHERE ch.message_type IN ('in', 'inbound', 'customer')
+         AND ch.created_at > NOW() - INTERVAL '2 hours'
+       ORDER BY ch.created_at DESC
+       LIMIT 5`
+    );
+
+    for (const chat of recentChats.rows) {
+      const preview = chat.content?.length > 50 ? chat.content.substring(0, 50) + '...' : chat.content;
+      notifications.push({
+        id: `chat-${chat.id}`,
+        type: 'chat',
+        title: 'Pesan baru',
+        message: `dari ${chat.name || 'Customer'}: "${preview}"`,
+        time: chat.created_at,
+        read: false,
+        link: '/customer-service',
+        customerId: chat.customer_id,
+      });
+    }
+
+    // 3. Get new high-score leads (last 24 hours, score > 80)
+    const newLeads = await pool.query(
+      `SELECT id, name, lead_score, created_at
+       FROM businesses
+       WHERE created_at > NOW() - INTERVAL '24 hours' AND lead_score > 80
+       ORDER BY created_at DESC
+       LIMIT 5`
+    );
+
+    for (const lead of newLeads.rows) {
+      notifications.push({
+        id: `lead-${lead.id}`,
+        type: 'lead',
+        title: 'Lead baru',
+        message: `${lead.name || 'Business'} dengan score ${lead.lead_score} ditambahkan`,
+        time: lead.created_at,
+        read: false,
+        link: '/marketing',
+        businessId: lead.id,
+      });
+    }
+
+    // Sort by time (most recent first)
+    notifications.sort((a, b) => new Date(b.time).getTime() - new Date(a.time).getTime());
+
+    return res.json({
+      data: notifications.slice(0, 10), // Max 10 notifications
+      meta: buildMeta(res.locals.requestId),
+    });
+  } catch (error) {
+    console.error('[GET /api/notifications]', error);
+    return res.status(500).json({
+      error: 'Internal server error',
+      code: 'NOTIFICATIONS_FETCH_FAILED',
+      meta: buildMeta(res.locals.requestId),
+    });
+  }
+});
+
+// Update business status
+router.patch('/api/businesses/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { status, message_sent } = req.body as { status?: string; message_sent?: boolean };
+
+    const updates: string[] = [];
+    const params: (string | number | boolean)[] = [];
+
+    if (status !== undefined) {
+      params.push(status);
+      updates.push(`status = $${params.length}`);
+    }
+    if (message_sent !== undefined) {
+      params.push(message_sent);
+      updates.push(`message_sent = $${params.length}`);
+    }
+
+    if (updates.length === 0) {
+      return res.status(400).json({
+        error: 'No fields to update',
+        code: 'NO_UPDATE_FIELDS',
+        meta: buildMeta(res.locals.requestId),
+      });
+    }
+
+    params.push(Number(id));
+    const result = await pool.query(
+      `UPDATE businesses SET ${updates.join(', ')}, updated_at = NOW() WHERE id = $${params.length} RETURNING *`,
+      params
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({
+        error: 'Business not found',
+        code: 'BUSINESS_NOT_FOUND',
+        meta: buildMeta(res.locals.requestId),
+      });
+    }
+
+    return res.json({
+      data: result.rows[0],
+      meta: buildMeta(res.locals.requestId),
+    });
+  } catch (error) {
+    console.error('[PATCH /api/businesses/:id]', error);
+    return res.status(500).json({
+      error: 'Internal server error',
+      code: 'BUSINESS_UPDATE_FAILED',
+      meta: buildMeta(res.locals.requestId),
+    });
+  }
+});
+
 // Send Message Gateway
 router.post('/api/send-message', async (req, res) => {
   try {
