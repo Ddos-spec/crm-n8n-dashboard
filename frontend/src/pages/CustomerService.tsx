@@ -110,8 +110,8 @@ export default function CustomerService() {
     if (!contactList.length) return;
     const headers = ['Name', 'Phone', 'Status', 'Last Contact'];
     const rows = contactList.map(c => [
-      `"${c.name.replace(/"/g, '""')}"`,
-      `"${c.phone}"`,
+      `"${c.name.replace(/"/g, '""')}"`, 
+      `"${c.phone}"`, 
       c.status,
       c.lastContact
     ]);
@@ -125,3 +125,171 @@ export default function CustomerService() {
     link.click();
     document.body.removeChild(link);
   };
+
+  // Infinite Scroll Handler
+  const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
+    const { scrollTop, clientHeight, scrollHeight } = e.currentTarget;
+    // Load more when scrolled to bottom (with 50px buffer)
+    if (scrollHeight - scrollTop <= clientHeight + 50) {
+      if (hasMore && !loading) {
+        loadMore();
+      }
+    }
+  };
+
+  return (
+    <div className="page active" id="customer-service">
+      <div className="page-header">
+        <h1 className="page-title">Customer Service</h1>
+        <p className="page-subtitle">Kelola percakapan dan eskalasi customer</p>
+      </div>
+
+      <div className="chat-layout">
+        {/* Sidebar Contact List */}
+        <div className="contact-list">
+          <div className="contact-list-header">
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+              <div className="contact-list-title" style={{ marginBottom: 0 }}>Kontak</div>
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                onClick={handleExportCSV} 
+                title="Export to CSV"
+                style={{ padding: 6 }}
+              >
+                <Download size={16} />
+              </Button>
+            </div>
+            <Input 
+              placeholder="Cari customer..." 
+              icon={<Search size={16} />} 
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+            />
+          </div>
+          <div className="contact-list-body" onScroll={handleScroll}>
+            {contactList.map((contact) => (
+              <div 
+                key={contact.id}
+                className={`contact-item ${selected?.id === contact.id ? 'active' : ''}`}
+                onClick={() => setSelected(contact)}
+              >
+                <div 
+                  className="contact-avatar"
+                  style={{ background: getAvatarGradient(contact.name) }}
+                >
+                  {getInitials(contact.name)}
+                </div>
+                <div className="contact-info">
+                  <div className="contact-name">
+                    {contact.name}
+                    <Badge variant="green" className="badge-sm" style={{padding: '2px 8px', fontSize: 10}}>{contact.status}</Badge>
+                  </div>
+                  <div className="contact-phone">{contact.phone}</div>
+                  <div className="contact-preview">Click to view chat history...</div>
+                </div>
+              </div>
+            ))}
+            
+            {loading && (
+              <div style={{padding: 20, textAlign: 'center', color: 'var(--text-muted)'}}>
+                <div className="spinner" style={{display:'inline-block', width: 16, height: 16, border: '2px solid var(--text-muted)', borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 1s linear infinite'}}></div>
+                <span style={{marginLeft: 8}}>Memuat kontak...</span>
+              </div>
+            )}
+            
+            {!loading && contactList.length === 0 && (
+              <div style={{padding: 20, textAlign: 'center', color: 'var(--text-muted)'}}>Tidak ada kontak</div>
+            )}
+            
+            {!loading && !hasMore && contactList.length > 0 && (
+              <div style={{padding: 10, textAlign: 'center', fontSize: 12, color: 'var(--text-muted)'}}>Semua kontak telah dimuat</div>
+            )}
+          </div>
+        </div>
+
+        {/* Main Chat Panel */}
+        <div className="chat-panel">
+          {selected ? (
+            <>
+              {/* Chat Header */}
+              <div className="chat-header">
+                <div className="chat-user">
+                  <div 
+                    className="contact-avatar"
+                    style={{ background: getAvatarGradient(selected.name) }}
+                  >
+                    {getInitials(selected.name)}
+                  </div>
+                  <div className="chat-user-info">
+                    <h3>{selected.name}</h3>
+                    <p>{selected.phone}</p>
+                  </div>
+                </div>
+                <div className="chat-actions">
+                  <Badge variant="green" dot>Active</Badge>
+                  <Button variant="secondary" size="sm" icon={<AlertTriangle size={14}/>}>
+                    Escalate
+                  </Button>
+                  <Button variant="ghost" size="sm">
+                    <MoreVertical size={16} />
+                  </Button>
+                </div>
+              </div>
+
+              {/* Messages Area */}
+              <div className="chat-messages">
+                {chatLoading && <div className="muted" style={{textAlign: 'center', marginTop: 20}}>Memuat chat...</div>}
+                {!chatLoading && chatMessages.length === 0 && (
+                  <div className="empty-state">
+                    <div className="empty-state-icon"><Phone size={32}/></div>
+                    <p>Belum ada riwayat percakapan</p>
+                  </div>
+                )}
+                {chatMessages.map((msg) => {
+                  const isOutgoing = ['out', 'outbound', 'agent'].includes(msg.message_type);
+                  return (
+                    <div key={msg.id} className={`message ${isOutgoing ? 'outgoing' : 'incoming'}`}>
+                      <div className="message-text">{msg.content}</div>
+                      <div className="message-time">
+                        {new Date(msg.created_at).toLocaleString([], { hour: '2-digit', minute: '2-digit' })}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Input Area */}
+              <div className="chat-input-area">
+                <div className="chat-input-wrapper">
+                  <Button variant="ghost">
+                    <Paperclip size={20} />
+                  </Button>
+                  <input 
+                    type="text" 
+                    className="chat-input" 
+                    placeholder="Ketik pesan..."
+                    value={textMessage}
+                    onChange={(e) => setTextMessage(e.target.value)}
+                    onKeyDown={(e) => e.key === 'Enter' && handleSend()}
+                  />
+                  <Button onClick={handleSend} icon={<Send size={18} />}>
+                    Kirim
+                  </Button>
+                </div>
+              </div>
+            </>
+          ) : (
+            <div className="empty-state">
+              <h3>Pilih Customer</h3>
+              <p>Pilih salah satu kontak di sebelah kiri untuk memulai chat</p>
+            </div>
+          )}
+        </div>
+      </div>
+      <style>{`
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+      `}</style>
+    </div>
+  );
+}
