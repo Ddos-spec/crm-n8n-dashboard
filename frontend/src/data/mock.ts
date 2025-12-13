@@ -2,7 +2,7 @@ export const customers = [
   { name: 'Siti Rahma', phone: '+62 812-9000-1234', status: 'active', lastContact: '13 Des 2025' },
   { name: 'Budi Santoso', phone: '+62 813-4555-2211', status: 'pending', lastContact: '12 Des 2025' },
   { name: 'Andi Pratama', phone: '+62 851-7777-0987', status: 'active', lastContact: '10 Des 2025' },
-  { name: 'Mega Lestari', phone: '+62 822-6666-1221', status: 'churn', lastContact: '01 Des 2025' },
+  { name: 'Mega Lestari', phone: '+62 822-6666-1221', status: 'escalation', lastContact: '01 Des 2025' },
 ] as const;
 
 export const escalations = [
@@ -36,6 +36,17 @@ export const chats = [
 
 export const campaigns = [
   { name: 'Flash Sale 12.12', channel: 'WhatsApp', sent: 1800, openRate: 0.78, ctr: 0.31, revenue: 42000000 },
-  { name: 'Re-activate churn', channel: 'Email', sent: 1200, openRate: 0.42, ctr: 0.12, revenue: 9000000 },
+  { name: 'Re-activate dormant', channel: 'Email', sent: 1200, openRate: 0.42, ctr: 0.12, revenue: 9000000 },
   { name: 'COD Reminder', channel: 'SMS', sent: 800, openRate: 0.55, ctr: 0.09, revenue: 5000000 },
+] as const;
+
+export const campaignPerformance = [
+  { batch: 'WA-12-12', total: 1200, contacted: 900, invalid: 25, avgScore: 78, lastBatch: '12 Des 2025' },
+  { batch: 'EMAIL-DORMANT', total: 800, contacted: 420, invalid: 12, avgScore: 65, lastBatch: '10 Des 2025' },
+] as const;
+
+export const engagementStats = [
+  { name: 'Siti Rahma', status: 'active', priority: 'high', totalChats: 24, lastChat: '2m', escalations: 0 },
+  { name: 'Budi Santoso', status: 'pending', priority: 'normal', totalChats: 12, lastChat: '8m', escalations: 1 },
+  { name: 'Mega Lestari', status: 'escalation', priority: 'high', totalChats: 4, lastChat: '1h', escalations: 2 },
 ] as const;

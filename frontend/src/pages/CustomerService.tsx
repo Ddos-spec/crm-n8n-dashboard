@@ -1,92 +1,125 @@
-import { useState } from 'react';
-import { campaigns, chats, customers, escalations } from '../data/mock';
+import { useEffect, useMemo, useState } from 'react';
+import { useCustomerContext } from '../context/customer';
+import { useChat, useCustomers } from '../hooks/useData';
+
+type Contact = {
+  name: string;
+  phone: string;
+  status: 'active' | 'pending' | 'escalation';
+  lastContact: string;
+  id: number;
+};
 
 const statusClass = {
   active: 'pill success',
   pending: 'pill warning',
-  churn: 'pill danger',
-};
-
-const chatBubbleClass = {
-  left: 'bubble left',
-  right: 'bubble right',
+  escalation: 'pill danger',
 };
 
 export default function CustomerService() {
-  const [showEscalation, setShowEscalation] = useState(false);
+  const { data: customers, loading } = useCustomers();
+  const contactList = useMemo<Contact[]>(
+    () =>
+      customers.map((c) => ({
+        id: c.id,
+        name: c.name ?? 'Tanpa nama',
+        phone: c.phone,
+        status: c.status,
+        lastContact: c.last_message_at ?? 'N/A',
+      })),
+    [customers],
+  );
+  const [selected, setSelected] = useState<Contact | null>(null);
+  const { focusName, setFocusName } = useCustomerContext();
+  const { data: chatMessages, loading: chatLoading } = useChat(selected?.id);
+
+  useEffect(() => {
+    if (focusName && contactList.length) {
+      const found = contactList.find((c) => c.name === focusName);
+      if (found) {
+        setSelected(found);
+        setFocusName(null);
+        return;
+      }
+    }
+    if (!selected && contactList.length) {
+      setSelected(contactList[0]);
+    }
+  }, [focusName, contactList, setFocusName, selected]);
+
+  useEffect(() => {
+    if (contactList.length && !selected) {
+      setSelected(contactList[0]);
+    }
+  }, [contactList, selected]);
 
   return (
-    <div className="stack">
-      <header className="hero">
-        <div>
-          <p className="eyebrow">Customer Service</p>
-          <h1>Inbox & Profil Pelanggan</h1>
-          <p className="lede">
-            Pantau pelanggan prioritas, riwayat kontak, dan status percakapan lintas kanal sebelum dihubungkan ke agen
-            atau otomatisasi n8n.
-          </p>
-        </div>
-      </header>
-
-      <section className="grid two">
-        <div className="card">
-          <div className="card-title">Pelanggan Aktif</div>
-          <div className="table">
-            <div className="table-head">
-              <span>Nama</span>
-              <span>Status</span>
-              <span>Kontak</span>
-              <span>Terakhir</span>
-            </div>
-            {customers.map((c) => (
-              <div key={c.phone} className="table-row">
-                <span>{c.name}</span>
-                <span className={statusClass[c.status]}>{c.status}</span>
-                <span className="mono">{c.phone}</span>
-                <span>{c.lastContact}</span>
-              </div>
-            ))}
+    <div className="cs-layout">
+      <aside className="cs-sidebar">
+        <div className="cs-header">
+          <div>
+            <div className="eyebrow">Kontak</div>
+            <div className="cs-title">Customer Service</div>
           </div>
         </div>
+        <div className="cs-contacts">
+          {loading && <div className="muted">Memuat kontak...</div>}
+          {!loading &&
+            contactList.map((c) => (
+              <button
+                key={c.phone}
+                className={selected?.phone === c.phone ? 'contact active' : 'contact'}
+                type="button"
+                onClick={() => setSelected(c)}
+              >
+                <div className="contact-top">
+                  <span className="contact-name">{c.name}</span>
+                  <span className={statusClass[c.status]}>{c.status}</span>
+                </div>
+                <div className="contact-bottom">
+                  <span className="mono">{c.phone}</span>
+                  <span className="muted">{c.lastContact}</span>
+                </div>
+              </button>
+            ))}
+        </div>
+      </aside>
 
-        <div className="card">
-          <div className="card-title">Inbox ala WhatsApp</div>
-          <div className="chat-window">
-            {chats.map((c, idx) => (
-              <div key={`${c.customer}-${idx}`} className={chatBubbleClass[c.align]}>
+      <main className="cs-chat">
+        <div className="cs-chat-header">
+          <div>
+            <div className="cs-title">{selected?.name ?? 'Memuat...'}</div>
+            <div className="muted">{selected?.phone ?? ''}</div>
+          </div>
+          {selected ? <div className={statusClass[selected.status]}>{selected.status}</div> : null}
+        </div>
+
+        <div className="chat-window">
+          {chatLoading && <div className="muted">Memuat chat...</div>}
+          {!chatLoading &&
+            chatMessages.map((c) => {
+              const align = ['out', 'outbound', 'agent'].includes(c.message_type) ? 'right' : 'left';
+              return (
+                <div key={c.id} className={align === 'right' ? 'bubble right' : 'bubble left'}>
                 <div className="bubble-meta">
-                  <span>{c.customer}</span>
-                  <span className="muted">{c.channel} · {c.time}</span>
+                  <span>{selected?.name ?? 'Customer'}</span>
+                  <span className="muted">
+                    {c.message_type} | {new Date(c.created_at).toLocaleString()}
+                  </span>
                 </div>
-                <div className="bubble-text">{c.snippet}</div>
+                <div className="bubble-text">{c.content}</div>
               </div>
-            ))}
-          </div>
-          <button className="button ghost" type="button" onClick={() => setShowEscalation((p) => !p)}>
-            {showEscalation ? 'Tutup Eskalasi' : 'Tampilkan Eskalasi'}
-          </button>
-          {showEscalation && (
-            <div className="table" style={{ marginTop: 12 }}>
-              <div className="table-head">
-                <span>Pelanggan</span>
-                <span>Isu</span>
-                <span>Owner</span>
-                <span>SLA</span>
-                <span>Prioritas</span>
-              </div>
-              {escalations.map((e) => (
-                <div key={e.name} className="table-row">
-                  <span>{e.name}</span>
-                  <span className="truncate">{e.issue}</span>
-                  <span>{e.owner}</span>
-                  <span>{e.sla}</span>
-                  <span className={e.priority === 'high' ? 'pill danger' : 'pill warning'}>{e.priority}</span>
-                </div>
-              ))}
-            </div>
-          </div>
+              );
+            })}
         </div>
-      </section>
+
+        <div className="cs-input">
+          <input className="input" placeholder="Ketik pesan..." />
+          <button className="button" type="button">
+            Kirim
+          </button>
+        </div>
+      </main>
     </div>
   );
 }

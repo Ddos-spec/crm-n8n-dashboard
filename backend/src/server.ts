@@ -6,6 +6,7 @@ import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
 import { config } from './config/env';
 import { checkDbConnection } from './lib/db';
+import { pool } from './lib/db';
 
 dotenv.config();
 
@@ -83,6 +84,105 @@ app.get('/ping', (_req, res) => {
     data: 'pong',
     meta: buildMeta(res.locals.requestId),
   });
+});
+
+app.get('/api/customers', async (_req, res) => {
+  try {
+    const result = await pool.query(
+      `SELECT id, name, phone, status, last_message_at
+       FROM customers
+       ORDER BY last_message_at DESC NULLS LAST
+       LIMIT 100`,
+    );
+    return res.json({ data: result.rows, meta: buildMeta(res.locals.requestId) });
+  } catch (error) {
+    console.error('[GET /api/customers]', error);
+    return res.status(500).json({
+      error: 'Internal server error',
+      code: 'CUSTOMERS_FETCH_FAILED',
+      meta: buildMeta(res.locals.requestId),
+    });
+  }
+});
+
+app.get('/api/escalations', async (_req, res) => {
+  try {
+    const result = await pool.query(
+      `SELECT e.id,
+              c.name,
+              c.phone,
+              COALESCE(e.escalation_reason, e.chat_summary, '') AS issue,
+              COALESCE(e.priority_level, 'normal') AS priority,
+              e.status
+       FROM escalations e
+       JOIN customers c ON c.id = e.customer_id
+       WHERE e.status = 'open'
+       ORDER BY e.priority_level DESC, e.created_at DESC
+       LIMIT 100`,
+    );
+    return res.json({ data: result.rows, meta: buildMeta(res.locals.requestId) });
+  } catch (error) {
+    console.error('[GET /api/escalations]', error);
+    return res.status(500).json({
+      error: 'Internal server error',
+      code: 'ESCALATIONS_FETCH_FAILED',
+      meta: buildMeta(res.locals.requestId),
+    });
+  }
+});
+
+app.get('/api/chat-history', async (req, res) => {
+  try {
+    const customerId = Number(req.query.customerId);
+    if (!customerId) {
+      return res.status(400).json({
+        error: 'customerId is required',
+        code: 'INVALID_CUSTOMER_ID',
+        meta: buildMeta(res.locals.requestId),
+      });
+    }
+    const result = await pool.query(
+      `SELECT id, customer_id, message_type, content, created_at, escalated
+       FROM chat_history
+       WHERE customer_id = $1
+       ORDER BY created_at DESC
+       LIMIT 50`,
+      [customerId],
+    );
+    return res.json({ data: result.rows, meta: buildMeta(res.locals.requestId) });
+  } catch (error) {
+    console.error('[GET /api/chat-history]', error);
+    return res.status(500).json({
+      error: 'Internal server error',
+      code: 'CHAT_HISTORY_FETCH_FAILED',
+      meta: buildMeta(res.locals.requestId),
+    });
+  }
+});
+
+app.get('/api/campaigns', async (_req, res) => {
+  try {
+    const result = await pool.query(
+      `SELECT campaign_batch AS name,
+              total_leads,
+              contacted,
+              invalid,
+              avg_lead_score,
+              batch_date
+       FROM campaign_performance
+       WHERE campaign_batch ILIKE 'WA%'
+       ORDER BY batch_date DESC NULLS LAST
+       LIMIT 50`,
+    );
+    return res.json({ data: result.rows, meta: buildMeta(res.locals.requestId) });
+  } catch (error) {
+    console.error('[GET /api/campaigns]', error);
+    return res.status(500).json({
+      error: 'Internal server error',
+      code: 'CAMPAIGNS_FETCH_FAILED',
+      meta: buildMeta(res.locals.requestId),
+    });
+  }
 });
 app.use((_req, res) => {
   return res.status(404).json({
