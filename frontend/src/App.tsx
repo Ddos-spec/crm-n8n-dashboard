@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { BrowserRouter, Link, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
+import { HashRouter, Link, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
 import Dashboard from './pages/Dashboard';
 import CustomerService from './pages/CustomerService';
 import Marketing from './pages/Marketing';
@@ -113,10 +113,10 @@ function Layout() {
 
 export default function App() {
   return (
-    <BrowserRouter>
+    <HashRouter>
       <CustomerContextProvider>
         <Layout />
       </CustomerContextProvider>
-    </BrowserRouter>
+    </HashRouter>
   );
 }
