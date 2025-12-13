@@ -72,11 +72,18 @@ app.get('/health', async (_req, res) => {
     return res.status(500).json({
       error: 'Internal server error',
       code: 'HEALTHCHECK_FAILED',
+      message: config.nodeEnv === 'development' ? (error as Error)?.message : undefined,
       meta: buildMeta(res.locals.requestId),
     });
   }
 });
 
+app.get('/ping', (_req, res) => {
+  return res.status(200).json({
+    data: 'pong',
+    meta: buildMeta(res.locals.requestId),
+  });
+});
 app.use((_req, res) => {
   return res.status(404).json({
     error: 'Not Found',
@@ -108,7 +115,7 @@ const start = async () => {
     }
     console.log('[BOOT] Database reachable, starting HTTP server');
 
-    app.listen(port, () => {
+    app.listen(port, '0.0.0.0', () => {
       console.log(`Server running on port ${port} (${config.nodeEnv})`);
     });
   } catch (err) {
