@@ -3,7 +3,6 @@ import cors from 'cors';
 import dotenv from 'dotenv';
 import express from 'express';
 import helmet from 'helmet';
-import rateLimit from 'express-rate-limit';
 import compression from 'compression';
 import { config } from './config/env';
 import { checkDbConnection } from './lib/db';
@@ -37,15 +36,6 @@ app.options('*', cors());
 app.use(helmet());
 app.use(compression()); // Enable Gzip compression
 app.use(express.json());
-
-const limiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 100,
-  standardHeaders: true,
-  legacyHeaders: false,
-});
-
-app.use(limiter);
 
 app.use((req, res, next) => {
   const requestId = crypto.randomUUID();
