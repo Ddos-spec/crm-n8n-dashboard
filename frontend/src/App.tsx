@@ -8,6 +8,8 @@ import { Layout } from './components/layout/Layout';
 const Dashboard = lazy(() => import('./pages/Dashboard'));
 const CustomerService = lazy(() => import('./pages/CustomerService'));
 const Marketing = lazy(() => import('./pages/Marketing'));
+const Tugas = lazy(() => import('./pages/Tugas'));
+const Penugasan = lazy(() => import('./pages/Penugasan'));
 
 // Simple Loading Spinner for Suspense fallback
 const PageLoader = () => (
@@ -43,6 +45,16 @@ export default function App() {
               <Route path="/marketing" element={
                 <Suspense fallback={<PageLoader />}>
                   <Marketing />
+                </Suspense>
+              } />
+              <Route path="/tugas" element={
+                <Suspense fallback={<PageLoader />}>
+                  <Tugas />
+                </Suspense>
+              } />
+              <Route path="/tugas/penugasan/:projectId" element={
+                <Suspense fallback={<PageLoader />}>
+                  <Penugasan />
                 </Suspense>
               } />
               <Route path="*" element={

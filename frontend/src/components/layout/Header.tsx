@@ -7,6 +7,7 @@ import {
   LayoutDashboard,
   MessageSquare,
   Target,
+  CheckSquare,
   Sun,
   Moon,
   Bell,
@@ -132,6 +133,13 @@ export function Header() {
           >
             <Target size={16} />
             Marketing
+          </NavLink>
+          <NavLink
+            to="/tugas"
+            className={({ isActive }) => `nav-tab ${isActive ? 'active' : ''}`}
+          >
+            <CheckSquare size={16} />
+            Tugas
           </NavLink>
         </nav>
 
