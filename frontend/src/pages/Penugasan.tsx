@@ -58,8 +58,40 @@ export default function Penugasan() {
   const [selectedMember, setSelectedMember] = useState<string | null>(null);
   const [showTaskModal, setShowTaskModal] = useState(false);
   const [taskName, setTaskName] = useState('');
-  const [taskDuration, setTaskDuration] = useState('');
   const [taskDurationUnit, setTaskDurationUnit] = useState<'hours' | 'days'>('days');
+  const [taskStartDate, setTaskStartDate] = useState(() => new Date().toISOString().split('T')[0]);
+  const [taskEndDate, setTaskEndDate] = useState('');
+  const [taskStartTime, setTaskStartTime] = useState('08:00');
+  const [taskEndTime, setTaskEndTime] = useState('17:00');
+
+  const getCategoryDisplay = (category: ProjectCategory) =>
+    PROJECT_CATEGORIES.find(item => item.value === category) ?? PROJECT_CATEGORIES[0];
+
+  const normalizeAiTeam = (loadedProject: Project): Project => {
+    if (loadedProject.category !== 'ai') return loadedProject;
+
+    const collectedTasks = loadedProject.teamMembers.flatMap(member => member.tasks || []);
+
+    return {
+      ...loadedProject,
+      teamMembers: [
+        { id: 'seto', name: 'SETO', tasks: collectedTasks }
+      ]
+    };
+  };
+
+  const updateTimeline = (baseProject: Project, members: TeamMember[]) => {
+    const totalTaskDuration = members.reduce(
+      (total, member) => total + member.tasks.reduce((sum, task) => sum + task.actualDays, 0),
+      0
+    );
+
+    const newDeadline = Math.max(baseProject.initialDeadlineDays, totalTaskDuration);
+    const newEndDate = new Date(baseProject.startDate);
+    newEndDate.setTime(newEndDate.getTime() + newDeadline * 24 * 60 * 60 * 1000);
+
+    return { newDeadline, newEndDate };
+  };
 
   const getCategoryDisplay = (category: ProjectCategory) =>
     PROJECT_CATEGORIES.find(item => item.value === category) ?? PROJECT_CATEGORIES[0];
@@ -113,6 +145,15 @@ export default function Penugasan() {
     }
   }, [projectId]);
 
+  useEffect(() => {
+    if (project) {
+      setTaskStartDate(project.startDate.toISOString().split('T')[0]);
+      setTaskEndDate('');
+      setTaskStartTime('08:00');
+      setTaskEndTime('17:00');
+    }
+  }, [project]);
+
   const saveProject = (updatedProject: Project) => {
     const normalizedProject = normalizeAiTeam(updatedProject);
     setProject(normalizedProject);
@@ -132,11 +173,45 @@ export default function Penugasan() {
   };
 
   const handleAddTask = () => {
-    if (!project || !selectedMember || !taskName || !taskDuration) return;
+    if (!project || !selectedMember || !taskName) return;
 
-    const durationDays = taskDurationUnit === 'hours'
-      ? parseFloat(taskDuration) / 24
-      : parseFloat(taskDuration);
+    const isDayMode = taskDurationUnit === 'days';
+
+    if (isDayMode && (!taskStartDate || !taskEndDate)) return;
+    if (!isDayMode && (!taskStartTime || !taskEndTime)) return;
+
+    let startDate: Date;
+    let endDate: Date;
+    let durationDays = 0;
+
+    if (isDayMode) {
+      startDate = new Date(`${taskStartDate}T00:00:00`);
+      endDate = new Date(`${taskEndDate}T23:59:59`);
+
+      if (endDate < startDate) {
+        alert('Tanggal selesai harus setelah tanggal mulai.');
+        return;
+      }
+
+      durationDays = (endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24);
+    } else {
+      const today = new Date();
+      const [startHour, startMinute] = taskStartTime.split(':').map(Number);
+      const [endHour, endMinute] = taskEndTime.split(':').map(Number);
+
+      startDate = new Date(today);
+      startDate.setHours(startHour, startMinute, 0, 0);
+
+      endDate = new Date(today);
+      endDate.setHours(endHour, endMinute, 0, 0);
+
+      if (endDate <= startDate) {
+        alert('Jam selesai harus setelah jam mulai.');
+        return;
+      }
+
+      durationDays = (endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24);
+    }
 
     if (Number.isNaN(durationDays) || durationDays <= 0) return;
 
@@ -145,7 +220,7 @@ export default function Penugasan() {
       name: taskName,
       estimatedDays: durationDays,
       actualDays: durationDays,
-      startDate: new Date(),
+      startDate,
       completed: false
     };
 
@@ -168,9 +243,12 @@ export default function Penugasan() {
 
     setShowTaskModal(false);
     setTaskName('');
-    setTaskDuration('');
     setTaskDurationUnit('days');
     setSelectedMember(null);
+    setTaskStartDate(project.startDate.toISOString().split('T')[0]);
+    setTaskEndDate('');
+    setTaskStartTime('08:00');
+    setTaskEndTime('17:00');
   };
 
   const handleAddDay = (memberId: string, taskId: string) => {
@@ -461,24 +539,58 @@ export default function Penugasan() {
               <div className="form-group">
                 <label htmlFor="task-duration">Estimasi Waktu</label>
                 <div className="deadline-input-group">
-                  <Input
-                    id="task-duration"
-                    type="number"
-                    placeholder="Berapa lama?"
-                    value={taskDuration}
-                    onChange={(e) => setTaskDuration(e.target.value)}
-                    min="0"
-                    step="0.5"
-                  />
                   <select
                     className="deadline-unit-select"
                     value={taskDurationUnit}
                     onChange={(e) => setTaskDurationUnit(e.target.value as 'hours' | 'days')}
                   >
-                    <option value="hours">Jam</option>
                     <option value="days">Hari</option>
+                    <option value="hours">Jam</option>
                   </select>
                 </div>
+
+                {taskDurationUnit === 'days' ? (
+                  <div className="deadline-range">
+                    <div className="deadline-range-field">
+                      <span className="deadline-range-label">Mulai</span>
+                      <Input
+                        type="date"
+                        value={taskStartDate}
+                        onChange={(e) => setTaskStartDate(e.target.value)}
+                      />
+                    </div>
+                    <span className="range-separator">→</span>
+                    <div className="deadline-range-field">
+                      <span className="deadline-range-label">Selesai</span>
+                      <Input
+                        type="date"
+                        value={taskEndDate}
+                        min={taskStartDate}
+                        onChange={(e) => setTaskEndDate(e.target.value)}
+                      />
+                    </div>
+                  </div>
+                ) : (
+                  <div className="deadline-range">
+                    <div className="deadline-range-field">
+                      <span className="deadline-range-label">Mulai</span>
+                      <Input
+                        type="time"
+                        value={taskStartTime}
+                        onChange={(e) => setTaskStartTime(e.target.value)}
+                      />
+                    </div>
+                    <span className="range-separator">→</span>
+                    <div className="deadline-range-field">
+                      <span className="deadline-range-label">Selesai</span>
+                      <Input
+                        type="time"
+                        value={taskEndTime}
+                        onChange={(e) => setTaskEndTime(e.target.value)}
+                      />
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
             <div className="modal-footer">
@@ -494,7 +606,11 @@ export default function Penugasan() {
               <Button
                 variant="primary"
                 onClick={handleAddTask}
-                disabled={!taskName || !taskDuration}
+                disabled={!taskName || (
+                  taskDurationUnit === 'days'
+                    ? !taskStartDate || !taskEndDate
+                    : !taskStartTime || !taskEndTime
+                )}
               >
                 Tambah Tugas
               </Button>
