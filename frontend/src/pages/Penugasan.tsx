@@ -22,9 +22,23 @@ interface TeamMember {
   tasks: Task[];
 }
 
+type ProjectCategory = 'laser_cutting_metal' | 'laser_non_metal' | 'cnc_router' | 'ai';
+
+const PROJECT_CATEGORIES: {
+  value: ProjectCategory;
+  label: string;
+  variant: 'green' | 'blue' | 'red' | 'yellow' | 'purple' | 'gray';
+}[] = [
+  { value: 'laser_cutting_metal', label: 'Laser Cutting Metal', variant: 'red' },
+  { value: 'laser_non_metal', label: 'Laser Non Metal', variant: 'yellow' },
+  { value: 'cnc_router', label: 'CNC Router', variant: 'blue' },
+  { value: 'ai', label: 'AI', variant: 'purple' }
+];
+
 interface Project {
   id: string;
   name: string;
+  category: ProjectCategory;
   initialDeadlineDays: number;
   actualDeadlineDays: number;
   startDate: Date;
@@ -47,11 +61,43 @@ export default function Penugasan() {
   const [taskDuration, setTaskDuration] = useState('');
   const [taskDurationUnit, setTaskDurationUnit] = useState<'hours' | 'days'>('days');
 
+  const getCategoryDisplay = (category: ProjectCategory) =>
+    PROJECT_CATEGORIES.find(item => item.value === category) ?? PROJECT_CATEGORIES[0];
+
+  const normalizeAiTeam = (loadedProject: Project): Project => {
+    if (loadedProject.category !== 'ai') return loadedProject;
+
+    const collectedTasks = loadedProject.teamMembers.flatMap(member => member.tasks || []);
+
+    return {
+      ...loadedProject,
+      teamMembers: [
+        { id: 'seto', name: 'SETO', tasks: collectedTasks }
+      ]
+    };
+  };
+
+  const updateTimeline = (baseProject: Project, members: TeamMember[]) => {
+    const totalTaskDuration = members.reduce(
+      (total, member) => total + member.tasks.reduce((sum, task) => sum + task.actualDays, 0),
+      0
+    );
+
+    const newDeadline = Math.max(baseProject.initialDeadlineDays, totalTaskDuration);
+    const newEndDate = new Date(baseProject.startDate);
+    newEndDate.setTime(newEndDate.getTime() + newDeadline * 24 * 60 * 60 * 1000);
+
+    return { newDeadline, newEndDate };
+  };
+
   useEffect(() => {
     // Load project from localStorage (for demo)
     const storedProjects = localStorage.getItem(PROJECT_STORAGE_KEY);
     if (storedProjects) {
-      const projects: Project[] = JSON.parse(storedProjects);
+      const projects: Project[] = JSON.parse(storedProjects).map((proj: Project) => ({
+        ...proj,
+        category: proj.category || PROJECT_CATEGORIES[0].value
+      }));
       const foundProject = projects.find(p => p.id === projectId);
       if (foundProject) {
         // Convert date strings back to Date objects
@@ -62,13 +108,14 @@ export default function Penugasan() {
             task.startDate = new Date(task.startDate);
           });
         });
-        setProject(foundProject);
+        setProject(normalizeAiTeam(foundProject));
       }
     }
   }, [projectId]);
 
   const saveProject = (updatedProject: Project) => {
-    setProject(updatedProject);
+    const normalizedProject = normalizeAiTeam(updatedProject);
+    setProject(normalizedProject);
 
     // Save to localStorage
     const storedProjects = localStorage.getItem(PROJECT_STORAGE_KEY);
@@ -76,9 +123,9 @@ export default function Penugasan() {
     const projectIndex = projects.findIndex(p => p.id === projectId);
 
     if (projectIndex >= 0) {
-      projects[projectIndex] = updatedProject;
+      projects[projectIndex] = normalizedProject;
     } else {
-      projects.push(updatedProject);
+      projects.push(normalizedProject);
     }
 
     localStorage.setItem(PROJECT_STORAGE_KEY, JSON.stringify(projects));
@@ -90,6 +137,8 @@ export default function Penugasan() {
     const durationDays = taskDurationUnit === 'hours'
       ? parseFloat(taskDuration) / 24
       : parseFloat(taskDuration);
+
+    if (Number.isNaN(durationDays) || durationDays <= 0) return;
 
     const newTask: Task = {
       id: Date.now().toString(),
@@ -106,20 +155,7 @@ export default function Penugasan() {
         : member
     );
 
-    // Calculate total task duration
-    const totalTaskDuration = updatedMembers.reduce(
-      (total, member) => total + member.tasks.reduce((sum, task) => sum + task.actualDays, 0),
-      0
-    );
-
-    // Update project deadline if needed
-    const maxTaskDuration = Math.max(...updatedMembers.map(member =>
-      member.tasks.reduce((sum, task) => sum + task.actualDays, 0)
-    ));
-
-    const newDeadline = Math.max(project.initialDeadlineDays, maxTaskDuration);
-    const newEndDate = new Date(project.startDate);
-    newEndDate.setDate(newEndDate.getDate() + newDeadline);
+    const { newDeadline, newEndDate } = updateTimeline(project, updatedMembers);
 
     const updatedProject = {
       ...project,
@@ -152,14 +188,7 @@ export default function Penugasan() {
       return member;
     });
 
-    // Recalculate project deadline
-    const maxTaskDuration = Math.max(...updatedMembers.map(member =>
-      member.tasks.reduce((sum, task) => sum + task.actualDays, 0)
-    ));
-
-    const newDeadline = Math.max(project.initialDeadlineDays, maxTaskDuration);
-    const newEndDate = new Date(project.startDate);
-    newEndDate.setDate(newEndDate.getDate() + newDeadline);
+    const { newDeadline, newEndDate } = updateTimeline(project, updatedMembers);
 
     const updatedProject = {
       ...project,
@@ -206,7 +235,9 @@ export default function Penugasan() {
     return new Intl.DateTimeFormat('id-ID', {
       day: 'numeric',
       month: 'short',
-      year: 'numeric'
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
     }).format(date);
   };
 
@@ -247,7 +278,12 @@ export default function Penugasan() {
           </Button>
           <div>
             <h1 className="page-title">{project.name}</h1>
-            <p className="page-subtitle">Penugasan Tim</p>
+            <div className="project-badges" style={{ justifyContent: 'flex-start' }}>
+              <Badge variant={getCategoryDisplay(project.category).variant}>
+                {getCategoryDisplay(project.category).label}
+              </Badge>
+              <p className="page-subtitle" style={{ margin: 0 }}>Penugasan Tim</p>
+            </div>
           </div>
         </div>
       </div>
@@ -255,6 +291,10 @@ export default function Penugasan() {
       <Card>
         <CardBody>
           <div className="project-summary">
+            <div className="summary-item">
+              <span className="summary-label">Tanggal Mulai</span>
+              <span className="summary-value">{formatDate(project.startDate)}</span>
+            </div>
             <div className="summary-item">
               <span className="summary-label">Target Awal</span>
               <span className="summary-value">{formatDuration(project.initialDeadlineDays)}</span>
@@ -264,13 +304,13 @@ export default function Penugasan() {
               <span className="summary-value">{formatDuration(project.actualDeadlineDays)}</span>
             </div>
             <div className="summary-item">
-              <span className="summary-label">Tanggal Target</span>
+              <span className="summary-label">Target Selesai</span>
               <span className="summary-value">{project.endDate ? formatDate(project.endDate) : '-'}</span>
             </div>
             {project.actualDeadlineDays !== project.initialDeadlineDays && (
               <div className="summary-alert">
                 <AlertCircle size={16} />
-                <span>Deadline diperpanjang {formatDuration(project.actualDeadlineDays - project.initialDeadlineDays)}</span>
+                <span>Deadline diperpanjang {formatDuration(project.actualDeadlineDays - project.initialDeadlineDays)} dari estimasi awal</span>
               </div>
             )}
           </div>
