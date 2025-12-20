@@ -207,6 +207,35 @@
   box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.1);
 }
 
+.deadline-range {
+  display: flex;
+  align-items: flex-end;
+  gap: 12px;
+  margin-top: 12px;
+}
+
+.deadline-range-field {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.deadline-range-label {
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.range-separator {
+  color: var(--text-tertiary);
+  font-weight: 700;
+  font-size: 16px;
+}
+
+.new-project-button {
+  margin-top: 6px;
+}
+
 .modal-close {
   background: none;
   border: none;
