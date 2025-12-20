@@ -50,7 +50,11 @@ const getAvatarGradient = (name: string) => {
 
 // Memoized message component for better performance
 const ChatMessageItem = React.memo(({ msg, customerName }: { msg: { id: number; message_type: string; content: string; created_at: string }, customerName: string }) => {
-  const isOutgoing = ['out', 'outbound', 'agent'].includes(msg.message_type);
+  // Logic: If it's explicitly strictly incoming types, it's incoming. Otherwise treat as outgoing (admin).
+  // This handles cases where outgoing messages might be labelled 'api', 'text', 'sent', etc.
+  const incomingTypes = ['in', 'inbound', 'customer', 'incoming'];
+  const isOutgoing = !incomingTypes.includes(msg.message_type?.toLowerCase());
+
   return (
     <div className={`cs-message-row ${isOutgoing ? 'outgoing' : 'incoming'}`}>
       {!isOutgoing && (
