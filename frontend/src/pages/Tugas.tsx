@@ -68,17 +68,19 @@ export default function Tugas() {
     if (storedProjects) {
       const parsedProjects: Project[] = JSON.parse(storedProjects);
       // Convert date strings back to Date objects
-      parsedProjects.forEach(project => {
-        project.startDate = new Date(project.startDate);
-        if (project.endDate) project.endDate = new Date(project.endDate);
-        if (!project.category) project.category = PROJECT_CATEGORIES[0].value;
-        project.teamMembers.forEach(member => {
+      const normalized = parsedProjects.map(project => {
+        const withCategory = project.category ? project : { ...project, category: PROJECT_CATEGORIES[0].value };
+        withCategory.startDate = new Date(withCategory.startDate);
+        if (withCategory.endDate) withCategory.endDate = new Date(withCategory.endDate);
+        withCategory.teamMembers.forEach(member => {
           member.tasks.forEach(task => {
             task.startDate = new Date(task.startDate);
           });
         });
+
+        return ensureAiTeam(withCategory);
       });
-      setProjects(parsedProjects);
+      setProjects(normalized);
     }
   }, []);
 
@@ -98,6 +100,33 @@ export default function Tugas() {
     () => projects.filter(p => p.status === 'completed' || p.status === 'cancelled'),
     [projects]
   );
+
+  const buildTeamMembers = (category: ProjectCategory): TeamMember[] => {
+    if (category === 'ai') {
+      return [
+        { id: 'seto', name: 'SETO', tasks: [] }
+      ];
+    }
+
+    return [
+      { id: '1', name: 'RUDY', tasks: [] },
+      { id: '2', name: 'DOMAN', tasks: [] },
+      { id: '3', name: 'KOJEK', tasks: [] }
+    ];
+  };
+
+  const ensureAiTeam = (project: Project): Project => {
+    if (project.category !== 'ai') return project;
+
+    const allTasks = project.teamMembers.flatMap(member => member.tasks || []);
+
+    return {
+      ...project,
+      teamMembers: [
+        { id: 'seto', name: 'SETO', tasks: allTasks }
+      ]
+    };
+  };
 
   const handleCreateProject = () => {
     if (!newProjectName) return;
@@ -149,11 +178,7 @@ export default function Tugas() {
       startDate,
       endDate,
       status: 'active',
-      teamMembers: [
-        { id: '1', name: 'RUDY', tasks: [] },
-        { id: '2', name: 'DOMAN', tasks: [] },
-        { id: '3', name: 'KOJEK', tasks: [] }
-      ]
+      teamMembers: buildTeamMembers(newProjectCategory)
     };
 
     setProjects([...projects, newProject]);
