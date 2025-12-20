@@ -49,14 +49,31 @@ const getAvatarGradient = (name: string) => {
 };
 
 // Memoized message component for better performance
-const ChatMessageItem = React.memo(({ msg }: { msg: { id: number; message_type: string; content: string; created_at: string } }) => {
+const ChatMessageItem = React.memo(({ msg, customerName }: { msg: { id: number; message_type: string; content: string; created_at: string }, customerName: string }) => {
   const isOutgoing = ['out', 'outbound', 'agent'].includes(msg.message_type);
   return (
-    <div className={`cs-message ${isOutgoing ? 'outgoing' : 'incoming'}`}>
-      <div className="cs-message-text">{msg.content}</div>
-      <div className="cs-message-time">
-        {new Date(msg.created_at).toLocaleString('id-ID', { hour: '2-digit', minute: '2-digit' })}
+    <div className={`cs-message-row ${isOutgoing ? 'outgoing' : 'incoming'}`}>
+      {!isOutgoing && (
+        <div className="cs-avatar-mini" style={{ background: getAvatarGradient(customerName) }}>
+          {getInitials(customerName)}
+        </div>
+      )}
+      
+      <div className={`cs-message ${isOutgoing ? 'outgoing' : 'incoming'}`}>
+        <div className="cs-message-sender">
+          {isOutgoing ? 'Admin' : customerName.split(' ')[0]}
+        </div>
+        <div className="cs-message-text">{msg.content}</div>
+        <div className="cs-message-time">
+          {new Date(msg.created_at).toLocaleString('id-ID', { hour: '2-digit', minute: '2-digit' })}
+        </div>
       </div>
+
+      {isOutgoing && (
+        <div className="cs-avatar-mini admin">
+          ME
+        </div>
+      )}
     </div>
   );
 });
@@ -473,25 +490,71 @@ export default function CustomerService() {
           scroll-behavior: smooth;
         }
 
+        .cs-message-row {
+          display: flex;
+          gap: 12px;
+          max-width: 80%;
+          align-items: flex-end;
+          margin-bottom: 4px;
+        }
+
+        .cs-message-row.incoming {
+          align-self: flex-start;
+        }
+
+        .cs-message-row.outgoing {
+          align-self: flex-end;
+          justify-content: flex-end;
+        }
+
+        .cs-avatar-mini {
+          width: 32px;
+          height: 32px;
+          border-radius: 50%;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          font-size: 10px;
+          font-weight: 700;
+          color: white;
+          flex-shrink: 0;
+          margin-bottom: 4px;
+          box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        .cs-avatar-mini.admin {
+          background: var(--bg-tertiary);
+          color: var(--text-secondary);
+          border: 1px solid var(--border);
+        }
+
         .cs-message {
-          max-width: 70%;
+          max-width: 100%;
           padding: 12px 16px;
           border-radius: 12px;
           position: relative;
+          min-width: 120px;
         }
 
         .cs-message.incoming {
           background: var(--bg-card);
           border: 1px solid var(--border);
-          align-self: flex-start;
           border-bottom-left-radius: 4px;
         }
 
         .cs-message.outgoing {
           background: linear-gradient(135deg, var(--accent), var(--cyan));
           color: white;
-          align-self: flex-end;
           border-bottom-right-radius: 4px;
+        }
+
+        .cs-message-sender {
+          font-size: 11px;
+          font-weight: 700;
+          margin-bottom: 4px;
+          opacity: 0.8;
+          text-transform: uppercase;
+          letter-spacing: 0.5px;
         }
 
         .cs-message-text {
@@ -504,6 +567,7 @@ export default function CustomerService() {
         .cs-message-time {
           font-size: 10px;
           opacity: 0.7;
+          text-align: right;
         }
 
         .cs-message.incoming .cs-message-time {
@@ -846,7 +910,7 @@ export default function CustomerService() {
                 )}
 
                 {chatMessages.map((msg) => (
-                  <ChatMessageItem key={msg.id} msg={msg} />
+                  <ChatMessageItem key={msg.id} msg={msg} customerName={selected?.name || 'Customer'} />
                 ))}
 
                 {chatLoading && chatMessages.length > 0 && (
