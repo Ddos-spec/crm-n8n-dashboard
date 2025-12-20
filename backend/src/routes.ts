@@ -575,4 +575,42 @@ router.post('/api/send-message', async (req, res) => {
   }
 });
 
+// AI Chat Proxy
+router.post('/api/ai-chat', async (req, res) => {
+  try {
+    const { message } = req.body;
+    
+    // Gunakan env var N8N_CHAT_WEBHOOK jika ada, atau placeholder
+    // User bisa set N8N_CHAT_WEBHOOK di .env backend nanti
+    const webhookUrl = process.env.N8N_CHAT_WEBHOOK;
+
+    if (!webhookUrl) {
+      // Mock response jika webhook belum diset
+      await new Promise(resolve => setTimeout(resolve, 1500)); // Fake delay
+      return res.json({ 
+        output: `[MOCK AI] Saya menerima pesan Anda: "${message}". \n\nUntuk mengaktifkan AI yang sebenarnya, silakan set variabel N8N_CHAT_WEBHOOK di file .env backend dengan URL Webhook n8n Anda.` 
+      });
+    }
+
+    const response = await fetch(webhookUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ chatInput: message })
+    });
+
+    if (!response.ok) {
+      throw new Error(`Webhook error: ${response.statusText}`);
+    }
+
+    const data = await response.json();
+    return res.json(data);
+  } catch (error) {
+    console.error('[POST /api/ai-chat]', error);
+    return res.status(500).json({ 
+      error: 'AI Service Error',
+      details: (error as Error).message
+    });
+  }
+});
+
 export default router;

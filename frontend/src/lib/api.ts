@@ -136,4 +136,10 @@ export const api = {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
     }),
+  sendAiMessage: (message: string) => 
+    fetch(buildUrl('/api/ai-chat'), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ message })
+    }).then(res => res.json()),
 };

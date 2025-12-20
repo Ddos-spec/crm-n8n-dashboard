@@ -10,6 +10,7 @@ const CustomerService = lazy(() => import('./pages/CustomerService'));
 const Marketing = lazy(() => import('./pages/Marketing'));
 const Tugas = lazy(() => import('./pages/Tugas'));
 const Penugasan = lazy(() => import('./pages/Penugasan'));
+const AI = lazy(() => import('./pages/AI'));
 
 // Simple Loading Spinner for Suspense fallback
 const PageLoader = () => (
@@ -55,6 +56,11 @@ export default function App() {
               <Route path="/tugas/penugasan/:projectId" element={
                 <Suspense fallback={<PageLoader />}>
                   <Penugasan />
+                </Suspense>
+              } />
+              <Route path="/ai" element={
+                <Suspense fallback={<PageLoader />}>
+                  <AI />
                 </Suspense>
               } />
               <Route path="*" element={

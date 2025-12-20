@@ -13,7 +13,8 @@ import {
   Bell,
   MessageCircle,
   AlertTriangle,
-  UserPlus
+  UserPlus,
+  Sparkles
 } from 'lucide-react';
 
 // Helper to format time ago
@@ -140,6 +141,13 @@ export function Header() {
           >
             <CheckSquare size={16} />
             Tugas
+          </NavLink>
+          <NavLink
+            to="/ai"
+            className={({ isActive }) => `nav-tab ${isActive ? 'active' : ''}`}
+          >
+            <Sparkles size={16} />
+            AI
           </NavLink>
         </nav>
 
