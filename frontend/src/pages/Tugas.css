@@ -209,7 +209,7 @@
 
 .deadline-range {
   display: flex;
-  align-items: flex-end;
+  align-items: center;
   gap: 12px;
   margin-top: 12px;
 }
@@ -230,6 +230,8 @@
   color: var(--text-tertiary);
   font-weight: 700;
   font-size: 16px;
+  display: inline-flex;
+  align-items: center;
 }
 
 .new-project-button {
@@ -240,7 +242,7 @@
   background: none;
   border: none;
   font-size: 28px;
-  color: var(--text-tertiary);
+  color: var(--danger);
   cursor: pointer;
   padding: 0;
   width: 32px;
@@ -250,11 +252,19 @@
   justify-content: center;
   border-radius: 6px;
   transition: all 0.2s;
+  margin-left: auto;
 }
 
 .modal-close:hover {
-  background: var(--hover);
-  color: var(--text-primary);
+  background: rgba(239, 68, 68, 0.1);
+}
+
+.project-badges {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+  justify-content: flex-end;
 }
 
 /* Responsive */

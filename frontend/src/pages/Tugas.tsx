@@ -22,9 +22,12 @@ interface Task {
   completed: boolean;
 }
 
+type ProjectCategory = 'laser_cutting_metal' | 'laser_non_metal' | 'cnc_router' | 'ai';
+
 interface Project {
   id: string;
   name: string;
+  category: ProjectCategory;
   initialDeadlineDays: number;
   actualDeadlineDays: number;
   startDate: Date;
@@ -35,11 +38,23 @@ interface Project {
 
 const PROJECT_STORAGE_KEY = 'tugas_projects';
 
+const PROJECT_CATEGORIES: {
+  value: ProjectCategory;
+  label: string;
+  variant: 'green' | 'blue' | 'red' | 'yellow' | 'purple' | 'gray';
+}[] = [
+  { value: 'laser_cutting_metal', label: 'Laser Cutting Metal', variant: 'red' },
+  { value: 'laser_non_metal', label: 'Laser Non Metal', variant: 'yellow' },
+  { value: 'cnc_router', label: 'CNC Router', variant: 'blue' },
+  { value: 'ai', label: 'AI', variant: 'purple' }
+];
+
 export default function Tugas() {
   const navigate = useNavigate();
   const [projects, setProjects] = useState<Project[]>([]);
   const [showNewProjectModal, setShowNewProjectModal] = useState(false);
   const [newProjectName, setNewProjectName] = useState('');
+  const [newProjectCategory, setNewProjectCategory] = useState<ProjectCategory>(PROJECT_CATEGORIES[0].value);
   const [newProjectDeadlineUnit, setNewProjectDeadlineUnit] = useState<'hours' | 'days'>('days');
   const [newProjectStartDate, setNewProjectStartDate] = useState(() => new Date().toISOString().split('T')[0]);
   const [newProjectEndDate, setNewProjectEndDate] = useState('');
@@ -56,6 +71,7 @@ export default function Tugas() {
       parsedProjects.forEach(project => {
         project.startDate = new Date(project.startDate);
         if (project.endDate) project.endDate = new Date(project.endDate);
+        if (!project.category) project.category = PROJECT_CATEGORIES[0].value;
         project.teamMembers.forEach(member => {
           member.tasks.forEach(task => {
             task.startDate = new Date(task.startDate);
@@ -127,6 +143,7 @@ export default function Tugas() {
     const newProject: Project = {
       id: Date.now().toString(),
       name: newProjectName,
+      category: newProjectCategory,
       initialDeadlineDays: deadlineDays,
       actualDeadlineDays: deadlineDays,
       startDate,
@@ -142,6 +159,7 @@ export default function Tugas() {
     setProjects([...projects, newProject]);
     setShowNewProjectModal(false);
     setNewProjectName('');
+    setNewProjectCategory(PROJECT_CATEGORIES[0].value);
     setNewProjectDeadlineUnit('days');
     setNewProjectStartDate(new Date().toISOString().split('T')[0]);
     setNewProjectEndDate('');
@@ -196,6 +214,9 @@ export default function Tugas() {
     return totalTasks === 0 ? 0 : Math.round((completedTasks / totalTasks) * 100);
   };
 
+  const getCategoryDisplay = (category: ProjectCategory) =>
+    PROJECT_CATEGORIES.find(item => item.value === category) ?? PROJECT_CATEGORIES[0];
+
   return (
     <div className="page">
       <div className="page-header">
@@ -243,7 +264,12 @@ export default function Tugas() {
                   <div className="project-card">
                     <div className="project-header">
                       <h3 className="project-name">{project.name}</h3>
-                      <Badge variant="blue" dot>Aktif</Badge>
+                      <div className="project-badges">
+                        <Badge variant={getCategoryDisplay(project.category).variant}>
+                          {getCategoryDisplay(project.category).label}
+                        </Badge>
+                        <Badge variant="blue" dot>Aktif</Badge>
+                      </div>
                     </div>
 
                     <div className="project-info">
@@ -329,12 +355,17 @@ export default function Tugas() {
                   <div className="project-card">
                     <div className="project-header">
                       <h3 className="project-name">{project.name}</h3>
-                      <Badge
-                        variant={project.status === 'completed' ? 'green' : 'red'}
-                        dot
-                      >
-                        {project.status === 'completed' ? 'Selesai' : 'Dibatalkan'}
-                      </Badge>
+                      <div className="project-badges">
+                        <Badge variant={getCategoryDisplay(project.category).variant}>
+                          {getCategoryDisplay(project.category).label}
+                        </Badge>
+                        <Badge
+                          variant={project.status === 'completed' ? 'green' : 'red'}
+                          dot
+                        >
+                          {project.status === 'completed' ? 'Selesai' : 'Dibatalkan'}
+                        </Badge>
+                      </div>
                     </div>
 
                     <div className="project-info">
@@ -386,6 +417,22 @@ export default function Tugas() {
                   value={newProjectName}
                   onChange={(e) => setNewProjectName(e.target.value)}
                 />
+              </div>
+
+              <div className="form-group">
+                <label htmlFor="project-category">Kategori</label>
+                <select
+                  id="project-category"
+                  className="deadline-unit-select"
+                  value={newProjectCategory}
+                  onChange={(e) => setNewProjectCategory(e.target.value as ProjectCategory)}
+                >
+                  {PROJECT_CATEGORIES.map(category => (
+                    <option key={category.value} value={category.value}>
+                      {category.label}
+                    </option>
+                  ))}
+                </select>
               </div>
 
               <div className="form-group">
