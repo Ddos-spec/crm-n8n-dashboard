@@ -1,5 +1,21 @@
 import { useState, useMemo, useEffect } from 'react';
-import { Plus, Clock, CheckCircle, XCircle, Users, Calendar, ArrowRight } from 'lucide-react';
+import { 
+  Plus, 
+  Clock, 
+  CheckCircle, 
+  XCircle, 
+  Users, 
+  Calendar, 
+  ArrowRight,
+  Search,
+  Filter,
+  LayoutGrid,
+  List,
+  MoreHorizontal,
+  AlertCircle,
+  TrendingUp,
+  PieChart
+} from 'lucide-react';
 import { Card, CardHeader, CardBody } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
 import { Badge } from '../components/ui/Badge';
@@ -52,6 +68,8 @@ const PROJECT_CATEGORIES: {
 export default function Tugas() {
   const navigate = useNavigate();
   const [projects, setProjects] = useState<Project[]>([]);
+  
+  // Modal State
   const [showNewProjectModal, setShowNewProjectModal] = useState(false);
   const [newProjectName, setNewProjectName] = useState('');
   const [newProjectCategory, setNewProjectCategory] = useState<ProjectCategory>(PROJECT_CATEGORIES[0].value);
@@ -60,14 +78,18 @@ export default function Tugas() {
   const [newProjectEndDate, setNewProjectEndDate] = useState('');
   const [newProjectStartTime, setNewProjectStartTime] = useState('08:00');
   const [newProjectEndTime, setNewProjectEndTime] = useState('17:00');
-  const [activeTab, setActiveTab] = useState<'active' | 'history'>('active');
 
-  // Load projects from localStorage on mount
+  // Filter & View State
+  const [activeTab, setActiveTab] = useState<'active' | 'history'>('active');
+  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [categoryFilter, setCategoryFilter] = useState<string>('all');
+
+  // Load projects
   useEffect(() => {
     const storedProjects = localStorage.getItem(PROJECT_STORAGE_KEY);
     if (storedProjects) {
       const parsedProjects: Project[] = JSON.parse(storedProjects);
-      // Convert date strings back to Date objects
       const normalized = parsedProjects.map(project => {
         const withCategory = project.category ? project : { ...project, category: PROJECT_CATEGORIES[0].value };
         withCategory.startDate = new Date(withCategory.startDate);
@@ -77,37 +99,20 @@ export default function Tugas() {
             task.startDate = new Date(task.startDate);
           });
         });
-
         return ensureAiTeam(withCategory);
       });
       setProjects(normalized);
     }
   }, []);
 
-  // Save projects to localStorage whenever they change
   useEffect(() => {
     if (projects.length > 0) {
       localStorage.setItem(PROJECT_STORAGE_KEY, JSON.stringify(projects));
     }
   }, [projects]);
 
-  const activeProjects = useMemo(
-    () => projects.filter(p => p.status === 'active'),
-    [projects]
-  );
-
-  const historyProjects = useMemo(
-    () => projects.filter(p => p.status === 'completed' || p.status === 'cancelled'),
-    [projects]
-  );
-
   const buildTeamMembers = (category: ProjectCategory): TeamMember[] => {
-    if (category === 'ai') {
-      return [
-        { id: 'seto', name: 'SETO', tasks: [] }
-      ];
-    }
-
+    if (category === 'ai') return [{ id: 'seto', name: 'SETO', tasks: [] }];
     return [
       { id: '1', name: 'RUDY', tasks: [] },
       { id: '2', name: 'DOMAN', tasks: [] },
@@ -117,22 +122,67 @@ export default function Tugas() {
 
   const ensureAiTeam = (project: Project): Project => {
     if (project.category !== 'ai') return project;
-
     const allTasks = project.teamMembers.flatMap(member => member.tasks || []);
-
     return {
       ...project,
-      teamMembers: [
-        { id: 'seto', name: 'SETO', tasks: allTasks }
-      ]
+      teamMembers: [{ id: 'seto', name: 'SETO', tasks: allTasks }]
     };
   };
+
+  // Stats Logic
+  const stats = useMemo(() => {
+    const active = projects.filter(p => p.status === 'active');
+    const completed = projects.filter(p => p.status === 'completed');
+    
+    // Logic "At Risk": Deadline < 2 days & progress < 80%
+    const atRisk = active.filter(p => {
+      if (!p.endDate) return false;
+      const now = new Date();
+      const diffTime = p.endDate.getTime() - now.getTime();
+      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+      
+      const totalTasks = p.teamMembers.reduce((sum, m) => sum + m.tasks.length, 0);
+      const completedTasks = p.teamMembers.reduce((sum, m) => sum + m.tasks.filter(t => t.completed).length, 0);
+      const progress = totalTasks === 0 ? 0 : (completedTasks / totalTasks);
+
+      return diffDays <= 2 && progress < 0.8 && diffDays >= 0;
+    });
+
+    return {
+      active: active.length,
+      completed: completed.length,
+      atRisk: atRisk.length
+    };
+  }, [projects]);
+
+  const filteredProjects = useMemo(() => {
+    let result = projects;
+
+    // Tab Filter
+    if (activeTab === 'active') {
+      result = result.filter(p => p.status === 'active');
+    } else {
+      result = result.filter(p => p.status === 'completed' || p.status === 'cancelled');
+    }
+
+    // Search Filter
+    if (searchQuery) {
+      const lowerQuery = searchQuery.toLowerCase();
+      result = result.filter(p => p.name.toLowerCase().includes(lowerQuery));
+    }
+
+    // Category Filter
+    if (categoryFilter !== 'all') {
+      result = result.filter(p => p.category === categoryFilter);
+    }
+
+    return result;
+  }, [projects, activeTab, searchQuery, categoryFilter]);
 
   const handleCreateProject = () => {
     if (!newProjectName) return;
 
     const isDayMode = newProjectDeadlineUnit === 'days';
-
     if (isDayMode && (!newProjectStartDate || !newProjectEndDate)) return;
     if (!isDayMode && (!newProjectStartTime || !newProjectEndTime)) return;
 
@@ -143,29 +193,23 @@ export default function Tugas() {
     if (isDayMode) {
       startDate = new Date(`${newProjectStartDate}T00:00:00`);
       endDate = new Date(`${newProjectEndDate}T23:59:59`);
-
       if (endDate < startDate) {
         alert('Tanggal selesai harus setelah tanggal mulai.');
         return;
       }
-
       deadlineDays = (endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24);
     } else {
       const today = new Date();
       const [startHour, startMinute] = newProjectStartTime.split(':').map(Number);
       const [endHour, endMinute] = newProjectEndTime.split(':').map(Number);
-
       startDate = new Date(today);
       startDate.setHours(startHour, startMinute, 0, 0);
-
       endDate = new Date(today);
       endDate.setHours(endHour, endMinute, 0, 0);
-
       if (endDate <= startDate) {
         alert('Jam selesai harus setelah jam mulai.');
         return;
       }
-
       deadlineDays = (endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24);
     }
 
@@ -186,10 +230,6 @@ export default function Tugas() {
     setNewProjectName('');
     setNewProjectCategory(PROJECT_CATEGORIES[0].value);
     setNewProjectDeadlineUnit('days');
-    setNewProjectStartDate(new Date().toISOString().split('T')[0]);
-    setNewProjectEndDate('');
-    setNewProjectStartTime('08:00');
-    setNewProjectEndTime('17:00');
   };
 
   const handleFinishProject = (projectId: string) => {
@@ -212,6 +252,7 @@ export default function Tugas() {
     navigate(`/tugas/penugasan/${projectId}`);
   };
 
+  // Helpers
   const formatDuration = (days: number) => {
     if (days < 1) {
       const hours = Math.round(days * 24);
@@ -224,9 +265,7 @@ export default function Tugas() {
     return new Intl.DateTimeFormat('id-ID', {
       day: 'numeric',
       month: 'short',
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
+      year: 'numeric'
     }).format(date);
   };
 
@@ -242,213 +281,248 @@ export default function Tugas() {
   const getCategoryDisplay = (category: ProjectCategory) =>
     PROJECT_CATEGORIES.find(item => item.value === category) ?? PROJECT_CATEGORIES[0];
 
+  const getAvatarGradient = (name: string) => {
+    const hash = name.charCodeAt(0);
+    const gradients = [
+      'linear-gradient(135deg, #10b981, #06b6d4)',
+      'linear-gradient(135deg, #3b82f6, #8b5cf6)',
+      'linear-gradient(135deg, #f59e0b, #ec4899)',
+    ];
+    return gradients[hash % gradients.length];
+  };
+
+  const getInitials = (name: string) => name.substring(0, 2).toUpperCase();
+
   return (
     <div className="page">
+      {/* Page Header */}
       <div className="page-header">
         <div>
           <h1 className="page-title">Manajemen Tugas</h1>
-          <p className="page-subtitle">Kelola proyek dan penugasan tim</p>
+          <p className="page-subtitle">Monitoring dan pengelolaan proyek tim</p>
         </div>
         <Button
           variant="primary"
           icon={<Plus size={18} />}
           onClick={() => setShowNewProjectModal(true)}
-          className="new-project-button"
         >
-          New Project
+          Project Baru
         </Button>
       </div>
 
+      {/* Stats Overview */}
+      <div className="stats-overview">
+        <div className="stat-card-mini">
+          <div className="stat-icon-wrapper blue">
+            <TrendingUp size={20} />
+          </div>
+          <div>
+            <span className="stat-label">Project Aktif</span>
+            <div className="stat-value">{stats.active}</div>
+          </div>
+        </div>
+        <div className="stat-card-mini">
+          <div className="stat-icon-wrapper green">
+            <CheckCircle size={20} />
+          </div>
+          <div>
+            <span className="stat-label">Selesai</span>
+            <div className="stat-value">{stats.completed}</div>
+          </div>
+        </div>
+        <div className="stat-card-mini">
+          <div className="stat-icon-wrapper orange">
+            <AlertCircle size={20} />
+          </div>
+          <div>
+            <span className="stat-label">Perlu Perhatian</span>
+            <div className="stat-value">{stats.atRisk}</div>
+          </div>
+        </div>
+      </div>
+
+      {/* Controls Bar (Filter & Search) */}
+      <div className="controls-bar">
+        <div className="search-wrapper">
+          <Search size={18} className="search-icon" />
+          <input 
+            type="text" 
+            placeholder="Cari project..." 
+            className="search-input"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+          />
+        </div>
+        
+        <div className="filter-wrapper">
+          <select 
+            className="filter-select"
+            value={categoryFilter}
+            onChange={(e) => setCategoryFilter(e.target.value)}
+          >
+            <option value="all">Semua Kategori</option>
+            {PROJECT_CATEGORIES.map(cat => (
+              <option key={cat.value} value={cat.value}>{cat.label}</option>
+            ))}
+          </select>
+
+          <div className="view-toggle">
+            <button 
+              className={`toggle-btn ${viewMode === 'grid' ? 'active' : ''}`}
+              onClick={() => setViewMode('grid')}
+            >
+              <LayoutGrid size={18} />
+            </button>
+            <button 
+              className={`toggle-btn ${viewMode === 'list' ? 'active' : ''}`}
+              onClick={() => setViewMode('list')}
+            >
+              <List size={18} />
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* Tabs */}
       <div className="tugas-tabs">
         <button
           className={`tugas-tab ${activeTab === 'active' ? 'active' : ''}`}
           onClick={() => setActiveTab('active')}
         >
-          Proyek Aktif ({activeProjects.length})
+          Sedang Berjalan
         </button>
         <button
           className={`tugas-tab ${activeTab === 'history' ? 'active' : ''}`}
           onClick={() => setActiveTab('history')}
         >
-          History ({historyProjects.length})
+          Riwayat
         </button>
       </div>
 
-      <div className="projects-grid">
-        {activeTab === 'active' ? (
-          activeProjects.length === 0 ? (
-            <div className="empty-state">
-              <Users size={48} />
-              <p>Belum ada proyek aktif</p>
-              <p className="empty-state-subtitle">Klik tombol "New Project" untuk memulai</p>
-            </div>
-          ) : (
-            activeProjects.map(project => (
-              <Card key={project.id}>
-                <CardBody>
-                  <div className="project-card">
-                    <div className="project-header">
-                      <h3 className="project-name">{project.name}</h3>
-                      <div className="project-badges">
-                        <Badge variant={getCategoryDisplay(project.category).variant}>
-                          {getCategoryDisplay(project.category).label}
-                        </Badge>
-                        <Badge variant="blue" dot>Aktif</Badge>
-                      </div>
-                    </div>
-
-                    <div className="project-info">
-                      <div className="project-info-item">
-                        <Calendar size={16} />
-                        <span>Mulai: {formatDate(project.startDate)}</span>
-                      </div>
-                      <div className="project-info-item">
-                        <Clock size={16} />
-                        <span>Target: {formatDuration(project.initialDeadlineDays)}</span>
-                      </div>
-                      <div className="project-info-item">
-                        <ArrowRight size={16} />
-                        <span>Deadline: {project.endDate ? formatDate(project.endDate) : '-'}</span>
-                      </div>
-                      <div className="project-info-item">
-                        <Users size={16} />
-                        <span>{project.teamMembers.reduce((sum, m) => sum + m.tasks.length, 0)} tugas</span>
-                      </div>
-                    </div>
-
-                    <div className="project-progress">
-                      <div className="progress-bar">
-                        <div
-                          className="progress-fill"
-                          style={{ width: `${getProjectProgress(project)}%` }}
-                        />
-                      </div>
-                      <span className="progress-text">{getProjectProgress(project)}%</span>
-                    </div>
-
-                    {project.actualDeadlineDays !== project.initialDeadlineDays && (
-                      <div className="project-alert">
-                        <Clock size={14} />
-                        <span>
-                          Durasi disesuaikan: {formatDuration(project.initialDeadlineDays)} → {formatDuration(project.actualDeadlineDays)}
-                        </span>
-                      </div>
-                    )}
-
-                    <div className="project-actions">
-                      <Button
-                        variant="primary"
-                        size="sm"
-                        icon={<Users size={16} />}
-                        onClick={() => handlePenugasan(project.id)}
-                      >
-                        Penugasan
-                      </Button>
-                      <Button
-                        variant="secondary"
-                        size="sm"
-                        icon={<CheckCircle size={16} />}
-                        onClick={() => handleFinishProject(project.id)}
-                      >
-                        Finish
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        icon={<XCircle size={16} />}
-                        onClick={() => handleCancelProject(project.id)}
-                      >
-                        Batal
-                      </Button>
-                    </div>
-                  </div>
-                </CardBody>
-              </Card>
-            ))
-          )
+      {/* Projects Grid/List */}
+      <div className={`projects-container ${viewMode}`}>
+        {filteredProjects.length === 0 ? (
+          <div className="empty-state">
+            <PieChart size={64} />
+            <h3>Tidak ada project ditemukan</h3>
+            <p>Coba sesuaikan filter pencarian atau buat project baru.</p>
+          </div>
         ) : (
-          historyProjects.length === 0 ? (
-            <div className="empty-state">
-              <Clock size={48} />
-              <p>Belum ada history proyek</p>
-              <p className="empty-state-subtitle">Proyek yang selesai atau dibatalkan akan muncul di sini</p>
-            </div>
-          ) : (
-            historyProjects.map(project => (
-              <Card key={project.id}>
-                <CardBody>
-                  <div className="project-card">
-                    <div className="project-header">
-                      <h3 className="project-name">{project.name}</h3>
-                      <div className="project-badges">
-                        <Badge variant={getCategoryDisplay(project.category).variant}>
-                          {getCategoryDisplay(project.category).label}
-                        </Badge>
-                        <Badge
-                          variant={project.status === 'completed' ? 'green' : 'red'}
-                          dot
-                        >
-                          {project.status === 'completed' ? 'Selesai' : 'Dibatalkan'}
-                        </Badge>
-                      </div>
+          filteredProjects.map(project => {
+            const progress = getProjectProgress(project);
+            const catDisplay = getCategoryDisplay(project.category);
+            
+            return (
+              <Card key={project.id} className="modern-card">
+                <CardBody className="modern-card-body">
+                  <div className="card-top">
+                    <div className="card-header-row">
+                      <Badge variant={catDisplay.variant}>{catDisplay.label}</Badge>
+                      <button className="more-options-btn">
+                        <MoreHorizontal size={16} />
+                      </button>
                     </div>
+                    <h3 className="modern-project-title">{project.name}</h3>
+                    <div className="card-dates">
+                      <Calendar size={14} />
+                      <span>{formatDate(project.startDate)} — {project.endDate ? formatDate(project.endDate) : 'ongoing'}</span>
+                    </div>
+                  </div>
 
-                    <div className="project-info">
-                      <div className="project-info-item">
-                        <Calendar size={16} />
-                        <span>Mulai: {formatDate(project.startDate)}</span>
-                      </div>
-                      <div className="project-info-item">
-                        <Clock size={16} />
-                        <span>Selesai: {project.endDate ? formatDate(project.endDate) : '-'}</span>
-                      </div>
-                      <div className="project-info-item">
-                        <ArrowRight size={16} />
-                        <span>Durasi: {formatDuration(project.actualDeadlineDays)}</span>
-                      </div>
+                  <div className="card-middle">
+                    <div className="stacked-avatars">
+                      {project.teamMembers.slice(0, 4).map((member, i) => (
+                        <div 
+                          key={member.id} 
+                          className="avatar-circle"
+                          style={{ 
+                            background: getAvatarGradient(member.name),
+                            zIndex: 4 - i,
+                            marginLeft: i > 0 ? '-10px' : 0
+                          }}
+                          title={member.name}
+                        >
+                          {getInitials(member.name)}
+                        </div>
+                      ))}
+                      {project.teamMembers.length > 4 && (
+                        <div className="avatar-circle more">+{project.teamMembers.length - 4}</div>
+                      )}
                     </div>
+                    <div className={`status-indicator ${progress === 100 ? 'done' : 'active'}`}>
+                      {progress === 100 ? 'Selesai' : `${progress}%`}
+                    </div>
+                  </div>
+
+                  <div className="card-progress-section">
+                    <div className="progress-track">
+                      <div className="progress-fill-modern" style={{ width: `${progress}%` }}></div>
+                    </div>
+                  </div>
+
+                  <div className="card-footer-actions">
+                     {activeTab === 'active' ? (
+                       <>
+                         <Button 
+                           variant="primary" 
+                           size="sm" 
+                           className="action-btn-full"
+                           onClick={() => handlePenugasan(project.id)}
+                         >
+                           Buka Tugas
+                         </Button>
+                         <Button
+                           variant="ghost"
+                           size="sm"
+                           className="action-btn-icon"
+                           onClick={() => handleFinishProject(project.id)}
+                           title="Selesaikan"
+                         >
+                           <CheckCircle size={18} />
+                         </Button>
+                       </>
+                     ) : (
+                       <Button 
+                        variant="ghost" 
+                        size="sm" 
+                        className="action-btn-full"
+                        onClick={() => handlePenugasan(project.id)}
+                       >
+                         Lihat Detail
+                       </Button>
+                     )}
                   </div>
                 </CardBody>
               </Card>
-            ))
-          )
+            );
+          })
         )}
       </div>
 
       {/* New Project Modal */}
       {showNewProjectModal && (
         <>
-          <div
-            className="modal-backdrop"
-            onClick={() => setShowNewProjectModal(false)}
-          />
+          <div className="modal-backdrop" onClick={() => setShowNewProjectModal(false)} />
           <div className="modal">
             <div className="modal-header">
               <h2>Buat Proyek Baru</h2>
-              <button
-                className="modal-close"
-                onClick={() => setShowNewProjectModal(false)}
-              >
-                ×
-              </button>
+              <button className="modal-close" onClick={() => setShowNewProjectModal(false)}>×</button>
             </div>
             <div className="modal-body">
               <div className="form-group">
-                <label htmlFor="project-name">Nama Proyek</label>
+                <label>Nama Proyek</label>
                 <Input
-                  id="project-name"
                   type="text"
-                  placeholder="Masukkan nama proyek..."
+                  placeholder="Contoh: Laser Cutting Pagar Pak Budi"
                   value={newProjectName}
                   onChange={(e) => setNewProjectName(e.target.value)}
                 />
               </div>
 
               <div className="form-group">
-                <label htmlFor="project-category">Kategori</label>
+                <label>Kategori</label>
                 <select
-                  id="project-category"
-                  className="deadline-unit-select"
+                  className="modern-select"
                   value={newProjectCategory}
                   onChange={(e) => setNewProjectCategory(e.target.value as ProjectCategory)}
                 >
@@ -461,10 +535,10 @@ export default function Tugas() {
               </div>
 
               <div className="form-group">
-                <label htmlFor="project-deadline">Deadline</label>
+                <label>Estimasi Waktu</label>
                 <div className="deadline-input-group">
                   <select
-                    className="deadline-unit-select"
+                    className="modern-select"
                     value={newProjectDeadlineUnit}
                     onChange={(e) => setNewProjectDeadlineUnit(e.target.value as 'hours' | 'days')}
                   >
@@ -472,7 +546,7 @@ export default function Tugas() {
                     <option value="hours">Jam</option>
                   </select>
                 </div>
-
+                
                 {newProjectDeadlineUnit === 'days' ? (
                   <div className="deadline-range">
                     <div className="deadline-range-field">
@@ -518,23 +592,8 @@ export default function Tugas() {
               </div>
             </div>
             <div className="modal-footer">
-              <Button
-                variant="ghost"
-                onClick={() => setShowNewProjectModal(false)}
-              >
-                Batal
-              </Button>
-              <Button
-                variant="primary"
-                onClick={handleCreateProject}
-                disabled={!newProjectName || (
-                  newProjectDeadlineUnit === 'days'
-                    ? !newProjectStartDate || !newProjectEndDate
-                    : !newProjectStartTime || !newProjectEndTime
-                )}
-              >
-                Buat Proyek
-              </Button>
+              <Button variant="ghost" onClick={() => setShowNewProjectModal(false)}>Batal</Button>
+              <Button variant="primary" onClick={handleCreateProject}>Buat Project</Button>
             </div>
           </div>
         </>
