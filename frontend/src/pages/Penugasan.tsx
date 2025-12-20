@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Plus, Clock, CheckCircle, Calendar, AlertCircle } from 'lucide-react';
+import { ArrowLeft, Plus, Clock, CheckCircle, Calendar, AlertCircle, ArrowRight } from 'lucide-react';
 import { Card, CardHeader, CardBody } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
 import { Badge } from '../components/ui/Badge';
@@ -214,6 +214,12 @@ export default function Penugasan() {
     return member.tasks.reduce((sum, task) => sum + task.actualDays, 0);
   };
 
+  const getTaskEndDate = (startDate: Date, days: number) => {
+    const end = new Date(startDate);
+    end.setTime(end.getTime() + days * 24 * 60 * 60 * 1000);
+    return end;
+  };
+
   if (!project) {
     return (
       <div className="page">
@@ -333,15 +339,15 @@ export default function Penugasan() {
                         <div className="task-details">
                           <div className="task-detail">
                             <Calendar size={14} />
-                            <span>{formatDate(task.startDate)}</span>
+                            <span>Mulai: {formatDate(task.startDate)}</span>
                           </div>
                           <div className="task-detail">
-                            <Clock size={14} />
+                            <ArrowRight size={14} />
                             <span>
-                              {formatDuration(task.actualDays)}
+                              Selesai: {formatDate(getTaskEndDate(task.startDate, task.actualDays))}
                               {task.actualDays !== task.estimatedDays && (
-                                <span className="task-extended">
-                                  {' '}(+{formatDuration(task.actualDays - task.estimatedDays)})
+                                <span className="task-extended" style={{ marginLeft: '4px', fontSize: '0.85em' }}>
+                                  (Ex: {formatDuration(task.actualDays - task.estimatedDays)})
                                 </span>
                               )}
                             </span>
