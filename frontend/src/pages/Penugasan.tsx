@@ -93,35 +93,6 @@ export default function Penugasan() {
     return { newDeadline, newEndDate };
   };
 
-  const getCategoryDisplay = (category: ProjectCategory) =>
-    PROJECT_CATEGORIES.find(item => item.value === category) ?? PROJECT_CATEGORIES[0];
-
-  const normalizeAiTeam = (loadedProject: Project): Project => {
-    if (loadedProject.category !== 'ai') return loadedProject;
-
-    const collectedTasks = loadedProject.teamMembers.flatMap(member => member.tasks || []);
-
-    return {
-      ...loadedProject,
-      teamMembers: [
-        { id: 'seto', name: 'SETO', tasks: collectedTasks }
-      ]
-    };
-  };
-
-  const updateTimeline = (baseProject: Project, members: TeamMember[]) => {
-    const totalTaskDuration = members.reduce(
-      (total, member) => total + member.tasks.reduce((sum, task) => sum + task.actualDays, 0),
-      0
-    );
-
-    const newDeadline = Math.max(baseProject.initialDeadlineDays, totalTaskDuration);
-    const newEndDate = new Date(baseProject.startDate);
-    newEndDate.setTime(newEndDate.getTime() + newDeadline * 24 * 60 * 60 * 1000);
-
-    return { newDeadline, newEndDate };
-  };
-
   useEffect(() => {
     // Load project from localStorage (for demo)
     const storedProjects = localStorage.getItem(PROJECT_STORAGE_KEY);
