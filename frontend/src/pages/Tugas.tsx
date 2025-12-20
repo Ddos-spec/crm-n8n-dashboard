@@ -40,8 +40,11 @@ export default function Tugas() {
   const [projects, setProjects] = useState<Project[]>([]);
   const [showNewProjectModal, setShowNewProjectModal] = useState(false);
   const [newProjectName, setNewProjectName] = useState('');
-  const [newProjectDeadline, setNewProjectDeadline] = useState('');
   const [newProjectDeadlineUnit, setNewProjectDeadlineUnit] = useState<'hours' | 'days'>('days');
+  const [newProjectStartDate, setNewProjectStartDate] = useState(() => new Date().toISOString().split('T')[0]);
+  const [newProjectEndDate, setNewProjectEndDate] = useState('');
+  const [newProjectStartTime, setNewProjectStartTime] = useState('08:00');
+  const [newProjectEndTime, setNewProjectEndTime] = useState('17:00');
   const [activeTab, setActiveTab] = useState<'active' | 'history'>('active');
 
   // Load projects from localStorage on mount
@@ -81,15 +84,45 @@ export default function Tugas() {
   );
 
   const handleCreateProject = () => {
-    if (!newProjectName || !newProjectDeadline) return;
+    if (!newProjectName) return;
 
-    const deadlineDays = newProjectDeadlineUnit === 'hours'
-      ? parseFloat(newProjectDeadline) / 24
-      : parseFloat(newProjectDeadline);
+    const isDayMode = newProjectDeadlineUnit === 'days';
 
-    const startDate = new Date();
-    const endDate = new Date(startDate);
-    endDate.setDate(endDate.getDate() + deadlineDays);
+    if (isDayMode && (!newProjectStartDate || !newProjectEndDate)) return;
+    if (!isDayMode && (!newProjectStartTime || !newProjectEndTime)) return;
+
+    let startDate: Date;
+    let endDate: Date;
+    let deadlineDays = 0;
+
+    if (isDayMode) {
+      startDate = new Date(`${newProjectStartDate}T00:00:00`);
+      endDate = new Date(`${newProjectEndDate}T23:59:59`);
+
+      if (endDate < startDate) {
+        alert('Tanggal selesai harus setelah tanggal mulai.');
+        return;
+      }
+
+      deadlineDays = (endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24);
+    } else {
+      const today = new Date();
+      const [startHour, startMinute] = newProjectStartTime.split(':').map(Number);
+      const [endHour, endMinute] = newProjectEndTime.split(':').map(Number);
+
+      startDate = new Date(today);
+      startDate.setHours(startHour, startMinute, 0, 0);
+
+      endDate = new Date(today);
+      endDate.setHours(endHour, endMinute, 0, 0);
+
+      if (endDate <= startDate) {
+        alert('Jam selesai harus setelah jam mulai.');
+        return;
+      }
+
+      deadlineDays = (endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24);
+    }
 
     const newProject: Project = {
       id: Date.now().toString(),
@@ -109,8 +142,11 @@ export default function Tugas() {
     setProjects([...projects, newProject]);
     setShowNewProjectModal(false);
     setNewProjectName('');
-    setNewProjectDeadline('');
     setNewProjectDeadlineUnit('days');
+    setNewProjectStartDate(new Date().toISOString().split('T')[0]);
+    setNewProjectEndDate('');
+    setNewProjectStartTime('08:00');
+    setNewProjectEndTime('17:00');
   };
 
   const handleFinishProject = (projectId: string) => {
@@ -171,6 +207,7 @@ export default function Tugas() {
           variant="primary"
           icon={<Plus size={18} />}
           onClick={() => setShowNewProjectModal(true)}
+          className="new-project-button"
         >
           New Project
         </Button>
@@ -354,24 +391,58 @@ export default function Tugas() {
               <div className="form-group">
                 <label htmlFor="project-deadline">Deadline</label>
                 <div className="deadline-input-group">
-                  <Input
-                    id="project-deadline"
-                    type="number"
-                    placeholder="Estimasi waktu..."
-                    value={newProjectDeadline}
-                    onChange={(e) => setNewProjectDeadline(e.target.value)}
-                    min="0"
-                    step="0.5"
-                  />
                   <select
                     className="deadline-unit-select"
                     value={newProjectDeadlineUnit}
                     onChange={(e) => setNewProjectDeadlineUnit(e.target.value as 'hours' | 'days')}
                   >
-                    <option value="hours">Jam</option>
                     <option value="days">Hari</option>
+                    <option value="hours">Jam</option>
                   </select>
                 </div>
+
+                {newProjectDeadlineUnit === 'days' ? (
+                  <div className="deadline-range">
+                    <div className="deadline-range-field">
+                      <span className="deadline-range-label">Mulai</span>
+                      <Input
+                        type="date"
+                        value={newProjectStartDate}
+                        onChange={(e) => setNewProjectStartDate(e.target.value)}
+                      />
+                    </div>
+                    <span className="range-separator">→</span>
+                    <div className="deadline-range-field">
+                      <span className="deadline-range-label">Selesai</span>
+                      <Input
+                        type="date"
+                        value={newProjectEndDate}
+                        min={newProjectStartDate}
+                        onChange={(e) => setNewProjectEndDate(e.target.value)}
+                      />
+                    </div>
+                  </div>
+                ) : (
+                  <div className="deadline-range">
+                    <div className="deadline-range-field">
+                      <span className="deadline-range-label">Mulai</span>
+                      <Input
+                        type="time"
+                        value={newProjectStartTime}
+                        onChange={(e) => setNewProjectStartTime(e.target.value)}
+                      />
+                    </div>
+                    <span className="range-separator">→</span>
+                    <div className="deadline-range-field">
+                      <span className="deadline-range-label">Selesai</span>
+                      <Input
+                        type="time"
+                        value={newProjectEndTime}
+                        onChange={(e) => setNewProjectEndTime(e.target.value)}
+                      />
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
             <div className="modal-footer">
@@ -384,7 +455,11 @@ export default function Tugas() {
               <Button
                 variant="primary"
                 onClick={handleCreateProject}
-                disabled={!newProjectName || !newProjectDeadline}
+                disabled={!newProjectName || (
+                  newProjectDeadlineUnit === 'days'
+                    ? !newProjectStartDate || !newProjectEndDate
+                    : !newProjectStartTime || !newProjectEndTime
+                )}
               >
                 Buat Proyek
               </Button>
