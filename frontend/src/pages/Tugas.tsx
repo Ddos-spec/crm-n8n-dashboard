@@ -1,11 +1,11 @@
-import { useState, useMemo, useEffect } from 'react';
-import { 
-  Plus, 
-  Clock, 
-  CheckCircle, 
-  XCircle, 
-  Users, 
-  Calendar, 
+import { useState, useMemo, useEffect, useCallback } from 'react';
+import {
+  Plus,
+  Clock,
+  CheckCircle,
+  XCircle,
+  Users,
+  Calendar,
   ArrowRight,
   Search,
   Filter,
@@ -14,43 +14,18 @@ import {
   MoreHorizontal,
   AlertCircle,
   TrendingUp,
-  PieChart
+  PieChart,
+  RefreshCw,
+  Cloud,
+  CloudOff
 } from 'lucide-react';
 import { Card, CardHeader, CardBody } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
 import { Badge } from '../components/ui/Badge';
 import { Input } from '../components/ui/Input';
 import { useNavigate } from 'react-router-dom';
+import { tugasApi, type Project, type TeamMember, type Task, type ProjectCategory } from '../lib/tugasApi';
 import './Tugas.css';
-
-interface TeamMember {
-  id: string;
-  name: string;
-  tasks: Task[];
-}
-
-interface Task {
-  id: string;
-  name: string;
-  estimatedDays: number;
-  actualDays: number;
-  startDate: Date;
-  completed: boolean;
-}
-
-type ProjectCategory = 'laser_cutting_metal' | 'laser_non_metal' | 'cnc_router' | 'ai';
-
-interface Project {
-  id: string;
-  name: string;
-  category: ProjectCategory;
-  initialDeadlineDays: number;
-  actualDeadlineDays: number;
-  startDate: Date;
-  endDate: Date | null;
-  status: 'active' | 'completed' | 'cancelled';
-  teamMembers: TeamMember[];
-}
 
 const PROJECT_STORAGE_KEY = 'tugas_projects';
 
@@ -68,7 +43,10 @@ const PROJECT_CATEGORIES: {
 export default function Tugas() {
   const navigate = useNavigate();
   const [projects, setProjects] = useState<Project[]>([]);
-  
+  const [isLoading, setIsLoading] = useState(true);
+  const [isSyncing, setIsSyncing] = useState(false);
+  const [isOnline, setIsOnline] = useState(tugasApi.isWebhookAvailable());
+
   // Modal State
   const [showNewProjectModal, setShowNewProjectModal] = useState(false);
   const [newProjectName, setNewProjectName] = useState('');
@@ -85,31 +63,59 @@ export default function Tugas() {
   const [searchQuery, setSearchQuery] = useState('');
   const [categoryFilter, setCategoryFilter] = useState<string>('all');
 
-  // Load projects
-  useEffect(() => {
-    const storedProjects = localStorage.getItem(PROJECT_STORAGE_KEY);
-    if (storedProjects) {
-      const parsedProjects: Project[] = JSON.parse(storedProjects);
-      const normalized = parsedProjects.map(project => {
-        const withCategory = project.category ? project : { ...project, category: PROJECT_CATEGORIES[0].value };
-        withCategory.startDate = new Date(withCategory.startDate);
-        if (withCategory.endDate) withCategory.endDate = new Date(withCategory.endDate);
-        withCategory.teamMembers.forEach(member => {
-          member.tasks.forEach(task => {
-            task.startDate = new Date(task.startDate);
-          });
-        });
+  // Load projects from API or localStorage
+  const loadProjects = useCallback(async () => {
+    setIsLoading(true);
+    try {
+      const loadedProjects = await tugasApi.getAllProjects();
+      const normalized = loadedProjects.map(project => {
+        const withCategory = project.category ? project : { ...project, category: PROJECT_CATEGORIES[0].value as ProjectCategory };
         return ensureAiTeam(withCategory);
       });
       setProjects(normalized);
+      setIsOnline(tugasApi.isWebhookAvailable());
+    } catch (error) {
+      console.error('Failed to load projects:', error);
+      // Fallback to localStorage
+      const storedProjects = localStorage.getItem(PROJECT_STORAGE_KEY);
+      if (storedProjects) {
+        const parsedProjects: Project[] = JSON.parse(storedProjects);
+        const normalized = parsedProjects.map(project => {
+          const withCategory = project.category ? project : { ...project, category: PROJECT_CATEGORIES[0].value as ProjectCategory };
+          withCategory.startDate = new Date(withCategory.startDate);
+          if (withCategory.endDate) withCategory.endDate = new Date(withCategory.endDate);
+          withCategory.teamMembers.forEach(member => {
+            member.tasks.forEach(task => {
+              task.startDate = new Date(task.startDate);
+            });
+          });
+          return ensureAiTeam(withCategory);
+        });
+        setProjects(normalized);
+      }
+      setIsOnline(false);
+    } finally {
+      setIsLoading(false);
     }
   }, []);
 
+  useEffect(() => {
+    loadProjects();
+  }, [loadProjects]);
+
+  // Save to localStorage as backup
   useEffect(() => {
     if (projects.length > 0) {
       localStorage.setItem(PROJECT_STORAGE_KEY, JSON.stringify(projects));
     }
   }, [projects]);
+
+  // Refresh/sync handler
+  const handleRefresh = async () => {
+    setIsSyncing(true);
+    await loadProjects();
+    setIsSyncing(false);
+  };
 
   const buildTeamMembers = (category: ProjectCategory): TeamMember[] => {
     if (category === 'ai') return [{ id: 'seto', name: 'SETO', tasks: [] }];
@@ -179,7 +185,7 @@ export default function Tugas() {
     return result;
   }, [projects, activeTab, searchQuery, categoryFilter]);
 
-  const handleCreateProject = () => {
+  const handleCreateProject = async () => {
     if (!newProjectName) return;
 
     const isDayMode = newProjectDeadlineUnit === 'days';
@@ -225,6 +231,9 @@ export default function Tugas() {
       teamMembers: buildTeamMembers(newProjectCategory)
     };
 
+    // Save to API
+    await tugasApi.createProject(newProject);
+
     setProjects([...projects, newProject]);
     setShowNewProjectModal(false);
     setNewProjectName('');
@@ -232,20 +241,34 @@ export default function Tugas() {
     setNewProjectDeadlineUnit('days');
   };
 
-  const handleFinishProject = (projectId: string) => {
-    setProjects(projects.map(p =>
+  const handleFinishProject = async (projectId: string) => {
+    const updatedProjects = projects.map(p =>
       p.id === projectId
         ? { ...p, status: 'completed' as const, endDate: new Date() }
         : p
-    ));
+    );
+    setProjects(updatedProjects);
+
+    // Update to API
+    const updatedProject = updatedProjects.find(p => p.id === projectId);
+    if (updatedProject) {
+      await tugasApi.updateProject(updatedProject);
+    }
   };
 
-  const handleCancelProject = (projectId: string) => {
-    setProjects(projects.map(p =>
+  const handleCancelProject = async (projectId: string) => {
+    const updatedProjects = projects.map(p =>
       p.id === projectId
         ? { ...p, status: 'cancelled' as const, endDate: new Date() }
         : p
-    ));
+    );
+    setProjects(updatedProjects);
+
+    // Update to API
+    const updatedProject = updatedProjects.find(p => p.id === projectId);
+    if (updatedProject) {
+      await tugasApi.updateProject(updatedProject);
+    }
   };
 
   const handlePenugasan = (projectId: string) => {
@@ -293,21 +316,52 @@ export default function Tugas() {
 
   const getInitials = (name: string) => name.substring(0, 2).toUpperCase();
 
+  if (isLoading) {
+    return (
+      <div className="page">
+        <div className="empty-state">
+          <RefreshCw size={48} className="spin" />
+          <h3>Memuat data...</h3>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="page">
       {/* Page Header */}
       <div className="page-header">
         <div>
           <h1 className="page-title">Manajemen Tugas</h1>
-          <p className="page-subtitle">Monitoring dan pengelolaan proyek tim</p>
+          <p className="page-subtitle">
+            Monitoring dan pengelolaan proyek tim
+            <span
+              className={`sync-status ${isOnline ? 'online' : 'offline'}`}
+              title={isOnline ? 'Tersinkronisasi dengan database' : 'Mode offline (localStorage)'}
+              style={{ marginLeft: '8px', display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '0.85em' }}
+            >
+              {isOnline ? <Cloud size={14} /> : <CloudOff size={14} />}
+              {isOnline ? 'Online' : 'Offline'}
+            </span>
+          </p>
         </div>
-        <Button
-          variant="primary"
-          icon={<Plus size={18} />}
-          onClick={() => setShowNewProjectModal(true)}
-        >
-          Project Baru
-        </Button>
+        <div style={{ display: 'flex', gap: '8px' }}>
+          <Button
+            variant="ghost"
+            icon={<RefreshCw size={18} className={isSyncing ? 'spin' : ''} />}
+            onClick={handleRefresh}
+            disabled={isSyncing}
+          >
+            {isSyncing ? 'Syncing...' : 'Refresh'}
+          </Button>
+          <Button
+            variant="primary"
+            icon={<Plus size={18} />}
+            onClick={() => setShowNewProjectModal(true)}
+          >
+            Project Baru
+          </Button>
+        </div>
       </div>
 
       {/* Stats Overview */}
