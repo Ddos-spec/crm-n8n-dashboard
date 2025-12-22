@@ -17,7 +17,10 @@ import {
   PieChart,
   RefreshCw,
   Cloud,
-  CloudOff
+  CloudOff,
+  Trash2,
+  Edit3,
+  Eye
 } from 'lucide-react';
 import { Card, CardHeader, CardBody } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
@@ -60,6 +63,9 @@ export default function Tugas() {
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const [searchQuery, setSearchQuery] = useState('');
   const [categoryFilter, setCategoryFilter] = useState<string>('all');
+
+  // Dropdown State
+  const [openDropdownId, setOpenDropdownId] = useState<string | null>(null);
 
   // Load projects from API
   const loadProjects = useCallback(async () => {
@@ -228,6 +234,7 @@ export default function Tugas() {
     if (updatedProject) {
       await tugasApi.updateProject(updatedProject);
     }
+    setOpenDropdownId(null);
   };
 
   const handleCancelProject = async (projectId: string) => {
@@ -243,11 +250,39 @@ export default function Tugas() {
     if (updatedProject) {
       await tugasApi.updateProject(updatedProject);
     }
+    setOpenDropdownId(null);
+  };
+
+  const handleDeleteProject = async (projectId: string) => {
+    if (!confirm('Apakah Anda yakin ingin menghapus project ini? Aksi ini tidak dapat dibatalkan.')) {
+      return;
+    }
+
+    // Delete from API
+    await tugasApi.deleteProject(projectId);
+
+    // Remove from local state
+    setProjects(projects.filter(p => p.id !== projectId));
+    setOpenDropdownId(null);
   };
 
   const handlePenugasan = (projectId: string) => {
     navigate(`/tugas/penugasan/${projectId}`);
   };
+
+  const toggleDropdown = (projectId: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setOpenDropdownId(openDropdownId === projectId ? null : projectId);
+  };
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = () => setOpenDropdownId(null);
+    if (openDropdownId) {
+      document.addEventListener('click', handleClickOutside);
+      return () => document.removeEventListener('click', handleClickOutside);
+    }
+  }, [openDropdownId]);
 
   // Helpers
   const formatDuration = (days: number) => {
@@ -446,9 +481,54 @@ export default function Tugas() {
                   <div className="card-top">
                     <div className="card-header-row">
                       <Badge variant={catDisplay.variant}>{catDisplay.label}</Badge>
-                      <button className="more-options-btn">
-                        <MoreHorizontal size={16} />
-                      </button>
+                      <div className="dropdown-container">
+                        <button
+                          className="more-options-btn"
+                          onClick={(e) => toggleDropdown(project.id, e)}
+                        >
+                          <MoreHorizontal size={16} />
+                        </button>
+                        {openDropdownId === project.id && (
+                          <div className="dropdown-menu" onClick={(e) => e.stopPropagation()}>
+                            <button
+                              className="dropdown-item"
+                              onClick={() => {
+                                handlePenugasan(project.id);
+                                setOpenDropdownId(null);
+                              }}
+                            >
+                              <Eye size={16} />
+                              Lihat Detail
+                            </button>
+                            {activeTab === 'active' && (
+                              <>
+                                <button
+                                  className="dropdown-item"
+                                  onClick={() => handleFinishProject(project.id)}
+                                >
+                                  <CheckCircle size={16} />
+                                  Selesaikan
+                                </button>
+                                <button
+                                  className="dropdown-item"
+                                  onClick={() => handleCancelProject(project.id)}
+                                >
+                                  <XCircle size={16} />
+                                  Batalkan
+                                </button>
+                              </>
+                            )}
+                            <div className="dropdown-divider" />
+                            <button
+                              className="dropdown-item danger"
+                              onClick={() => handleDeleteProject(project.id)}
+                            >
+                              <Trash2 size={16} />
+                              Hapus Project
+                            </button>
+                          </div>
+                        )}
+                      </div>
                     </div>
                     <h3 className="modern-project-title">{project.name}</h3>
                     <div className="card-dates">
