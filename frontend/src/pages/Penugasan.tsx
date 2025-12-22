@@ -1,28 +1,12 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Plus, Clock, CheckCircle, Calendar, AlertCircle, ArrowRight } from 'lucide-react';
+import { ArrowLeft, Plus, Clock, CheckCircle, Calendar, AlertCircle, ArrowRight, RefreshCw } from 'lucide-react';
 import { Card, CardHeader, CardBody } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
 import { Badge } from '../components/ui/Badge';
 import { Input } from '../components/ui/Input';
+import { tugasApi, type Project, type TeamMember, type Task, type ProjectCategory } from '../lib/tugasApi';
 import './Penugasan.css';
-
-interface Task {
-  id: string;
-  name: string;
-  estimatedDays: number;
-  actualDays: number;
-  startDate: Date;
-  completed: boolean;
-}
-
-interface TeamMember {
-  id: string;
-  name: string;
-  tasks: Task[];
-}
-
-type ProjectCategory = 'laser_cutting_metal' | 'laser_non_metal' | 'cnc_router' | 'ai';
 
 const PROJECT_CATEGORIES: {
   value: ProjectCategory;
@@ -35,19 +19,7 @@ const PROJECT_CATEGORIES: {
   { value: 'ai', label: 'AI', variant: 'purple' }
 ];
 
-interface Project {
-  id: string;
-  name: string;
-  category: ProjectCategory;
-  initialDeadlineDays: number;
-  actualDeadlineDays: number;
-  startDate: Date;
-  endDate: Date | null;
-  status: 'active' | 'completed' | 'cancelled';
-  teamMembers: TeamMember[];
-}
-
-// Temporary storage for demo purposes
+// localStorage key for fallback
 const PROJECT_STORAGE_KEY = 'tugas_projects';
 
 export default function Penugasan() {
@@ -55,6 +27,7 @@ export default function Penugasan() {
   const navigate = useNavigate();
 
   const [project, setProject] = useState<Project | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
   const [selectedMember, setSelectedMember] = useState<string | null>(null);
   const [showTaskModal, setShowTaskModal] = useState(false);
   const [taskName, setTaskName] = useState('');
@@ -93,28 +66,45 @@ export default function Penugasan() {
     return { newDeadline, newEndDate };
   };
 
-  useEffect(() => {
-    // Load project from localStorage (for demo)
-    const storedProjects = localStorage.getItem(PROJECT_STORAGE_KEY);
-    if (storedProjects) {
-      const projects: Project[] = JSON.parse(storedProjects).map((proj: Project) => ({
-        ...proj,
-        category: proj.category || PROJECT_CATEGORIES[0].value
-      }));
-      const foundProject = projects.find(p => p.id === projectId);
-      if (foundProject) {
-        // Convert date strings back to Date objects
-        foundProject.startDate = new Date(foundProject.startDate);
-        if (foundProject.endDate) foundProject.endDate = new Date(foundProject.endDate);
-        foundProject.teamMembers.forEach(member => {
-          member.tasks.forEach(task => {
-            task.startDate = new Date(task.startDate);
-          });
-        });
-        setProject(normalizeAiTeam(foundProject));
+  // Load project from API
+  const loadProject = useCallback(async () => {
+    if (!projectId) return;
+
+    setIsLoading(true);
+    try {
+      const loadedProject = await tugasApi.getProjectById(projectId);
+      if (loadedProject) {
+        setProject(normalizeAiTeam(loadedProject));
       }
+    } catch (error) {
+      console.error('Failed to load project:', error);
+      // Fallback to localStorage
+      const storedProjects = localStorage.getItem(PROJECT_STORAGE_KEY);
+      if (storedProjects) {
+        const projects: Project[] = JSON.parse(storedProjects).map((proj: Project) => ({
+          ...proj,
+          category: proj.category || PROJECT_CATEGORIES[0].value
+        }));
+        const foundProject = projects.find(p => p.id === projectId);
+        if (foundProject) {
+          foundProject.startDate = new Date(foundProject.startDate);
+          if (foundProject.endDate) foundProject.endDate = new Date(foundProject.endDate);
+          foundProject.teamMembers.forEach(member => {
+            member.tasks.forEach(task => {
+              task.startDate = new Date(task.startDate);
+            });
+          });
+          setProject(normalizeAiTeam(foundProject));
+        }
+      }
+    } finally {
+      setIsLoading(false);
     }
   }, [projectId]);
+
+  useEffect(() => {
+    loadProject();
+  }, [loadProject]);
 
   useEffect(() => {
     if (project) {
@@ -125,11 +115,14 @@ export default function Penugasan() {
     }
   }, [project]);
 
-  const saveProject = (updatedProject: Project) => {
+  const saveProject = async (updatedProject: Project) => {
     const normalizedProject = normalizeAiTeam(updatedProject);
     setProject(normalizedProject);
 
-    // Save to localStorage
+    // Save to API
+    await tugasApi.updateProject(normalizedProject);
+
+    // Also save to localStorage as backup
     const storedProjects = localStorage.getItem(PROJECT_STORAGE_KEY);
     const projects: Project[] = storedProjects ? JSON.parse(storedProjects) : [];
     const projectIndex = projects.findIndex(p => p.id === projectId);
@@ -299,6 +292,26 @@ export default function Penugasan() {
     end.setTime(end.getTime() + days * 24 * 60 * 60 * 1000);
     return end;
   };
+
+  if (isLoading) {
+    return (
+      <div className="page">
+        <div className="page-header">
+          <Button
+            variant="ghost"
+            icon={<ArrowLeft size={18} />}
+            onClick={() => navigate('/tugas')}
+          >
+            Kembali
+          </Button>
+        </div>
+        <div className="empty-state">
+          <RefreshCw size={48} className="spin" />
+          <p>Memuat data proyek...</p>
+        </div>
+      </div>
+    );
+  }
 
   if (!project) {
     return (

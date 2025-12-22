@@ -370,21 +370,48 @@
   opacity: 0.3;
 }
 
+/* Sync Status */
+.sync-status {
+  padding: 2px 8px;
+  border-radius: 12px;
+  font-weight: 500;
+}
+
+.sync-status.online {
+  background: rgba(16, 185, 129, 0.15);
+  color: #10b981;
+}
+
+.sync-status.offline {
+  background: rgba(249, 115, 22, 0.15);
+  color: #f97316;
+}
+
+/* Spin Animation */
+.spin {
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
 /* Responsive */
 @media (max-width: 768px) {
   .stats-overview {
     grid-template-columns: 1fr;
   }
-  
+
   .controls-bar {
     flex-direction: column;
     align-items: stretch;
   }
-  
+
   .filter-wrapper {
     justify-content: space-between;
   }
-  
+
   .filter-select {
     flex: 1;
   }
