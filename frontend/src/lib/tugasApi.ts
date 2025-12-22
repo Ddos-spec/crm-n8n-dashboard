@@ -211,13 +211,27 @@ export const tugasApi = {
    * Baca single project by ID
    */
   getProjectById: async (projectId: string): Promise<Project | null> => {
-    const response = await callWebhook<Project>({
+    const response = await callWebhook<Project[]>({
       type: 'baca',
       data: { action: 'get_by_id', project_id: projectId },
     });
 
-    if (response.success && response.data) {
-      return parseProjectDates(response.data as unknown as Record<string, unknown>);
+    // Handle wrapped format
+    if (response && typeof response === 'object' && 'success' in response && response.success && response.data) {
+      const data = response.data;
+      if (Array.isArray(data) && data.length > 0) {
+        return parseProjectDates(data[0] as unknown as Record<string, unknown>);
+      } else if (!Array.isArray(data)) {
+        return parseProjectDates(data as unknown as Record<string, unknown>);
+      }
+    }
+
+    // Handle raw array format (direct from database)
+    if (Array.isArray(response)) {
+      const found = (response as unknown as Record<string, unknown>[]).find(p => p.id === projectId);
+      if (found) {
+        return parseProjectDates(found);
+      }
     }
 
     return null;
@@ -227,45 +241,68 @@ export const tugasApi = {
    * Tambah project baru
    */
   createProject: async (project: Project): Promise<boolean> => {
-    const response = await callWebhook({
-      type: 'tambah',
-      data: {
-        action: 'create_project',
-        project: projectToDbFormat(project),
-      },
-    });
+    try {
+      const response = await callWebhook({
+        type: 'tambah',
+        data: {
+          action: 'create_project',
+          project: projectToDbFormat(project),
+        },
+      });
 
-    return response.success;
+      // Success if: wrapped response with success=true, or any non-error response
+      if (response && typeof response === 'object' && 'success' in response) {
+        return response.success;
+      }
+      // If we got any response without error, consider it success
+      return response !== null && response !== undefined;
+    } catch {
+      return false;
+    }
   },
 
   /**
    * Update project (termasuk status, team members, tasks)
    */
   updateProject: async (project: Project): Promise<boolean> => {
-    const response = await callWebhook({
-      type: 'edit',
-      data: {
-        action: 'update_project',
-        project: projectToDbFormat(project),
-      },
-    });
+    try {
+      const response = await callWebhook({
+        type: 'edit',
+        data: {
+          action: 'update_project',
+          project: projectToDbFormat(project),
+        },
+      });
 
-    return response.success;
+      if (response && typeof response === 'object' && 'success' in response) {
+        return response.success;
+      }
+      return response !== null && response !== undefined;
+    } catch {
+      return false;
+    }
   },
 
   /**
    * Hapus project
    */
   deleteProject: async (projectId: string): Promise<boolean> => {
-    const response = await callWebhook({
-      type: 'hapus',
-      data: {
-        action: 'delete_project',
-        project_id: projectId,
-      },
-    });
+    try {
+      const response = await callWebhook({
+        type: 'hapus',
+        data: {
+          action: 'delete_project',
+          project_id: projectId,
+        },
+      });
 
-    return response.success;
+      if (response && typeof response === 'object' && 'success' in response) {
+        return response.success;
+      }
+      return response !== null && response !== undefined;
+    } catch {
+      return false;
+    }
   },
 
   /**
