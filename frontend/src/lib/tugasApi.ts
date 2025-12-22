@@ -130,9 +130,6 @@ async function callWebhook<T>(request: WebhookRequest): Promise<WebhookResponse<
   }
 }
 
-// Storage key untuk localStorage fallback
-const PROJECT_STORAGE_KEY = 'tugas_projects';
-
 // Tugas API object
 export const tugasApi = {
   /**
@@ -148,13 +145,6 @@ export const tugasApi = {
       return response.data.map(parseProjectDates);
     }
 
-    // Fallback ke localStorage jika webhook gagal
-    console.warn('Fallback ke localStorage untuk getAllProjects');
-    const stored = localStorage.getItem(PROJECT_STORAGE_KEY);
-    if (stored) {
-      const parsed = JSON.parse(stored) as Record<string, unknown>[];
-      return parsed.map(parseProjectDates);
-    }
     return [];
   },
 
@@ -171,14 +161,6 @@ export const tugasApi = {
       return parseProjectDates(response.data as unknown as Record<string, unknown>);
     }
 
-    // Fallback ke localStorage
-    console.warn('Fallback ke localStorage untuk getProjectById');
-    const stored = localStorage.getItem(PROJECT_STORAGE_KEY);
-    if (stored) {
-      const parsed = JSON.parse(stored) as Record<string, unknown>[];
-      const found = parsed.find((p) => p.id === projectId);
-      return found ? parseProjectDates(found) : null;
-    }
     return null;
   },
 
@@ -194,17 +176,7 @@ export const tugasApi = {
       },
     });
 
-    if (response.success) {
-      return true;
-    }
-
-    // Fallback: simpan ke localStorage
-    console.warn('Fallback ke localStorage untuk createProject');
-    const stored = localStorage.getItem(PROJECT_STORAGE_KEY);
-    const projects = stored ? JSON.parse(stored) : [];
-    projects.push(project);
-    localStorage.setItem(PROJECT_STORAGE_KEY, JSON.stringify(projects));
-    return true;
+    return response.success;
   },
 
   /**
@@ -219,22 +191,7 @@ export const tugasApi = {
       },
     });
 
-    if (response.success) {
-      return true;
-    }
-
-    // Fallback ke localStorage
-    console.warn('Fallback ke localStorage untuk updateProject');
-    const stored = localStorage.getItem(PROJECT_STORAGE_KEY);
-    if (stored) {
-      const projects = JSON.parse(stored) as Project[];
-      const index = projects.findIndex((p) => p.id === project.id);
-      if (index !== -1) {
-        projects[index] = project;
-        localStorage.setItem(PROJECT_STORAGE_KEY, JSON.stringify(projects));
-      }
-    }
-    return true;
+    return response.success;
   },
 
   /**
@@ -249,19 +206,7 @@ export const tugasApi = {
       },
     });
 
-    if (response.success) {
-      return true;
-    }
-
-    // Fallback ke localStorage
-    console.warn('Fallback ke localStorage untuk deleteProject');
-    const stored = localStorage.getItem(PROJECT_STORAGE_KEY);
-    if (stored) {
-      const projects = JSON.parse(stored) as Project[];
-      const filtered = projects.filter((p) => p.id !== projectId);
-      localStorage.setItem(PROJECT_STORAGE_KEY, JSON.stringify(filtered));
-    }
-    return true;
+    return response.success;
   },
 
   /**
@@ -323,21 +268,6 @@ export const tugasApi = {
         project_id: projectId,
         member_id: memberId,
         task_id: taskId,
-      },
-    });
-
-    return response.success;
-  },
-
-  /**
-   * Sync semua data ke database (untuk migrasi dari localStorage)
-   */
-  syncAllProjects: async (projects: Project[]): Promise<boolean> => {
-    const response = await callWebhook({
-      type: 'tambah',
-      data: {
-        action: 'sync_all',
-        projects: projects.map(projectToDbFormat),
       },
     });
 

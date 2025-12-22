@@ -19,9 +19,6 @@ const PROJECT_CATEGORIES: {
   { value: 'ai', label: 'AI', variant: 'purple' }
 ];
 
-// localStorage key for fallback
-const PROJECT_STORAGE_KEY = 'tugas_projects';
-
 export default function Penugasan() {
   const { projectId } = useParams<{ projectId: string }>();
   const navigate = useNavigate();
@@ -78,25 +75,6 @@ export default function Penugasan() {
       }
     } catch (error) {
       console.error('Failed to load project:', error);
-      // Fallback to localStorage
-      const storedProjects = localStorage.getItem(PROJECT_STORAGE_KEY);
-      if (storedProjects) {
-        const projects: Project[] = JSON.parse(storedProjects).map((proj: Project) => ({
-          ...proj,
-          category: proj.category || PROJECT_CATEGORIES[0].value
-        }));
-        const foundProject = projects.find(p => p.id === projectId);
-        if (foundProject) {
-          foundProject.startDate = new Date(foundProject.startDate);
-          if (foundProject.endDate) foundProject.endDate = new Date(foundProject.endDate);
-          foundProject.teamMembers.forEach(member => {
-            member.tasks.forEach(task => {
-              task.startDate = new Date(task.startDate);
-            });
-          });
-          setProject(normalizeAiTeam(foundProject));
-        }
-      }
     } finally {
       setIsLoading(false);
     }
@@ -121,19 +99,6 @@ export default function Penugasan() {
 
     // Save to API
     await tugasApi.updateProject(normalizedProject);
-
-    // Also save to localStorage as backup
-    const storedProjects = localStorage.getItem(PROJECT_STORAGE_KEY);
-    const projects: Project[] = storedProjects ? JSON.parse(storedProjects) : [];
-    const projectIndex = projects.findIndex(p => p.id === projectId);
-
-    if (projectIndex >= 0) {
-      projects[projectIndex] = normalizedProject;
-    } else {
-      projects.push(normalizedProject);
-    }
-
-    localStorage.setItem(PROJECT_STORAGE_KEY, JSON.stringify(projects));
   };
 
   const handleAddTask = () => {

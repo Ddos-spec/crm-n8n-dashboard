@@ -27,8 +27,6 @@ import { useNavigate } from 'react-router-dom';
 import { tugasApi, type Project, type TeamMember, type Task, type ProjectCategory } from '../lib/tugasApi';
 import './Tugas.css';
 
-const PROJECT_STORAGE_KEY = 'tugas_projects';
-
 const PROJECT_CATEGORIES: {
   value: ProjectCategory;
   label: string;
@@ -63,7 +61,7 @@ export default function Tugas() {
   const [searchQuery, setSearchQuery] = useState('');
   const [categoryFilter, setCategoryFilter] = useState<string>('all');
 
-  // Load projects from API or localStorage
+  // Load projects from API
   const loadProjects = useCallback(async () => {
     setIsLoading(true);
     try {
@@ -76,23 +74,6 @@ export default function Tugas() {
       setIsOnline(tugasApi.isWebhookAvailable());
     } catch (error) {
       console.error('Failed to load projects:', error);
-      // Fallback to localStorage
-      const storedProjects = localStorage.getItem(PROJECT_STORAGE_KEY);
-      if (storedProjects) {
-        const parsedProjects: Project[] = JSON.parse(storedProjects);
-        const normalized = parsedProjects.map(project => {
-          const withCategory = project.category ? project : { ...project, category: PROJECT_CATEGORIES[0].value as ProjectCategory };
-          withCategory.startDate = new Date(withCategory.startDate);
-          if (withCategory.endDate) withCategory.endDate = new Date(withCategory.endDate);
-          withCategory.teamMembers.forEach(member => {
-            member.tasks.forEach(task => {
-              task.startDate = new Date(task.startDate);
-            });
-          });
-          return ensureAiTeam(withCategory);
-        });
-        setProjects(normalized);
-      }
       setIsOnline(false);
     } finally {
       setIsLoading(false);
@@ -102,13 +83,6 @@ export default function Tugas() {
   useEffect(() => {
     loadProjects();
   }, [loadProjects]);
-
-  // Save to localStorage as backup
-  useEffect(() => {
-    if (projects.length > 0) {
-      localStorage.setItem(PROJECT_STORAGE_KEY, JSON.stringify(projects));
-    }
-  }, [projects]);
 
   // Refresh/sync handler
   const handleRefresh = async () => {
