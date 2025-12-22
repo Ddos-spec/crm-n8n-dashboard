@@ -59,18 +59,63 @@ export interface WebhookResponse<T = unknown> {
 
 // Helper untuk konversi date dari JSON
 function parseProjectDates(project: Record<string, unknown>): Project {
+  // Handle both snake_case (from DB) and camelCase field names
+  const id = (project.id as string) || '';
+  const name = (project.name as string) || '';
+  const category = (project.category as ProjectCategory) || 'laser_cutting_metal';
+  const initialDeadlineDays = parseFloat((project.initial_deadline_days || project.initialDeadlineDays || 0) as string);
+  const actualDeadlineDays = parseFloat((project.actual_deadline_days || project.actualDeadlineDays || 0) as string);
+  const startDateRaw = (project.start_date || project.startDate) as string;
+  const endDateRaw = (project.end_date || project.endDate) as string | null;
+  const status = (project.status as 'active' | 'completed' | 'cancelled') || 'active';
+
+  // Parse team_members if exists, otherwise create default
+  const teamMembersRaw = (project.team_members || project.teamMembers || project.team_members_data) as unknown;
+  let teamMembers: TeamMember[] = [];
+
+  if (teamMembersRaw) {
+    // If it's a JSON string, parse it
+    const membersData = typeof teamMembersRaw === 'string' ? JSON.parse(teamMembersRaw) : teamMembersRaw;
+    if (Array.isArray(membersData)) {
+      teamMembers = membersData.map((member: Record<string, unknown>) => ({
+        id: (member.member_id || member.id) as string,
+        name: member.name as string,
+        tasks: ((member.tasks as Record<string, unknown>[]) || []).map(task => ({
+          id: task.id as string,
+          name: task.name as string,
+          estimatedDays: parseFloat((task.estimated_days || task.estimatedDays || 0) as string),
+          actualDays: parseFloat((task.actual_days || task.actualDays || 0) as string),
+          startDate: new Date((task.start_date || task.startDate) as string),
+          completed: task.completed as boolean,
+        })),
+      }));
+    }
+  }
+
+  // If no team members, create default based on category
+  if (teamMembers.length === 0) {
+    if (category === 'ai') {
+      teamMembers = [{ id: 'seto', name: 'SETO', tasks: [] }];
+    } else {
+      teamMembers = [
+        { id: '1', name: 'RUDY', tasks: [] },
+        { id: '2', name: 'DOMAN', tasks: [] },
+        { id: '3', name: 'KOJEK', tasks: [] }
+      ];
+    }
+  }
+
   return {
-    ...project,
-    startDate: new Date(project.startDate as string),
-    endDate: project.endDate ? new Date(project.endDate as string) : null,
-    teamMembers: ((project.teamMembers as Record<string, unknown>[]) || []).map(member => ({
-      ...member,
-      tasks: ((member.tasks as Record<string, unknown>[]) || []).map(task => ({
-        ...task,
-        startDate: new Date(task.startDate as string),
-      })) as Task[],
-    })) as TeamMember[],
-  } as Project;
+    id,
+    name,
+    category,
+    initialDeadlineDays,
+    actualDeadlineDays,
+    startDate: new Date(startDateRaw),
+    endDate: endDateRaw ? new Date(endDateRaw) : null,
+    status,
+    teamMembers,
+  };
 }
 
 // Helper untuk konversi project ke format database
@@ -100,9 +145,9 @@ function projectToDbFormat(project: Project) {
 }
 
 // Main API call function
-async function callWebhook<T>(request: WebhookRequest): Promise<WebhookResponse<T>> {
+async function callWebhook<T>(request: WebhookRequest): Promise<WebhookResponse<T> | T> {
   if (!TUGAS_WEBHOOK_URL) {
-    console.warn('VITE_N8N_TUGAS_WEBHOOK tidak di-set, menggunakan localStorage fallback');
+    console.warn('VITE_N8N_TUGAS_WEBHOOK tidak di-set');
     return { success: false, error: 'Webhook URL belum dikonfigurasi' };
   }
 
@@ -120,6 +165,13 @@ async function callWebhook<T>(request: WebhookRequest): Promise<WebhookResponse<
     }
 
     const result = await response.json();
+
+    // If result is already an array (raw DB response), return it directly
+    if (Array.isArray(result)) {
+      return result as T;
+    }
+
+    // Otherwise return as WebhookResponse
     return result as WebhookResponse<T>;
   } catch (error) {
     console.error('Webhook call failed:', error);
@@ -141,8 +193,15 @@ export const tugasApi = {
       data: { action: 'get_all' },
     });
 
+    // Handle both formats:
+    // 1. { success: true, data: [...] } - wrapped format
+    // 2. [...] - raw array from database
     if (response.success && response.data) {
+      // Wrapped format
       return response.data.map(parseProjectDates);
+    } else if (Array.isArray(response)) {
+      // Raw array format (direct from database)
+      return (response as unknown as Record<string, unknown>[]).map(parseProjectDates);
     }
 
     return [];
@@ -152,13 +211,27 @@ export const tugasApi = {
    * Baca single project by ID
    */
   getProjectById: async (projectId: string): Promise<Project | null> => {
-    const response = await callWebhook<Project>({
+    const response = await callWebhook<Project[]>({
       type: 'baca',
       data: { action: 'get_by_id', project_id: projectId },
     });
 
-    if (response.success && response.data) {
-      return parseProjectDates(response.data as unknown as Record<string, unknown>);
+    // Handle wrapped format
+    if (response && typeof response === 'object' && 'success' in response && response.success && response.data) {
+      const data = response.data;
+      if (Array.isArray(data) && data.length > 0) {
+        return parseProjectDates(data[0] as unknown as Record<string, unknown>);
+      } else if (!Array.isArray(data)) {
+        return parseProjectDates(data as unknown as Record<string, unknown>);
+      }
+    }
+
+    // Handle raw array format (direct from database)
+    if (Array.isArray(response)) {
+      const found = (response as unknown as Record<string, unknown>[]).find(p => p.id === projectId);
+      if (found) {
+        return parseProjectDates(found);
+      }
     }
 
     return null;
@@ -168,45 +241,68 @@ export const tugasApi = {
    * Tambah project baru
    */
   createProject: async (project: Project): Promise<boolean> => {
-    const response = await callWebhook({
-      type: 'tambah',
-      data: {
-        action: 'create_project',
-        project: projectToDbFormat(project),
-      },
-    });
+    try {
+      const response = await callWebhook({
+        type: 'tambah',
+        data: {
+          action: 'create_project',
+          project: projectToDbFormat(project),
+        },
+      });
 
-    return response.success;
+      // Success if: wrapped response with success=true, or any non-error response
+      if (response && typeof response === 'object' && 'success' in response) {
+        return response.success;
+      }
+      // If we got any response without error, consider it success
+      return response !== null && response !== undefined;
+    } catch {
+      return false;
+    }
   },
 
   /**
    * Update project (termasuk status, team members, tasks)
    */
   updateProject: async (project: Project): Promise<boolean> => {
-    const response = await callWebhook({
-      type: 'edit',
-      data: {
-        action: 'update_project',
-        project: projectToDbFormat(project),
-      },
-    });
+    try {
+      const response = await callWebhook({
+        type: 'edit',
+        data: {
+          action: 'update_project',
+          project: projectToDbFormat(project),
+        },
+      });
 
-    return response.success;
+      if (response && typeof response === 'object' && 'success' in response) {
+        return response.success;
+      }
+      return response !== null && response !== undefined;
+    } catch {
+      return false;
+    }
   },
 
   /**
    * Hapus project
    */
   deleteProject: async (projectId: string): Promise<boolean> => {
-    const response = await callWebhook({
-      type: 'hapus',
-      data: {
-        action: 'delete_project',
-        project_id: projectId,
-      },
-    });
+    try {
+      const response = await callWebhook({
+        type: 'hapus',
+        data: {
+          action: 'delete_project',
+          project_id: projectId,
+        },
+      });
 
-    return response.success;
+      if (response && typeof response === 'object' && 'success' in response) {
+        return response.success;
+      }
+      return response !== null && response !== undefined;
+    } catch {
+      return false;
+    }
   },
 
   /**
