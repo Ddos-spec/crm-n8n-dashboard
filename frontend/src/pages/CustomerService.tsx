@@ -8,7 +8,8 @@ import {
   AlertTriangle,
   Download,
   Image,
-  X
+  X,
+  ArrowLeft
 } from 'lucide-react';
 import { useCustomerContext } from '../context/customer';
 import { useChat, useCustomers } from '../hooks/useData';
@@ -124,6 +125,7 @@ export default function CustomerService() {
   const [selectedImage, setSelectedImage] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [sending, setSending] = useState(false);
+  const [mobileShowChat, setMobileShowChat] = useState(false); // Mobile: toggle between contacts/chat
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const chatMessagesEndRef = useRef<HTMLDivElement>(null);
@@ -769,18 +771,152 @@ export default function CustomerService() {
 
         /* Responsive */
         @media (max-width: 768px) {
-          .cs-sidebar {
-            width: 100%;
-            max-height: 40vh;
+          .cs-page {
+            top: 56px;
+            flex-direction: column;
+            bottom: 64px; /* Space for bottom nav */
           }
 
-          .cs-page {
-            flex-direction: column;
+          .cs-sidebar {
+            width: 100%;
+            height: auto;
+            max-height: none;
+            flex-shrink: 0;
+          }
+
+          .cs-sidebar.hide-mobile {
+            display: none;
+          }
+
+          .cs-sidebar-header {
+            padding: 12px;
+          }
+
+          .cs-contact-list {
+            max-height: 35vh;
           }
 
           .cs-chat-panel {
-            height: 60vh;
+            flex: 1;
+            height: auto;
+            min-height: 0;
           }
+
+          .cs-chat-panel.hide-mobile {
+            display: none;
+          }
+
+          .cs-chat-header {
+            padding: 12px 14px;
+          }
+
+          .cs-chat-user-info h3 {
+            font-size: 14px;
+          }
+
+          .cs-chat-actions {
+            gap: 6px;
+          }
+
+          .cs-chat-actions .badge {
+            display: none;
+          }
+
+          .cs-messages {
+            padding: 12px;
+            gap: 8px;
+          }
+
+          .cs-message-row {
+            max-width: 90%;
+          }
+
+          .cs-message {
+            padding: 10px 12px;
+            min-width: 100px;
+          }
+
+          .cs-message-text {
+            font-size: 13px;
+          }
+
+          .cs-avatar-mini {
+            width: 28px;
+            height: 28px;
+            font-size: 9px;
+          }
+
+          .cs-input-area {
+            padding: 10px 12px;
+          }
+
+          .cs-text-input {
+            padding: 10px 12px;
+            font-size: 14px;
+          }
+
+          .cs-send-btn {
+            padding: 10px 14px;
+            font-size: 13px;
+          }
+
+          .cs-send-btn span {
+            display: none;
+          }
+
+          .cs-icon-btn {
+            width: 38px;
+            height: 38px;
+          }
+
+          /* Back button for mobile */
+          .cs-back-btn {
+            display: flex !important;
+          }
+
+          .cs-contact-avatar {
+            width: 38px;
+            height: 38px;
+            font-size: 13px;
+          }
+
+          .cs-contact-item {
+            padding: 12px;
+            gap: 10px;
+          }
+
+          .cs-contact-name {
+            font-size: 13px;
+          }
+
+          .cs-contact-phone {
+            font-size: 11px;
+          }
+
+          .cs-status-badge {
+            font-size: 9px;
+            padding: 2px 6px;
+          }
+        }
+
+        .cs-back-btn {
+          display: none;
+          width: 32px;
+          height: 32px;
+          border-radius: var(--radius-sm);
+          border: 1px solid var(--border);
+          background: var(--bg-tertiary);
+          color: var(--text-secondary);
+          cursor: pointer;
+          align-items: center;
+          justify-content: center;
+          margin-right: 8px;
+          flex-shrink: 0;
+        }
+
+        .cs-back-btn:hover {
+          background: var(--bg-hover);
+          color: var(--text-primary);
         }
 
         @keyframes spin {
@@ -802,7 +938,7 @@ export default function CustomerService() {
 
       <div className="cs-page">
         {/* Contact List Sidebar */}
-        <div className="cs-sidebar">
+        <div className={`cs-sidebar ${mobileShowChat ? 'hide-mobile' : ''}`}>
           <div className="cs-sidebar-header">
             <div className="cs-sidebar-title-row">
               <div className="cs-sidebar-title">Kontak</div>
@@ -833,7 +969,10 @@ export default function CustomerService() {
                 key={contact.id}
                 contact={contact}
                 isSelected={selected?.id === contact.id}
-                onClick={() => setSelected(contact)}
+                onClick={() => {
+                  setSelected(contact);
+                  setMobileShowChat(true); // Show chat on mobile when contact selected
+                }}
               />
             ))}
 
@@ -855,12 +994,20 @@ export default function CustomerService() {
         </div>
 
         {/* Chat Panel */}
-        <div className="cs-chat-panel">
+        <div className={`cs-chat-panel ${!mobileShowChat ? 'hide-mobile' : ''}`}>
           {selected ? (
             <>
               {/* Chat Header */}
               <div className="cs-chat-header">
                 <div className="cs-chat-user">
+                  {/* Back button for mobile */}
+                  <button
+                    className="cs-back-btn"
+                    onClick={() => setMobileShowChat(false)}
+                    title="Kembali ke daftar kontak"
+                  >
+                    <ArrowLeft size={18} />
+                  </button>
                   <div
                     className="cs-contact-avatar"
                     style={{ background: getAvatarGradient(selected.name) }}

@@ -581,19 +581,123 @@
 /* Responsive */
 @media (max-width: 768px) {
   .stats-overview {
-    grid-template-columns: 1fr;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+  }
+
+  .stat-card-mini {
+    padding: 12px;
+    gap: 12px;
+  }
+
+  .stat-icon-wrapper {
+    width: 40px;
+    height: 40px;
+  }
+
+  .stat-value {
+    font-size: 20px;
+  }
+
+  .stat-label {
+    font-size: 11px;
   }
 
   .controls-bar {
     flex-direction: column;
     align-items: stretch;
+    gap: 12px;
+  }
+
+  .search-wrapper {
+    min-width: auto;
   }
 
   .filter-wrapper {
     justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 8px;
   }
 
   .filter-select {
     flex: 1;
+    min-width: 120px;
+  }
+
+  .tugas-tabs {
+    gap: 16px;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    padding-bottom: 12px;
+  }
+
+  .tugas-tab {
+    white-space: nowrap;
+    font-size: 13px;
+  }
+
+  .projects-container.grid {
+    grid-template-columns: 1fr;
+    gap: 16px;
+  }
+
+  .modern-card-body {
+    padding: 16px;
+  }
+
+  .modern-project-title {
+    font-size: 16px;
+  }
+
+  .card-dates {
+    font-size: 12px;
+  }
+
+  .avatar-circle {
+    width: 28px;
+    height: 28px;
+    font-size: 9px;
+  }
+
+  .card-footer-actions {
+    flex-wrap: wrap;
+  }
+
+  .modal {
+    padding: 16px;
+    max-width: calc(100% - 24px);
+  }
+
+  .modal-header h2 {
+    font-size: 18px;
+  }
+
+  .page-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+  }
+}
+
+@media (max-width: 480px) {
+  .stats-overview {
+    grid-template-columns: 1fr;
+  }
+
+  .stat-card-mini {
+    flex-direction: row;
+    padding: 12px;
+  }
+
+  .view-toggle {
+    display: none; /* Hide view toggle on very small screens */
+  }
+
+  .filter-wrapper {
+    flex-direction: column;
+  }
+
+  .filter-select {
+    width: 100%;
   }
 }

@@ -259,9 +259,88 @@
     padding: 0;
     height: calc(100vh - 120px); /* Adjust for mobile nav */
   }
-  
+
+  .ai-header {
+    padding: 16px;
+    margin-bottom: 0;
+  }
+
+  .ai-title {
+    font-size: 20px;
+    gap: 8px;
+  }
+
+  .ai-subtitle {
+    font-size: 13px;
+  }
+
   .chat-container {
     border: none;
     border-radius: 0;
+  }
+
+  .chat-history {
+    padding: 16px;
+    gap: 16px;
+  }
+
+  .ai-message-row {
+    max-width: 95%;
+    gap: 10px;
+  }
+
+  .ai-avatar {
+    width: 32px;
+    height: 32px;
+    border-radius: 10px;
+  }
+
+  .ai-bubble {
+    padding: 12px 14px;
+    font-size: 14px;
+    border-radius: 14px;
+  }
+
+  .chat-input-container {
+    padding: 12px;
+  }
+
+  .ai-input {
+    padding: 12px 50px 12px 14px;
+    font-size: 14px;
+    border-radius: 10px;
+  }
+
+  .ai-send-btn {
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
+    right: 6px;
+  }
+
+  .loading-dots {
+    margin-left: 42px;
+    padding: 10px 14px;
+  }
+
+  .ai-empty-state {
+    padding: 24px;
+  }
+
+  .ai-logo-large {
+    width: 60px;
+    height: 60px;
+    border-radius: 16px;
+    margin-bottom: 16px;
+  }
+
+  .suggestion-chips {
+    gap: 8px;
+    margin-top: 24px;
+  }
+
+  .chip {
+    padding: 8px 14px;
+    font-size: 12px;
   }
 }

@@ -428,6 +428,83 @@ export default function Marketing() {
           font-size: 14px;
           font-weight: 500;
         }
+
+        /* Mobile Responsive */
+        @media (max-width: 768px) {
+          .filter-actions-row {
+            flex-direction: column;
+            gap: 12px;
+            align-items: stretch !important;
+          }
+
+          .filter-actions-row .filter-pills {
+            order: 2;
+          }
+
+          .filter-actions-row > div:last-child {
+            order: 1;
+            justify-content: flex-end;
+          }
+
+          .action-dropdown {
+            position: fixed;
+            left: 12px;
+            right: 12px;
+            top: auto;
+            bottom: 80px;
+            width: auto;
+            border-radius: 12px;
+          }
+
+          .action-item {
+            padding: 14px 18px;
+          }
+
+          .modal-content {
+            width: 95%;
+            margin: 12px;
+          }
+
+          .modal-header {
+            padding: 14px 16px;
+          }
+
+          .modal-body {
+            padding: 16px;
+          }
+
+          .detail-row {
+            flex-direction: column;
+            align-items: flex-start;
+            gap: 4px;
+          }
+
+          /* Hide some columns on mobile */
+          .table-wrapper th:nth-child(5),
+          .table-wrapper td:nth-child(5),
+          .table-wrapper th:nth-child(6),
+          .table-wrapper td:nth-child(6) {
+            display: none;
+          }
+
+          .table-wrapper th,
+          .table-wrapper td {
+            padding: 10px 8px;
+            font-size: 12px;
+          }
+
+          .score-bar-track {
+            width: 50px !important;
+          }
+        }
+
+        @media (max-width: 480px) {
+          /* Hide even more columns on very small screens */
+          .table-wrapper th:nth-child(4),
+          .table-wrapper td:nth-child(4) {
+            display: none;
+          }
+        }
       `}</style>
 
       <div className="page-header">
@@ -485,7 +562,7 @@ export default function Marketing() {
       </div>
 
       {/* Filter & Actions */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
+      <div className="filter-actions-row" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24, flexWrap: 'wrap', gap: 12 }}>
         <div className="filter-pills">
           {['all', 'new', 'contacted', 'qualified', 'invalid'].map((filter) => (
             <button
