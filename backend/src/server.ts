@@ -4,6 +4,7 @@ import dotenv from 'dotenv';
 import express from 'express';
 import helmet from 'helmet';
 import compression from 'compression';
+import rateLimit from 'express-rate-limit';
 import { config } from './config/env';
 import { checkDbConnection } from './lib/db';
 import routes from './routes';
@@ -33,9 +34,55 @@ app.use(
 );
 app.options('*', cors());
 
-app.use(helmet());
+// Enhanced Helmet configuration for security
+app.use(helmet({
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      styleSrc: ["'self'", "'unsafe-inline'"],
+      scriptSrc: ["'self'"],
+      imgSrc: ["'self'", "data:", "https:"],
+    },
+  },
+  crossOriginEmbedderPolicy: false, // Disable for API compatibility
+}));
+
 app.use(compression()); // Enable Gzip compression
-app.use(express.json());
+
+// Rate limiting to prevent brute force and DDoS attacks
+const generalLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 100, // limit each IP to 100 requests per windowMs
+  message: {
+    error: 'Too many requests',
+    code: 'RATE_LIMIT_EXCEEDED',
+    retryAfter: '15 minutes',
+  },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+// Stricter rate limit for sensitive endpoints
+const strictLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 20, // limit each IP to 20 requests per windowMs
+  message: {
+    error: 'Too many requests to this endpoint',
+    code: 'RATE_LIMIT_EXCEEDED',
+    retryAfter: '15 minutes',
+  },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+// Apply general rate limiting to all routes
+app.use('/api/', generalLimiter);
+
+// Apply strict rate limiting to message/AI endpoints
+app.use('/api/send-message', strictLimiter);
+app.use('/api/ai-chat', strictLimiter);
+
+app.use(express.json({ limit: '1mb' })); // Limit request body size
 
 app.use((req, res, next) => {
   const requestId = crypto.randomUUID();

@@ -4,6 +4,26 @@ import { config } from './config/env';
 
 const router = Router();
 
+// Input validation helpers
+const sanitizeString = (input: unknown): string | null => {
+  if (input === null || input === undefined) return null;
+  const str = String(input).trim();
+  // Remove potentially dangerous characters for SQL/XSS
+  return str.replace(/[<>'"`;\\]/g, '').slice(0, 500); // Limit length
+};
+
+const validatePositiveInt = (input: unknown, defaultValue: number, max: number): number => {
+  const num = parseInt(String(input), 10);
+  if (isNaN(num) || num < 0) return defaultValue;
+  return Math.min(num, max);
+};
+
+const validateId = (input: unknown): number | null => {
+  const num = parseInt(String(input), 10);
+  if (isNaN(num) || num <= 0) return null;
+  return num;
+};
+
 const buildMeta = (requestId: string) => ({
   timestamp: new Date().toISOString(),
   requestId,
@@ -49,35 +69,50 @@ router.get('/api/stats', async (_req, res) => {
       return Math.round(((current - previous) / previous) * 100);
     };
 
-    const getMonthCount = async (table: string, dateCol: string, where = '') => {
+    // Whitelist of allowed tables and columns to prevent SQL injection
+    const allowedTables = ['customers', 'chat_history', 'escalations', 'businesses'] as const;
+    const allowedDateColumns: Record<typeof allowedTables[number], string> = {
+      customers: 'last_message_at',
+      chat_history: 'created_at',
+      escalations: 'created_at',
+      businesses: 'created_at',
+    };
+
+    const getMonthCount = async (table: typeof allowedTables[number], where = '') => {
+      // Validate table name against whitelist
+      if (!allowedTables.includes(table)) {
+        throw new Error(`Invalid table name: ${table}`);
+      }
+      const dateCol = allowedDateColumns[table];
+
       const q = `
-        SELECT 
+        SELECT
           COUNT(*) FILTER (WHERE date_trunc('month', ${dateCol}) = date_trunc('month', CURRENT_DATE))::int as curr,
           COUNT(*) FILTER (WHERE date_trunc('month', ${dateCol}) = date_trunc('month', CURRENT_DATE - INTERVAL '1 month'))::int as prev
         FROM ${table}
         ${where ? 'WHERE ' + where : ''}
       `;
-      const res = await pool.query(q);
-      return { curr: res.rows[0].curr, prev: res.rows[0].prev };
+      const result = await pool.query(q);
+      return { curr: result.rows[0].curr, prev: result.rows[0].prev };
     };
 
     // 1. Total Customers (All Time) + Trend (Active Monthly)
     const totalCustRes = await pool.query('SELECT COUNT(*)::int as count FROM customers');
-    const custTrendStats = await getMonthCount('customers', 'last_message_at'); 
+    const custTrendStats = await getMonthCount('customers');
     const custTrend = calcTrend(custTrendStats.curr, custTrendStats.prev);
 
     // 2. Total Chats (All Time) + Trend (Monthly Volume)
     const totalChatRes = await pool.query('SELECT COUNT(*)::int as count FROM chat_history');
-    const chatTrendStats = await getMonthCount('chat_history', 'created_at');
+    const chatTrendStats = await getMonthCount('chat_history');
     const chatTrend = calcTrend(chatTrendStats.curr, chatTrendStats.prev);
 
     // 3. Open Escalations (Current Snapshot) + Trend (New Escalations Month vs Month)
     const openEscRes = await pool.query("SELECT COUNT(*)::int as count FROM escalations WHERE status = 'open'");
-    const escTrendStats = await getMonthCount('escalations', 'created_at'); // Trend of NEW escalations
+    const escTrendStats = await getMonthCount('escalations'); // Trend of NEW escalations
     const escTrend = calcTrend(escTrendStats.curr, escTrendStats.prev);
 
     // 4. Leads (This Month) + Trend (vs Last Month)
-    const leadsTrendStats = await getMonthCount('businesses', 'created_at');
+    const leadsTrendStats = await getMonthCount('businesses');
     const leadsTrend = calcTrend(leadsTrendStats.curr, leadsTrendStats.prev);
 
     return res.json({
@@ -120,13 +155,13 @@ router.get('/api/stats', async (_req, res) => {
 // Customers
 router.get('/api/customers', async (req, res) => {
   try {
-    const limit = Math.min(parseInt(String(req.query.limit ?? '20'), 10) || 20, 1000); // Increased cap from 100 to 1000
-    const offset = Math.max(parseInt(String(req.query.offset ?? '0'), 10) || 0, 0);
-    const search = req.query.search ? String(req.query.search) : null;
+    const limit = validatePositiveInt(req.query.limit, 20, 1000);
+    const offset = validatePositiveInt(req.query.offset, 0, 100000);
+    const search = sanitizeString(req.query.search);
 
     const params: (string | number)[] = [limit, offset];
     let whereClause = '';
-    
+
     if (search) {
       params.push(`%${search}%`);
       whereClause = `WHERE name ILIKE $3 OR phone ILIKE $3`;
@@ -142,14 +177,9 @@ router.get('/api/customers', async (req, res) => {
       params
     );
 
-    console.log(`[DEBUG API] Customers request: Limit=${limit}, Offset=${offset}, Search=${search || 'None'}. Found=${result.rows.length} rows.`); // DEBUG LOG
-    
-    // Get total count for meta info (optional but good practice)
-    // const countRes = await pool.query('SELECT COUNT(*)::int as count FROM customers');
-
-    return res.json({ 
-      data: result.rows, 
-      meta: { ...buildMeta(res.locals.requestId), limit, offset } 
+    return res.json({
+      data: result.rows,
+      meta: { ...buildMeta(res.locals.requestId), limit, offset }
     });
   } catch (error) {
     console.error('[GET /api/customers]', error);
@@ -191,18 +221,18 @@ router.get('/api/escalations', async (_req, res) => {
 // Chat History
 router.get('/api/chat-history', async (req, res) => {
   try {
-    const customerId = Number(req.query.customerId);
+    const customerId = validateId(req.query.customerId);
     if (!customerId) {
       return res.status(400).json({
-        error: 'customerId is required',
+        error: 'customerId is required and must be a positive integer',
         code: 'INVALID_CUSTOMER_ID',
         meta: buildMeta(res.locals.requestId),
       });
     }
 
     // Support pagination for better performance
-    const limit = Math.min(parseInt(String(req.query.limit ?? '50'), 10) || 50, 200); // Max 200 per request
-    const offset = Math.max(parseInt(String(req.query.offset ?? '0'), 10) || 0, 0);
+    const limit = validatePositiveInt(req.query.limit, 50, 200);
+    const offset = validatePositiveInt(req.query.offset, 0, 100000);
 
     const result = await pool.query(
       `SELECT id, customer_id, message_type, content, created_at, escalated
@@ -255,10 +285,10 @@ router.get('/api/campaigns', async (_req, res) => {
 // Businesses (Leads)
 router.get('/api/businesses', async (req, res) => {
   try {
-    const limit = Math.min(parseInt(String(req.query.limit ?? '50'), 10) || 50, 200);
-    const offset = Math.max(parseInt(String(req.query.offset ?? '0'), 10) || 0, 0);
-    const status = req.query.status ? String(req.query.status) : null;
-    const search = req.query.search ? String(req.query.search) : null;
+    const limit = validatePositiveInt(req.query.limit, 50, 200);
+    const offset = validatePositiveInt(req.query.offset, 0, 100000);
+    const status = sanitizeString(req.query.status);
+    const search = sanitizeString(req.query.search);
 
     const where: string[] = [];
     const params: Array<string | number> = [];
@@ -431,30 +461,50 @@ router.get('/api/notifications', async (_req, res) => {
 // Update business status
 router.patch('/api/businesses/:id', async (req, res) => {
   try {
-    const { id } = req.params;
+    const id = validateId(req.params.id);
+    if (!id) {
+      return res.status(400).json({
+        error: 'Invalid business ID',
+        code: 'INVALID_ID',
+        meta: buildMeta(res.locals.requestId),
+      });
+    }
+
     const { status, message_sent } = req.body as { status?: string; message_sent?: boolean };
+
+    // Validate status against allowed values
+    const allowedStatuses = ['new', 'contacted', 'qualified', 'invalid_whatsapp', 'not_interested', 'converted'];
+    const sanitizedStatus = status ? sanitizeString(status) : undefined;
+
+    if (sanitizedStatus && !allowedStatuses.includes(sanitizedStatus)) {
+      return res.status(400).json({
+        error: 'Invalid status value',
+        code: 'INVALID_STATUS',
+        meta: buildMeta(res.locals.requestId),
+      });
+    }
 
     const updates: string[] = [];
     const params: (string | number | boolean)[] = [];
 
-    if (status !== undefined) {
-      params.push(status);
+    if (sanitizedStatus) {
+      params.push(sanitizedStatus);
       updates.push(`status = $${params.length}`);
     }
-    if (message_sent !== undefined) {
+    if (typeof message_sent === 'boolean') {
       params.push(message_sent);
       updates.push(`message_sent = $${params.length}`);
     }
 
     if (updates.length === 0) {
       return res.status(400).json({
-        error: 'No fields to update',
+        error: 'No valid fields to update',
         code: 'NO_UPDATE_FIELDS',
         meta: buildMeta(res.locals.requestId),
       });
     }
 
-    params.push(Number(id));
+    params.push(id);
     const result = await pool.query(
       `UPDATE businesses SET ${updates.join(', ')}, updated_at = NOW() WHERE id = $${params.length} RETURNING *`,
       params
@@ -505,21 +555,25 @@ router.post('/api/send-message', async (req, res) => {
 
     if (!mtype || !allowedTypes.includes(mtype)) {
       return res.status(400).json({
-        error: 'Invalid mtype',
+        error: 'Invalid mtype. Allowed: ' + allowedTypes.join(', '),
         code: 'INVALID_MTYPE',
         meta: buildMeta(res.locals.requestId),
       });
     }
 
-    if (!receiver) {
+    // Validate receiver - must be a valid phone number format (digits, +, -)
+    if (!receiver || !/^[+\d][\d\s-]{8,20}$/.test(receiver.replace(/\s/g, ''))) {
       return res.status(400).json({
-        error: 'receiver is required',
+        error: 'receiver must be a valid phone number',
         code: 'INVALID_RECEIVER',
         meta: buildMeta(res.locals.requestId),
       });
     }
 
-    if (mtype === 'text' && !text) {
+    // Sanitize text content
+    const sanitizedText = text ? text.slice(0, 4096) : undefined; // Limit message length
+
+    if (mtype === 'text' && !sanitizedText) {
       return res.status(400).json({
         error: 'text is required for mtype=text',
         code: 'INVALID_TEXT',
@@ -527,21 +581,37 @@ router.post('/api/send-message', async (req, res) => {
       });
     }
 
-    if (mtype !== 'text' && !url) {
-      return res.status(400).json({
-        error: 'url is required for media message',
-        code: 'INVALID_URL',
-        meta: buildMeta(res.locals.requestId),
-      });
+    // Validate URL format for media messages
+    if (mtype !== 'text') {
+      if (!url) {
+        return res.status(400).json({
+          error: 'url is required for media message',
+          code: 'INVALID_URL',
+          meta: buildMeta(res.locals.requestId),
+        });
+      }
+      // Basic URL validation
+      try {
+        new URL(url);
+      } catch {
+        return res.status(400).json({
+          error: 'url must be a valid URL',
+          code: 'INVALID_URL_FORMAT',
+          meta: buildMeta(res.locals.requestId),
+        });
+      }
     }
+
+    // Sanitize filename
+    const sanitizedFilename = filename ? filename.replace(/[^a-zA-Z0-9._-]/g, '_').slice(0, 255) : undefined;
 
     const payload = {
       apikey: config.whatsappApiKey,
       mtype,
-      receiver,
-      text,
+      receiver: receiver.replace(/\s/g, ''), // Remove spaces from phone number
+      text: sanitizedText,
       url,
-      filename,
+      filename: sanitizedFilename,
     };
 
     const gwRes = await fetch(config.whatsappUrl, {
@@ -556,7 +626,6 @@ router.post('/api/send-message', async (req, res) => {
       return res.status(502).json({
         error: 'Gateway error',
         code: 'WHATSAPP_GATEWAY_FAILED',
-        details: gwJson,
         meta: buildMeta(res.locals.requestId),
       });
     }
@@ -578,37 +647,59 @@ router.post('/api/send-message', async (req, res) => {
 // AI Chat Proxy
 router.post('/api/ai-chat', async (req, res) => {
   try {
-    const { message } = req.body;
-    
-    // Gunakan env var N8N_CHAT_WEBHOOK jika ada, atau placeholder
-    // User bisa set N8N_CHAT_WEBHOOK di .env backend nanti
+    const { message } = req.body as { message?: string };
+
+    // Validate message input
+    if (!message || typeof message !== 'string') {
+      return res.status(400).json({
+        error: 'message is required and must be a string',
+        code: 'INVALID_MESSAGE',
+        meta: buildMeta(res.locals.requestId),
+      });
+    }
+
+    // Limit message length to prevent abuse
+    const sanitizedMessage = message.trim().slice(0, 2000);
+    if (sanitizedMessage.length === 0) {
+      return res.status(400).json({
+        error: 'message cannot be empty',
+        code: 'EMPTY_MESSAGE',
+        meta: buildMeta(res.locals.requestId),
+      });
+    }
+
     const webhookUrl = process.env.N8N_CHAT_WEBHOOK;
 
     if (!webhookUrl) {
-      // Mock response jika webhook belum diset
-      await new Promise(resolve => setTimeout(resolve, 1500)); // Fake delay
-      return res.json({ 
-        output: `[MOCK AI] Saya menerima pesan Anda: "${message}". \n\nUntuk mengaktifkan AI yang sebenarnya, silakan set variabel N8N_CHAT_WEBHOOK di file .env backend dengan URL Webhook n8n Anda.` 
+      // Mock response if webhook not configured
+      await new Promise(resolve => setTimeout(resolve, 500));
+      return res.json({
+        output: `[MOCK AI] Pesan Anda diterima. Untuk mengaktifkan AI, set N8N_CHAT_WEBHOOK di .env backend.`,
+        meta: buildMeta(res.locals.requestId),
       });
     }
 
     const response = await fetch(webhookUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ chatInput: message })
+      body: JSON.stringify({ chatInput: sanitizedMessage })
     });
 
     if (!response.ok) {
-      throw new Error(`Webhook error: ${response.statusText}`);
+      throw new Error(`Webhook error: ${response.status}`);
     }
 
-    const data = await response.json();
-    return res.json(data);
+    const data = await response.json() as Record<string, unknown>;
+    return res.json({
+      data,
+      meta: buildMeta(res.locals.requestId),
+    });
   } catch (error) {
     console.error('[POST /api/ai-chat]', error);
-    return res.status(500).json({ 
+    return res.status(500).json({
       error: 'AI Service Error',
-      details: (error as Error).message
+      code: 'AI_SERVICE_ERROR',
+      meta: buildMeta(res.locals.requestId),
     });
   }
 });

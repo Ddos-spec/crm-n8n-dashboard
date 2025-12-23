@@ -309,65 +309,89 @@ export const tugasApi = {
    * Tambah task ke team member
    */
   addTask: async (projectId: string, memberId: string, task: Task): Promise<boolean> => {
-    const response = await callWebhook({
-      type: 'tambah',
-      data: {
-        action: 'add_task',
-        project_id: projectId,
-        member_id: memberId,
-        task: {
-          id: task.id,
-          name: task.name,
-          estimated_days: task.estimatedDays,
-          actual_days: task.actualDays,
-          start_date: task.startDate.toISOString(),
-          completed: task.completed,
+    try {
+      const response = await callWebhook({
+        type: 'tambah',
+        data: {
+          action: 'add_task',
+          project_id: projectId,
+          member_id: memberId,
+          task: {
+            id: task.id,
+            name: task.name,
+            estimated_days: task.estimatedDays,
+            actual_days: task.actualDays,
+            start_date: task.startDate.toISOString(),
+            completed: task.completed,
+          },
         },
-      },
-    });
+      });
 
-    return response.success;
+      // Handle both wrapped and raw response formats
+      if (response && typeof response === 'object' && 'success' in response) {
+        return response.success;
+      }
+      return response !== null && response !== undefined;
+    } catch {
+      return false;
+    }
   },
 
   /**
    * Update task (toggle completed, edit details)
    */
   updateTask: async (projectId: string, memberId: string, task: Task): Promise<boolean> => {
-    const response = await callWebhook({
-      type: 'edit',
-      data: {
-        action: 'update_task',
-        project_id: projectId,
-        member_id: memberId,
-        task: {
-          id: task.id,
-          name: task.name,
-          estimated_days: task.estimatedDays,
-          actual_days: task.actualDays,
-          start_date: task.startDate.toISOString(),
-          completed: task.completed,
+    try {
+      const response = await callWebhook({
+        type: 'edit',
+        data: {
+          action: 'update_task',
+          project_id: projectId,
+          member_id: memberId,
+          task: {
+            id: task.id,
+            name: task.name,
+            estimated_days: task.estimatedDays,
+            actual_days: task.actualDays,
+            start_date: task.startDate.toISOString(),
+            completed: task.completed,
+          },
         },
-      },
-    });
+      });
 
-    return response.success;
+      // Handle both wrapped and raw response formats
+      if (response && typeof response === 'object' && 'success' in response) {
+        return response.success;
+      }
+      return response !== null && response !== undefined;
+    } catch {
+      return false;
+    }
   },
 
   /**
    * Hapus task
    */
   deleteTask: async (projectId: string, memberId: string, taskId: string): Promise<boolean> => {
-    const response = await callWebhook({
-      type: 'hapus',
-      data: {
-        action: 'delete_task',
-        project_id: projectId,
-        member_id: memberId,
-        task_id: taskId,
-      },
-    });
+    try {
+      const response = await callWebhook({
+        type: 'hapus',
+        data: {
+          action: 'delete_task',
+          project_id: projectId,
+          member_id: memberId,
+          task_id: taskId,
+        },
+      });
 
-    return response.success;
+      // Handle both wrapped and raw response formats
+      if (response && typeof response === 'object' && 'success' in response) {
+        return response.success;
+      }
+      return response !== null && response !== undefined;
+    } catch {
+      return false;
+    }
   },
 
   /**
