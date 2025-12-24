@@ -196,9 +196,11 @@ export const tugasApi = {
     // Handle both formats:
     // 1. { success: true, data: [...] } - wrapped format
     // 2. [...] - raw array from database
-    if (response.success && response.data) {
-      // Wrapped format
-      return response.data.map(parseProjectDates);
+    if (response && typeof response === 'object' && 'success' in response) {
+      const wrapped = response as WebhookResponse<Project[]>;
+      if (wrapped.success && wrapped.data) {
+        return wrapped.data.map((p) => parseProjectDates(p as unknown as Record<string, unknown>));
+      }
     } else if (Array.isArray(response)) {
       // Raw array format (direct from database)
       return (response as unknown as Record<string, unknown>[]).map(parseProjectDates);
@@ -252,7 +254,7 @@ export const tugasApi = {
 
       // Success if: wrapped response with success=true, or any non-error response
       if (response && typeof response === 'object' && 'success' in response) {
-        return response.success;
+        return Boolean((response as WebhookResponse<unknown>).success);
       }
       // If we got any response without error, consider it success
       return response !== null && response !== undefined;
@@ -275,7 +277,7 @@ export const tugasApi = {
       });
 
       if (response && typeof response === 'object' && 'success' in response) {
-        return response.success;
+        return Boolean((response as WebhookResponse<unknown>).success);
       }
       return response !== null && response !== undefined;
     } catch {
@@ -297,7 +299,7 @@ export const tugasApi = {
       });
 
       if (response && typeof response === 'object' && 'success' in response) {
-        return response.success;
+        return Boolean((response as WebhookResponse<unknown>).success);
       }
       return response !== null && response !== undefined;
     } catch {
@@ -329,7 +331,7 @@ export const tugasApi = {
 
       // Handle both wrapped and raw response formats
       if (response && typeof response === 'object' && 'success' in response) {
-        return response.success;
+        return Boolean((response as WebhookResponse<unknown>).success);
       }
       return response !== null && response !== undefined;
     } catch {
@@ -361,7 +363,7 @@ export const tugasApi = {
 
       // Handle both wrapped and raw response formats
       if (response && typeof response === 'object' && 'success' in response) {
-        return response.success;
+        return Boolean((response as WebhookResponse<unknown>).success);
       }
       return response !== null && response !== undefined;
     } catch {
@@ -386,7 +388,7 @@ export const tugasApi = {
 
       // Handle both wrapped and raw response formats
       if (response && typeof response === 'object' && 'success' in response) {
-        return response.success;
+        return Boolean((response as WebhookResponse<unknown>).success);
       }
       return response !== null && response !== undefined;
     } catch {
