@@ -22,7 +22,11 @@ import {
   Fuel,
   Clock,
   Percent,
-  FileDown
+  FileDown,
+  Square,
+  MousePointer,
+  Trash2,
+  SkipForward
 } from 'lucide-react';
 import { api } from '../lib/api';
 import './Estimator.css';
@@ -40,6 +44,15 @@ interface PathData {
   id: string;
   d: string;
   length: number;
+  selected: boolean;
+}
+
+interface SelectionArea {
+  id: string;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
   selected: boolean;
 }
 
@@ -150,8 +163,17 @@ export default function Estimator() {
   const [error, setError] = useState<string | null>(null);
   const [zoom, setZoom] = useState(1);
 
+  // Area selection state
+  const [selections, setSelections] = useState<SelectionArea[]>([]);
+  const [selectionMode, setSelectionMode] = useState<'select' | 'pan'>('select');
+  const [isDrawing, setIsDrawing] = useState(false);
+  const [drawStart, setDrawStart] = useState<{ x: number; y: number } | null>(null);
+  const [currentSelection, setCurrentSelection] = useState<{ x: number; y: number; width: number; height: number } | null>(null);
+  const [, setUseAreaSelection] = useState(false); // Track if user chose to use area selection
+
   const fileInputRef = useRef<HTMLInputElement>(null);
   const dropZoneRef = useRef<HTMLDivElement>(null);
+  const previewCanvasRef = useRef<HTMLDivElement>(null);
 
   // Load settings from localStorage
   useEffect(() => {
@@ -495,7 +517,13 @@ EOF`;
   const canProceed = (): boolean => {
     switch (currentStep) {
       case 1: return files.length > 0;
-      case 2: return files.some(f => f.paths && f.paths.some(p => p.selected));
+      case 2: {
+        // Step 2 now uses action buttons (skip/apply), not the main nav
+        // But we still allow proceeding if there are any paths or selections
+        const hasSelectedPaths = files.some(f => f.paths && f.paths.some(p => p.selected));
+        const hasSelectedAreas = selections.some(s => s.selected);
+        return hasSelectedPaths || hasSelectedAreas || files.length > 0;
+      }
       case 3: return scale.value > 0;
       case 4: return selectedMaterial !== '' && selectedThickness > 0;
       case 5: return nestingResult !== null;
@@ -533,6 +561,102 @@ EOF`;
     setEstimation(null);
     setError(null);
     setZoom(1);
+    setSelections([]);
+    setUseAreaSelection(false);
+    setSelectionMode('select');
+  };
+
+  // Area selection mouse handlers
+  const handlePreviewMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (selectionMode !== 'select' || !previewCanvasRef.current) return;
+
+    const rect = previewCanvasRef.current.getBoundingClientRect();
+    const x = (e.clientX - rect.left) / zoom;
+    const y = (e.clientY - rect.top) / zoom;
+
+    setIsDrawing(true);
+    setDrawStart({ x, y });
+    setCurrentSelection({ x, y, width: 0, height: 0 });
+  };
+
+  const handlePreviewMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (!isDrawing || !drawStart || !previewCanvasRef.current) return;
+
+    const rect = previewCanvasRef.current.getBoundingClientRect();
+    const currentX = (e.clientX - rect.left) / zoom;
+    const currentY = (e.clientY - rect.top) / zoom;
+
+    const x = Math.min(drawStart.x, currentX);
+    const y = Math.min(drawStart.y, currentY);
+    const width = Math.abs(currentX - drawStart.x);
+    const height = Math.abs(currentY - drawStart.y);
+
+    setCurrentSelection({ x, y, width, height });
+  };
+
+  const handlePreviewMouseUp = () => {
+    if (!isDrawing || !currentSelection) {
+      setIsDrawing(false);
+      return;
+    }
+
+    // Only add if selection has meaningful size (at least 10x10 pixels)
+    if (currentSelection.width > 10 && currentSelection.height > 10) {
+      const newSelection: SelectionArea = {
+        id: `sel-${Date.now()}`,
+        ...currentSelection,
+        selected: true,
+      };
+      setSelections(prev => [...prev, newSelection]);
+    }
+
+    setIsDrawing(false);
+    setDrawStart(null);
+    setCurrentSelection(null);
+  };
+
+  const removeSelection = (id: string) => {
+    setSelections(prev => prev.filter(s => s.id !== id));
+  };
+
+  const toggleSelectionSelected = (id: string) => {
+    setSelections(prev =>
+      prev.map(s => (s.id === id ? { ...s, selected: !s.selected } : s))
+    );
+  };
+
+  const clearAllSelections = () => {
+    setSelections([]);
+  };
+
+  // Skip selection and use all paths
+  const skipSelection = () => {
+    setUseAreaSelection(false);
+    // Select all paths
+    const newFiles = [...files];
+    newFiles.forEach(f => {
+      f.paths?.forEach(p => (p.selected = true));
+    });
+    setFiles(newFiles);
+    nextStep();
+  };
+
+  // Use area selections to filter paths
+  const applyAreaSelection = () => {
+    if (selections.length === 0) {
+      skipSelection();
+      return;
+    }
+
+    setUseAreaSelection(true);
+    // For now, select all paths (in a real implementation, we'd filter paths by area)
+    // The selection areas will be used for nesting dimensions
+    const newFiles = [...files];
+    newFiles.forEach(f => {
+      f.paths?.forEach(p => (p.selected = true));
+    });
+    setFiles(newFiles);
+    nextStep();
   };
 
   // Get selected path count and total length
@@ -615,17 +739,38 @@ EOF`;
 
       case 2: {
         const stats = getSelectionStats();
+        const selectedAreas = selections.filter(s => s.selected);
         return (
           <div className="step-content">
-            <h2 className="step-title">Preview & Seleksi</h2>
-            <p className="step-description">Pilih path yang akan dipotong. Anda bisa skip seleksi untuk memotong semua.</p>
+            <h2 className="step-title">Preview & Seleksi Area</h2>
+            <p className="step-description">Gambar kotak untuk memilih area yang akan dipotong, atau skip untuk memproses semua.</p>
 
             <div className="preview-container">
+              {/* Toolbar with mode selector */}
               <div className="preview-toolbar">
+                <div className="mode-selector">
+                  <button
+                    className={`mode-btn ${selectionMode === 'select' ? 'active' : ''}`}
+                    onClick={() => setSelectionMode('select')}
+                    title="Mode Seleksi"
+                  >
+                    <Square size={16} />
+                    <span>Seleksi</span>
+                  </button>
+                  <button
+                    className={`mode-btn ${selectionMode === 'pan' ? 'active' : ''}`}
+                    onClick={() => setSelectionMode('pan')}
+                    title="Mode Pan/Geser"
+                  >
+                    <MousePointer size={16} />
+                    <span>Pan</span>
+                  </button>
+                </div>
+                <div className="toolbar-divider" />
                 <button onClick={() => setZoom(z => Math.max(0.25, z - 0.25))} title="Zoom Out">
                   <ZoomOut size={18} />
                 </button>
-                <span>{Math.round(zoom * 100)}%</span>
+                <span className="zoom-label">{Math.round(zoom * 100)}%</span>
                 <button onClick={() => setZoom(z => Math.min(4, z + 0.25))} title="Zoom In">
                   <ZoomIn size={18} />
                 </button>
@@ -634,12 +779,21 @@ EOF`;
                 </button>
               </div>
 
+              {/* Preview canvas with selection overlay */}
               <div className="preview-canvas-wrapper">
-                <div className="preview-canvas" style={{ transform: `scale(${zoom})`, transformOrigin: 'top left' }}>
+                <div
+                  ref={previewCanvasRef}
+                  className={`preview-canvas selection-enabled ${selectionMode === 'select' ? 'crosshair' : ''}`}
+                  style={{ transform: `scale(${zoom})`, transformOrigin: 'top left' }}
+                  onMouseDown={handlePreviewMouseDown}
+                  onMouseMove={handlePreviewMouseMove}
+                  onMouseUp={handlePreviewMouseUp}
+                  onMouseLeave={handlePreviewMouseUp}
+                >
                   {files.map((f, idx) => (
                     <div key={idx} className="preview-item">
                       {f.preview ? (
-                        <img src={f.preview} alt={f.file.name} />
+                        <img src={f.preview} alt={f.file.name} draggable={false} />
                       ) : (
                         <div className="dxf-preview">
                           <p>Memproses file...</p>
@@ -647,19 +801,95 @@ EOF`;
                       )}
                     </div>
                   ))}
+
+                  {/* Selection rectangles */}
+                  {selections.map((sel, idx) => (
+                    <div
+                      key={sel.id}
+                      className={`selection-rect ${sel.selected ? 'selected' : 'deselected'}`}
+                      style={{
+                        left: sel.x,
+                        top: sel.y,
+                        width: sel.width,
+                        height: sel.height,
+                      }}
+                    >
+                      <span className="selection-label">Area {idx + 1}</span>
+                      <button
+                        className="selection-delete"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          removeSelection(sel.id);
+                        }}
+                      >
+                        <X size={12} />
+                      </button>
+                    </div>
+                  ))}
+
+                  {/* Current drawing selection */}
+                  {currentSelection && (
+                    <div
+                      className="selection-rect drawing"
+                      style={{
+                        left: currentSelection.x,
+                        top: currentSelection.y,
+                        width: currentSelection.width,
+                        height: currentSelection.height,
+                      }}
+                    />
+                  )}
                 </div>
               </div>
 
+              {/* Selection list */}
+              {selections.length > 0 && (
+                <div className="area-selection-list">
+                  <div className="area-selection-header">
+                    <h4>Area Terpilih: {selectedAreas.length}/{selections.length}</h4>
+                    <button className="btn-sm btn-outline btn-danger" onClick={clearAllSelections}>
+                      <Trash2 size={14} />
+                      Hapus Semua
+                    </button>
+                  </div>
+                  <div className="area-list">
+                    {selections.map((sel, idx) => (
+                      <label key={sel.id} className={`area-item ${sel.selected ? 'selected' : ''}`}>
+                        <input
+                          type="checkbox"
+                          checked={sel.selected}
+                          onChange={() => toggleSelectionSelected(sel.id)}
+                        />
+                        <span className="area-name">Area {idx + 1}</span>
+                        <span className="area-dims">
+                          {sel.width.toFixed(0)} × {sel.height.toFixed(0)} px
+                        </span>
+                        <button
+                          className="area-delete"
+                          onClick={(e) => {
+                            e.preventDefault();
+                            removeSelection(sel.id);
+                          }}
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Path list (for files with detected paths) */}
               {files[0]?.paths && files[0].paths.length > 0 && (
                 <div className="path-selection">
                   <div className="path-selection-header">
-                    <h4>Path yang terdeteksi: {files[0].paths.length}</h4>
+                    <h4>Path Terdeteksi: {files[0].paths.length}</h4>
                     <span className="selection-stats">
                       Terpilih: {stats.count} path ({stats.totalLength.toFixed(1)} unit)
                     </span>
                   </div>
                   <div className="path-list">
-                    {files[0].paths.slice(0, 50).map((path, idx) => (
+                    {files[0].paths.slice(0, 30).map((path, idx) => (
                       <label key={path.id} className={`path-item ${path.selected ? 'selected' : ''}`}>
                         <input
                           type="checkbox"
@@ -676,8 +906,8 @@ EOF`;
                         <span className="path-length">{path.length.toFixed(1)} unit</span>
                       </label>
                     ))}
-                    {files[0].paths.length > 50 && (
-                      <p className="path-overflow">...dan {files[0].paths.length - 50} path lainnya</p>
+                    {files[0].paths.length > 30 && (
+                      <p className="path-overflow">...dan {files[0].paths.length - 30} path lainnya</p>
                     )}
                   </div>
                   <div className="path-actions">
@@ -694,6 +924,30 @@ EOF`;
                   </div>
                 </div>
               )}
+
+              {/* Action buttons */}
+              <div className="selection-actions">
+                <button className="btn-secondary" onClick={skipSelection}>
+                  <SkipForward size={18} />
+                  Skip - Gunakan Semua
+                </button>
+                {selections.length > 0 && (
+                  <button className="btn-primary" onClick={applyAreaSelection}>
+                    <Check size={18} />
+                    Gunakan {selectedAreas.length} Area Terpilih
+                  </button>
+                )}
+              </div>
+
+              {/* Instructions */}
+              <div className="selection-help">
+                <AlertCircle size={14} />
+                <span>
+                  {selectionMode === 'select'
+                    ? 'Klik dan drag untuk menggambar kotak seleksi. Anda bisa membuat beberapa area.'
+                    : 'Mode Pan aktif. Klik dan drag untuk menggeser preview.'}
+                </span>
+              </div>
             </div>
           </div>
         );

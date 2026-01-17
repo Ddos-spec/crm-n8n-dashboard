@@ -1789,6 +1789,250 @@
   }
 }
 
+/* Area Selection Feature */
+.mode-selector {
+  display: flex;
+  gap: 4px;
+  background: var(--bg-card);
+  border-radius: var(--radius-sm);
+  padding: 4px;
+  border: 1px solid var(--border);
+}
+
+.mode-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 12px;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.mode-btn:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.mode-btn.active {
+  background: var(--info);
+  color: white;
+}
+
+.toolbar-divider {
+  width: 1px;
+  height: 24px;
+  background: var(--border);
+  margin: 0 8px;
+}
+
+.zoom-label {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-primary);
+  min-width: 50px;
+  text-align: center;
+}
+
+.preview-canvas.selection-enabled {
+  position: relative;
+  user-select: none;
+}
+
+.preview-canvas.crosshair {
+  cursor: crosshair;
+}
+
+.preview-canvas.crosshair img {
+  pointer-events: none;
+}
+
+.selection-rect {
+  position: absolute;
+  border: 2px solid var(--info);
+  background: rgba(59, 130, 246, 0.15);
+  pointer-events: auto;
+}
+
+.selection-rect.selected {
+  border-color: var(--info);
+  background: rgba(59, 130, 246, 0.2);
+}
+
+.selection-rect.deselected {
+  border-color: var(--text-muted);
+  background: rgba(128, 128, 128, 0.1);
+  border-style: dashed;
+}
+
+.selection-rect.drawing {
+  border-style: dashed;
+  border-color: var(--cyan);
+  background: rgba(6, 182, 212, 0.2);
+}
+
+.selection-label {
+  position: absolute;
+  top: -24px;
+  left: 0;
+  background: var(--info);
+  color: white;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 4px 4px 0 0;
+  white-space: nowrap;
+}
+
+.selection-delete {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  width: 20px;
+  height: 20px;
+  border: none;
+  border-radius: 50%;
+  background: rgba(239, 68, 68, 0.9);
+  color: white;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+
+.selection-rect:hover .selection-delete {
+  opacity: 1;
+}
+
+/* Area selection list */
+.area-selection-list {
+  margin-top: 20px;
+  padding: 16px;
+  background: var(--bg-tertiary);
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+}
+
+.area-selection-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.area-selection-header h4 {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin: 0;
+}
+
+.area-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 150px;
+  overflow-y: auto;
+}
+
+.area-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  background: var(--bg-card);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: all 0.2s;
+  border: 1px solid transparent;
+}
+
+.area-item:hover {
+  background: var(--bg-hover);
+}
+
+.area-item.selected {
+  border-color: rgba(59, 130, 246, 0.3);
+  background: rgba(59, 130, 246, 0.1);
+}
+
+.area-item input {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--info);
+}
+
+.area-name {
+  flex: 1;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+.area-dims {
+  font-size: 12px;
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+}
+
+.area-delete {
+  width: 28px;
+  height: 28px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+}
+
+.area-delete:hover {
+  background: rgba(239, 68, 68, 0.15);
+  color: var(--danger);
+}
+
+/* Selection action buttons */
+.selection-actions {
+  display: flex;
+  justify-content: center;
+  gap: 12px;
+  margin-top: 20px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
+}
+
+.selection-help {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 16px;
+  padding: 12px;
+  background: rgba(59, 130, 246, 0.1);
+  border-radius: var(--radius-sm);
+  font-size: 13px;
+  color: var(--info);
+}
+
+.btn-danger {
+  border-color: var(--danger) !important;
+  color: var(--danger) !important;
+}
+
+.btn-danger:hover {
+  background: rgba(239, 68, 68, 0.1) !important;
+}
+
 /* Print styles */
 @media print {
   .estimator-header,
