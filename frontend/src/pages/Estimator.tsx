@@ -65,7 +65,7 @@ interface EstimationResult {
 }
 
 interface SettingsData {
-  laborCostPerHour: number;
+  laborCostPerMinute: number;
   machineType: string;
   defaultSheetWidth: number;
   defaultSheetHeight: number;
@@ -81,7 +81,7 @@ const DEFAULT_MATERIALS: Material[] = [
 ];
 
 const DEFAULT_SETTINGS: SettingsData = {
-  laborCostPerHour: 50000,
+  laborCostPerMinute: 1500,
   machineType: 'Fiber Laser 1500W',
   defaultSheetWidth: 1220,
   defaultSheetHeight: 2440,
@@ -162,85 +162,35 @@ export default function Estimator() {
 
     const type: FileData['type'] = ext === 'svg' ? 'svg' : ext === 'dxf' ? 'dxf' : 'image';
 
-    return new Promise((resolve) => {
-      const reader = new FileReader();
-      reader.onload = async (e) => {
-        const content = e.target?.result as string;
-        let preview = content;
-        let paths: PathData[] = [];
-        let dimensions = { width: 0, height: 0 };
+    setIsProcessing(true);
+    setError(null);
 
-        if (type === 'svg') {
-          // Parse SVG to extract paths
-          const parser = new DOMParser();
-          const doc = parser.parseFromString(content, 'image/svg+xml');
-          const svgEl = doc.querySelector('svg');
+    try {
+      // Send all files to backend for processing
+      const formData = new FormData();
+      formData.append('file', file);
+      const result = await api.uploadEstimatorFile(formData);
 
-          if (svgEl) {
-            const viewBox = svgEl.getAttribute('viewBox')?.split(' ').map(Number);
-            const width = parseFloat(svgEl.getAttribute('width') || String(viewBox?.[2] || 100));
-            const height = parseFloat(svgEl.getAttribute('height') || String(viewBox?.[3] || 100));
-            dimensions = { width, height };
-
-            // Extract all paths
-            const pathElements = doc.querySelectorAll('path, line, rect, circle, ellipse, polygon, polyline');
-            pathElements.forEach((el, idx) => {
-              const d = el.getAttribute('d') || convertToPath(el);
-              if (d) {
-                paths.push({
-                  id: `path-${idx}`,
-                  d,
-                  length: estimatePathLength(d),
-                  selected: true,
-                });
-              }
-            });
-          }
-          preview = `data:image/svg+xml;base64,${btoa(unescape(encodeURIComponent(content)))}`;
-        } else if (type === 'image') {
-          preview = content;
-          // Get image dimensions
-          const img = new Image();
-          img.onload = () => {
-            dimensions = { width: img.width, height: img.height };
-          };
-          img.src = content;
-        } else if (type === 'dxf') {
-          // For DXF, we'll need backend processing
-          // For now, create a placeholder
-          preview = '';
-          setIsProcessing(true);
-          try {
-            const formData = new FormData();
-            formData.append('file', file);
-            const result = await api.uploadEstimatorFile(formData);
-            if (result.success) {
-              preview = result.preview || '';
-              paths = result.paths || [];
-              dimensions = result.dimensions || { width: 0, height: 0 };
-            }
-          } catch (err) {
-            console.error('DXF processing failed', err);
-            setError('Gagal memproses file DXF');
-          }
-          setIsProcessing(false);
-        }
-
-        resolve({
+      if (result.success) {
+        setIsProcessing(false);
+        return {
           file,
-          preview,
+          preview: result.preview || '',
           type,
-          dimensions,
-          paths,
-        });
-      };
-
-      if (type === 'image') {
-        reader.readAsDataURL(file);
+          dimensions: result.dimensions || { width: 100, height: 100 },
+          paths: result.paths || [],
+        };
       } else {
-        reader.readAsText(file);
+        setError(result.error || 'Gagal memproses file');
+        setIsProcessing(false);
+        return null;
       }
-    });
+    } catch (err) {
+      console.error('File processing failed', err);
+      setError('Gagal memproses file. Silakan coba lagi.');
+      setIsProcessing(false);
+      return null;
+    }
   };
 
   const handleDrop = useCallback(async (e: React.DragEvent) => {
@@ -279,92 +229,6 @@ export default function Estimator() {
 
   const removeFile = (index: number) => {
     setFiles(prev => prev.filter((_, i) => i !== index));
-  };
-
-  // Path length estimation (simple approximation)
-  const estimatePathLength = (d: string): number => {
-    // Simple estimation based on path commands
-    // For accurate calculation, we'd use svg-path-properties library
-    const commands = d.match(/[MLHVCSQTAZ][^MLHVCSQTAZ]*/gi) || [];
-    let length = 0;
-    let lastX = 0, lastY = 0;
-
-    commands.forEach(cmd => {
-      const type = cmd[0].toUpperCase();
-      const coords = cmd.slice(1).trim().split(/[\s,]+/).map(Number);
-
-      switch (type) {
-        case 'M':
-          lastX = coords[0];
-          lastY = coords[1];
-          break;
-        case 'L':
-          length += Math.sqrt(Math.pow(coords[0] - lastX, 2) + Math.pow(coords[1] - lastY, 2));
-          lastX = coords[0];
-          lastY = coords[1];
-          break;
-        case 'H':
-          length += Math.abs(coords[0] - lastX);
-          lastX = coords[0];
-          break;
-        case 'V':
-          length += Math.abs(coords[0] - lastY);
-          lastY = coords[0];
-          break;
-        case 'C':
-          // Bezier curve approximation
-          length += Math.sqrt(Math.pow(coords[4] - lastX, 2) + Math.pow(coords[5] - lastY, 2)) * 1.2;
-          lastX = coords[4];
-          lastY = coords[5];
-          break;
-        case 'Z':
-          break;
-      }
-    });
-
-    return length;
-  };
-
-  // Convert SVG elements to path data
-  const convertToPath = (el: Element): string => {
-    const tag = el.tagName.toLowerCase();
-
-    switch (tag) {
-      case 'rect': {
-        const x = parseFloat(el.getAttribute('x') || '0');
-        const y = parseFloat(el.getAttribute('y') || '0');
-        const w = parseFloat(el.getAttribute('width') || '0');
-        const h = parseFloat(el.getAttribute('height') || '0');
-        return `M${x},${y} L${x+w},${y} L${x+w},${y+h} L${x},${y+h} Z`;
-      }
-      case 'circle': {
-        const cx = parseFloat(el.getAttribute('cx') || '0');
-        const cy = parseFloat(el.getAttribute('cy') || '0');
-        const r = parseFloat(el.getAttribute('r') || '0');
-        return `M${cx-r},${cy} A${r},${r} 0 1,0 ${cx+r},${cy} A${r},${r} 0 1,0 ${cx-r},${cy}`;
-      }
-      case 'line': {
-        const x1 = el.getAttribute('x1') || '0';
-        const y1 = el.getAttribute('y1') || '0';
-        const x2 = el.getAttribute('x2') || '0';
-        const y2 = el.getAttribute('y2') || '0';
-        return `M${x1},${y1} L${x2},${y2}`;
-      }
-      case 'polygon':
-      case 'polyline': {
-        const points = el.getAttribute('points') || '';
-        const pairs = points.trim().split(/\s+/);
-        if (pairs.length === 0) return '';
-        let d = `M${pairs[0]}`;
-        for (let i = 1; i < pairs.length; i++) {
-          d += ` L${pairs[i]}`;
-        }
-        if (tag === 'polygon') d += ' Z';
-        return d;
-      }
-      default:
-        return '';
-    }
   };
 
   // Calculate nesting (simple grid layout)
@@ -431,7 +295,7 @@ export default function Estimator() {
 
     // Calculate costs
     const materialCost = (totalLength / 1000) * material.pricePerMeter; // Convert mm to m
-    const laborCost = (cuttingTime / 60) * settings.laborCostPerHour;
+    const laborCost = cuttingTime * settings.laborCostPerMinute;
     const totalCost = materialCost + laborCost;
     const pricePerPiece = totalCost / quantity;
 
@@ -574,14 +438,19 @@ export default function Estimator() {
               <div className="preview-canvas" style={{ transform: `scale(${zoom})` }}>
                 {files.map((f, idx) => (
                   <div key={idx} className="preview-item">
-                    {f.type === 'svg' || f.type === 'image' ? (
+                    {f.preview ? (
                       <img src={f.preview} alt={f.file.name} />
                     ) : (
                       <div className="dxf-preview">
-                        <p>Preview DXF</p>
+                        <p>Memproses file...</p>
                         {f.dimensions && (
-                          <p>{f.dimensions.width} x {f.dimensions.height}</p>
+                          <p>{f.dimensions.width.toFixed(1)} x {f.dimensions.height.toFixed(1)} unit</p>
                         )}
+                      </div>
+                    )}
+                    {f.dimensions && f.dimensions.width > 0 && (
+                      <div className="preview-dimensions">
+                        {f.dimensions.width.toFixed(1)} x {f.dimensions.height.toFixed(1)} unit
                       </div>
                     )}
                   </div>
@@ -1059,11 +928,11 @@ export default function Estimator() {
               <div className="setting-section">
                 <h3>Biaya</h3>
                 <div className="setting-row">
-                  <label>Biaya Jasa per Jam (Rp)</label>
+                  <label>Biaya Jasa per Menit (Rp)</label>
                   <input
                     type="number"
-                    value={settings.laborCostPerHour}
-                    onChange={(e) => saveSettings({ ...settings, laborCostPerHour: parseInt(e.target.value) || 0 })}
+                    value={settings.laborCostPerMinute}
+                    onChange={(e) => saveSettings({ ...settings, laborCostPerMinute: parseInt(e.target.value) || 0 })}
                   />
                 </div>
               </div>
