@@ -1,6 +1,27 @@
 import { Router } from 'express';
+import multer from 'multer';
+import DxfParser from 'dxf-parser';
 import { pool } from './lib/db';
 import { config } from './config/env';
+
+// Configure multer for file uploads
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: {
+    fileSize: 10 * 1024 * 1024, // 10MB limit
+  },
+  fileFilter: (_req, file, cb) => {
+    const allowedMimes = ['image/svg+xml', 'application/dxf', 'image/png', 'image/jpeg', 'image/webp'];
+    const allowedExts = ['.svg', '.dxf', '.png', '.jpg', '.jpeg', '.webp'];
+    const ext = file.originalname.toLowerCase().slice(file.originalname.lastIndexOf('.'));
+
+    if (allowedExts.includes(ext) || allowedMimes.includes(file.mimetype)) {
+      cb(null, true);
+    } else {
+      cb(new Error('Invalid file type. Allowed: SVG, DXF, PNG, JPG, WEBP'));
+    }
+  },
+});
 
 const router = Router();
 
@@ -644,7 +665,7 @@ router.post('/api/send-message', async (req, res) => {
   }
 });
 
-// AI Chat Proxy
+// AI Chat Proxy (legacy - kept for backward compatibility)
 router.post('/api/ai-chat', async (req, res) => {
   try {
     const { message } = req.body as { message?: string };
@@ -703,5 +724,310 @@ router.post('/api/ai-chat', async (req, res) => {
     });
   }
 });
+
+// Estimator - File Upload & Processing
+router.post('/api/estimator/upload', upload.single('file'), async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({
+        success: false,
+        error: 'No file uploaded',
+        meta: buildMeta(res.locals.requestId),
+      });
+    }
+
+    const fileContent = req.file.buffer.toString('utf-8');
+    const ext = req.file.originalname.toLowerCase().slice(req.file.originalname.lastIndexOf('.'));
+
+    interface PathData {
+      id: string;
+      d: string;
+      length: number;
+      selected: boolean;
+    }
+
+    let paths: PathData[] = [];
+    let dimensions = { width: 0, height: 0 };
+    let preview = '';
+
+    if (ext === '.dxf') {
+      // Parse DXF file
+      try {
+        const parser = new DxfParser();
+        const dxf = parser.parseSync(fileContent);
+
+        if (dxf && dxf.entities) {
+          let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          dxf.entities.forEach((entity: any, idx: number) => {
+            let pathD = '';
+            let length = 0;
+
+            const entityType = entity.type;
+
+            if (entityType === 'LINE') {
+              const vertices = entity.vertices;
+              const start = vertices?.[0] || { x: entity.x || 0, y: entity.y || 0 };
+              const end = vertices?.[1] || { x: entity.x1 || 0, y: entity.y1 || 0 };
+              pathD = `M${start.x},${start.y} L${end.x},${end.y}`;
+              length = Math.sqrt(Math.pow(end.x - start.x, 2) + Math.pow(end.y - start.y, 2));
+
+              minX = Math.min(minX, start.x, end.x);
+              minY = Math.min(minY, start.y, end.y);
+              maxX = Math.max(maxX, start.x, end.x);
+              maxY = Math.max(maxY, start.y, end.y);
+            } else if (entityType === 'CIRCLE') {
+              const cx = entity.center ? entity.center.x : (entity.x || 0);
+              const cy = entity.center ? entity.center.y : (entity.y || 0);
+              const r = entity.radius || 0;
+              pathD = `M${cx - r},${cy} A${r},${r} 0 1,0 ${cx + r},${cy} A${r},${r} 0 1,0 ${cx - r},${cy}`;
+              length = 2 * Math.PI * r;
+
+              minX = Math.min(minX, cx - r);
+              minY = Math.min(minY, cy - r);
+              maxX = Math.max(maxX, cx + r);
+              maxY = Math.max(maxY, cy + r);
+            } else if (entityType === 'ARC') {
+              const cx = entity.center ? entity.center.x : (entity.x || 0);
+              const cy = entity.center ? entity.center.y : (entity.y || 0);
+              const r = entity.radius || 0;
+              const startAngle = (entity.startAngle || 0) * (Math.PI / 180);
+              const endAngle = (entity.endAngle || 0) * (Math.PI / 180);
+
+              const startX = cx + r * Math.cos(startAngle);
+              const startY = cy + r * Math.sin(startAngle);
+              const endX = cx + r * Math.cos(endAngle);
+              const endY = cy + r * Math.sin(endAngle);
+
+              const angleDiff = endAngle - startAngle;
+              const largeArc = Math.abs(angleDiff) > Math.PI ? 1 : 0;
+
+              pathD = `M${startX},${startY} A${r},${r} 0 ${largeArc},1 ${endX},${endY}`;
+              length = r * Math.abs(angleDiff);
+
+              minX = Math.min(minX, cx - r);
+              minY = Math.min(minY, cy - r);
+              maxX = Math.max(maxX, cx + r);
+              maxY = Math.max(maxY, cy + r);
+            } else if (entityType === 'LWPOLYLINE' || entityType === 'POLYLINE') {
+              const vertices = entity.vertices;
+              if (vertices && vertices.length > 0) {
+                pathD = `M${vertices[0].x},${vertices[0].y}`;
+                for (let i = 1; i < vertices.length; i++) {
+                  pathD += ` L${vertices[i].x},${vertices[i].y}`;
+                  length += Math.sqrt(
+                    Math.pow(vertices[i].x - vertices[i - 1].x, 2) +
+                    Math.pow(vertices[i].y - vertices[i - 1].y, 2)
+                  );
+                }
+                if (entity.shape) {
+                  pathD += ' Z';
+                  length += Math.sqrt(
+                    Math.pow(vertices[0].x - vertices[vertices.length - 1].x, 2) +
+                    Math.pow(vertices[0].y - vertices[vertices.length - 1].y, 2)
+                  );
+                }
+
+                vertices.forEach((v: { x: number; y: number }) => {
+                  minX = Math.min(minX, v.x);
+                  minY = Math.min(minY, v.y);
+                  maxX = Math.max(maxX, v.x);
+                  maxY = Math.max(maxY, v.y);
+                });
+              }
+            } else if (entityType === 'SPLINE') {
+              const controlPoints = entity.controlPoints;
+              if (controlPoints && controlPoints.length > 0) {
+                pathD = `M${controlPoints[0].x},${controlPoints[0].y}`;
+                for (let i = 1; i < controlPoints.length; i++) {
+                  pathD += ` L${controlPoints[i].x},${controlPoints[i].y}`;
+                  length += Math.sqrt(
+                    Math.pow(controlPoints[i].x - controlPoints[i - 1].x, 2) +
+                    Math.pow(controlPoints[i].y - controlPoints[i - 1].y, 2)
+                  );
+                }
+
+                controlPoints.forEach((p: { x: number; y: number }) => {
+                  minX = Math.min(minX, p.x);
+                  minY = Math.min(minY, p.y);
+                  maxX = Math.max(maxX, p.x);
+                  maxY = Math.max(maxY, p.y);
+                });
+              }
+            }
+
+            if (pathD) {
+              paths.push({
+                id: `dxf-path-${idx}`,
+                d: pathD,
+                length,
+                selected: true,
+              });
+            }
+          });
+
+          // Calculate dimensions
+          if (minX !== Infinity) {
+            dimensions = {
+              width: maxX - minX,
+              height: maxY - minY,
+            };
+
+            // Generate SVG preview
+            const padding = 10;
+            const svgWidth = dimensions.width + padding * 2;
+            const svgHeight = dimensions.height + padding * 2;
+
+            let svgPaths = paths.map(p => {
+              // Translate path to start from padding
+              return `<path d="${p.d}" fill="none" stroke="#3b82f6" stroke-width="1" transform="translate(${-minX + padding}, ${-minY + padding})"/>`;
+            }).join('\n');
+
+            preview = `data:image/svg+xml;base64,${Buffer.from(
+              `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${svgWidth} ${svgHeight}" width="${svgWidth}" height="${svgHeight}">${svgPaths}</svg>`
+            ).toString('base64')}`;
+          }
+        }
+      } catch (parseError) {
+        console.error('DXF parse error:', parseError);
+        return res.status(400).json({
+          success: false,
+          error: 'Failed to parse DXF file',
+          meta: buildMeta(res.locals.requestId),
+        });
+      }
+    } else if (ext === '.svg') {
+      // For SVG, we just return the content as base64
+      preview = `data:image/svg+xml;base64,${Buffer.from(fileContent).toString('base64')}`;
+
+      // Parse SVG to extract dimensions and paths (basic extraction)
+      const viewBoxMatch = fileContent.match(/viewBox="([^"]+)"/);
+      const widthMatch = fileContent.match(/width="([^"]+)"/);
+      const heightMatch = fileContent.match(/height="([^"]+)"/);
+
+      if (viewBoxMatch) {
+        const [, , , w, h] = viewBoxMatch[1].split(/\s+/).map(Number);
+        dimensions = { width: w || 100, height: h || 100 };
+      } else if (widthMatch && heightMatch) {
+        dimensions = {
+          width: parseFloat(widthMatch[1]) || 100,
+          height: parseFloat(heightMatch[1]) || 100,
+        };
+      }
+
+      // Extract paths from SVG
+      const pathMatches = fileContent.matchAll(/<path[^>]*d="([^"]+)"[^>]*\/?>/gi);
+      let idx = 0;
+      for (const match of pathMatches) {
+        paths.push({
+          id: `svg-path-${idx++}`,
+          d: match[1],
+          length: estimatePathLength(match[1]),
+          selected: true,
+        });
+      }
+    } else {
+      // For images, we return the base64 data URL
+      const mimeType = req.file.mimetype || 'image/png';
+      preview = `data:${mimeType};base64,${req.file.buffer.toString('base64')}`;
+      // For images, we can't extract paths - user would need to trace them
+    }
+
+    return res.json({
+      success: true,
+      preview,
+      paths,
+      dimensions,
+      meta: buildMeta(res.locals.requestId),
+    });
+  } catch (error) {
+    console.error('[POST /api/estimator/upload]', error);
+    return res.status(500).json({
+      success: false,
+      error: 'File processing failed',
+      meta: buildMeta(res.locals.requestId),
+    });
+  }
+});
+
+// Helper function to estimate path length from SVG path data
+function estimatePathLength(d: string): number {
+  const commands = d.match(/[MLHVCSQTAZ][^MLHVCSQTAZ]*/gi) || [];
+  let length = 0;
+  let lastX = 0, lastY = 0;
+  let startX = 0, startY = 0;
+
+  commands.forEach(cmd => {
+    const type = cmd[0].toUpperCase();
+    const coords = cmd.slice(1).trim().split(/[\s,]+/).filter(Boolean).map(Number);
+
+    switch (type) {
+      case 'M':
+        if (coords.length >= 2) {
+          lastX = coords[0];
+          lastY = coords[1];
+          startX = lastX;
+          startY = lastY;
+        }
+        break;
+      case 'L':
+        if (coords.length >= 2) {
+          length += Math.sqrt(Math.pow(coords[0] - lastX, 2) + Math.pow(coords[1] - lastY, 2));
+          lastX = coords[0];
+          lastY = coords[1];
+        }
+        break;
+      case 'H':
+        if (coords.length >= 1) {
+          length += Math.abs(coords[0] - lastX);
+          lastX = coords[0];
+        }
+        break;
+      case 'V':
+        if (coords.length >= 1) {
+          length += Math.abs(coords[0] - lastY);
+          lastY = coords[0];
+        }
+        break;
+      case 'C':
+        if (coords.length >= 6) {
+          // Cubic bezier - approximate with chord length * factor
+          length += Math.sqrt(Math.pow(coords[4] - lastX, 2) + Math.pow(coords[5] - lastY, 2)) * 1.3;
+          lastX = coords[4];
+          lastY = coords[5];
+        }
+        break;
+      case 'Q':
+        if (coords.length >= 4) {
+          // Quadratic bezier - approximate
+          length += Math.sqrt(Math.pow(coords[2] - lastX, 2) + Math.pow(coords[3] - lastY, 2)) * 1.2;
+          lastX = coords[2];
+          lastY = coords[3];
+        }
+        break;
+      case 'A':
+        if (coords.length >= 7) {
+          // Arc - approximate with distance * pi/2
+          const endX = coords[5];
+          const endY = coords[6];
+          const rx = coords[0];
+          const ry = coords[1];
+          const avgR = (rx + ry) / 2;
+          length += avgR * Math.PI; // Rough approximation
+          lastX = endX;
+          lastY = endY;
+        }
+        break;
+      case 'Z':
+        length += Math.sqrt(Math.pow(startX - lastX, 2) + Math.pow(startY - lastY, 2));
+        lastX = startX;
+        lastY = startY;
+        break;
+    }
+  });
+
+  return length;
+}
 
 export default router;

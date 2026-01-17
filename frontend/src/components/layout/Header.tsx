@@ -14,7 +14,7 @@ import {
   MessageCircle,
   AlertTriangle,
   UserPlus,
-  Sparkles
+  Calculator
 } from 'lucide-react';
 
 // Helper to format time ago
@@ -146,8 +146,8 @@ export function Header() {
             to="/ai"
             className={({ isActive }) => `nav-tab ${isActive ? 'active' : ''}`}
           >
-            <Sparkles size={16} />
-            AI
+            <Calculator size={16} />
+            Estimator
           </NavLink>
         </nav>
 

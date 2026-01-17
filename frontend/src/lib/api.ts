@@ -136,10 +136,23 @@ export const api = {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
     }),
-  sendAiMessage: (message: string) => 
+  sendAiMessage: (message: string) =>
     fetch(buildUrl('/api/ai-chat'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ message })
     }).then(res => res.json()),
+
+  // Estimator API
+  uploadEstimatorFile: (formData: FormData) =>
+    fetch(buildUrl('/api/estimator/upload'), {
+      method: 'POST',
+      body: formData,
+    }).then(res => res.json()) as Promise<{
+      success: boolean;
+      preview?: string;
+      paths?: Array<{ id: string; d: string; length: number; selected: boolean }>;
+      dimensions?: { width: number; height: number };
+      error?: string;
+    }>,
 };
