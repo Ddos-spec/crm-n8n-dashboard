@@ -18,7 +18,11 @@ import {
   Download,
   ZoomIn,
   ZoomOut,
-  Move
+  Move,
+  Fuel,
+  Clock,
+  Percent,
+  FileDown
 } from 'lucide-react';
 import { api } from '../lib/api';
 import './Estimator.css';
@@ -44,15 +48,18 @@ interface Material {
   name: string;
   thickness: number[];
   pricePerMeter: number;
-  cuttingSpeed: number; // mm/min
+  cuttingSpeed: number; // mm/min for 1mm thickness
+  gasType: 'oxygen' | 'nitrogen' | 'air';
 }
 
 interface NestingResult {
   sheetWidth: number;
   sheetHeight: number;
   utilization: number;
+  wastePercent: number;
   positions: { x: number; y: number; rotation: number }[];
-  quantity: number;
+  partsPerSheet: number;
+  totalSheets: number;
 }
 
 interface EstimationResult {
@@ -60,31 +67,54 @@ interface EstimationResult {
   cuttingTime: number;
   materialCost: number;
   laborCost: number;
+  gasCost: number;
   totalCost: number;
   pricePerPiece: number;
+  gasUsage: number; // m³
+  processedArea: number; // mm²
+  totalSheets: number;
+  wastePercent: number;
 }
 
 interface SettingsData {
-  laborCostPerHour: number;
+  laborCostPerMinute: number;
   machineType: string;
+  machinePower: number; // Watt
   defaultSheetWidth: number;
   defaultSheetHeight: number;
+  sheetPricePerM2: number;
+  gasPrice: number; // per m³
+  gasTankVolume: number; // m³
+  gasFlowRate: number; // L/min
   materials: Material[];
 }
 
+// Cutting speeds for Fiber Laser 1500W (mm/min) based on material and thickness
+const CUTTING_SPEEDS: Record<string, Record<number, number>> = {
+  ss304: { 0.5: 35000, 1: 25000, 1.5: 18000, 2: 12000, 3: 6000 },
+  ss316: { 0.5: 32000, 1: 22000, 1.5: 16000, 2: 10000, 3: 5000 },
+  ms: { 1: 28000, 2: 18000, 3: 12000, 4: 8000, 5: 5000, 6: 3500 },
+  aluminum: { 1: 30000, 2: 20000, 3: 12000, 4: 7000, 5: 4000 },
+  galvanized: { 0.5: 35000, 1: 25000, 1.5: 18000, 2: 12000 },
+};
+
 const DEFAULT_MATERIALS: Material[] = [
-  { id: 'ss304', name: 'Stainless Steel 304', thickness: [0.5, 1, 1.5, 2, 3], pricePerMeter: 15000, cuttingSpeed: 3000 },
-  { id: 'ss316', name: 'Stainless Steel 316', thickness: [0.5, 1, 1.5, 2, 3], pricePerMeter: 20000, cuttingSpeed: 2800 },
-  { id: 'ms', name: 'Mild Steel', thickness: [1, 2, 3, 4, 5, 6], pricePerMeter: 8000, cuttingSpeed: 4000 },
-  { id: 'aluminum', name: 'Aluminium', thickness: [1, 2, 3, 4, 5], pricePerMeter: 12000, cuttingSpeed: 5000 },
-  { id: 'galvanized', name: 'Galvanized Steel', thickness: [0.5, 1, 1.5, 2], pricePerMeter: 10000, cuttingSpeed: 3500 },
+  { id: 'ms', name: 'Besi (Mild Steel)', thickness: [1, 2, 3, 4, 5, 6], pricePerMeter: 8000, cuttingSpeed: 4000, gasType: 'oxygen' },
+  { id: 'ss304', name: 'Stainless Steel 304', thickness: [0.5, 1, 1.5, 2, 3], pricePerMeter: 15000, cuttingSpeed: 3000, gasType: 'nitrogen' },
+  { id: 'galvanized', name: 'Galvanis', thickness: [0.5, 1, 1.5, 2], pricePerMeter: 10000, cuttingSpeed: 3500, gasType: 'oxygen' },
+  { id: 'aluminum', name: 'Aluminium', thickness: [1, 2, 3, 4, 5], pricePerMeter: 12000, cuttingSpeed: 5000, gasType: 'nitrogen' },
 ];
 
 const DEFAULT_SETTINGS: SettingsData = {
-  laborCostPerHour: 50000,
+  laborCostPerMinute: 1500,
   machineType: 'Fiber Laser 1500W',
+  machinePower: 1500,
   defaultSheetWidth: 1220,
   defaultSheetHeight: 2440,
+  sheetPricePerM2: 150000, // Rp per m²
+  gasPrice: 50000, // Rp per m³
+  gasTankVolume: 6, // m³ per tank
+  gasFlowRate: 20, // L/min
   materials: DEFAULT_MATERIALS,
 };
 
@@ -97,12 +127,18 @@ const STEPS = [
   { id: 6, name: 'Hasil', subtitle: 'Estimasi biaya', icon: Calculator },
 ];
 
+const GAS_NAMES: Record<string, string> = {
+  oxygen: 'Oksigen (O₂)',
+  nitrogen: 'Nitrogen (N₂)',
+  air: 'Udara Kompresi',
+};
+
 export default function Estimator() {
   // State
   const [currentStep, setCurrentStep] = useState(1);
   const [files, setFiles] = useState<FileData[]>([]);
-  const [, setSelectedPaths] = useState<string[]>([]);
   const [scale, setScale] = useState({ value: 1, unit: 'mm' as 'mm' | 'cm' | 'inch' });
+  const [scaleBarLength, setScaleBarLength] = useState(100); // mm
   const [selectedMaterial, setSelectedMaterial] = useState<string>('');
   const [selectedThickness, setSelectedThickness] = useState<number>(0);
   const [quantity, setQuantity] = useState(1);
@@ -119,10 +155,11 @@ export default function Estimator() {
 
   // Load settings from localStorage
   useEffect(() => {
-    const saved = localStorage.getItem('estimator-settings');
+    const saved = localStorage.getItem('estimator-settings-v2');
     if (saved) {
       try {
-        setSettings(JSON.parse(saved));
+        const parsed = JSON.parse(saved);
+        setSettings({ ...DEFAULT_SETTINGS, ...parsed });
       } catch (e) {
         console.error('Failed to load settings', e);
       }
@@ -132,7 +169,7 @@ export default function Estimator() {
   // Save settings to localStorage
   const saveSettings = (newSettings: SettingsData) => {
     setSettings(newSettings);
-    localStorage.setItem('estimator-settings', JSON.stringify(newSettings));
+    localStorage.setItem('estimator-settings-v2', JSON.stringify(newSettings));
   };
 
   // File handling
@@ -162,85 +199,34 @@ export default function Estimator() {
 
     const type: FileData['type'] = ext === 'svg' ? 'svg' : ext === 'dxf' ? 'dxf' : 'image';
 
-    return new Promise((resolve) => {
-      const reader = new FileReader();
-      reader.onload = async (e) => {
-        const content = e.target?.result as string;
-        let preview = content;
-        let paths: PathData[] = [];
-        let dimensions = { width: 0, height: 0 };
+    setIsProcessing(true);
+    setError(null);
 
-        if (type === 'svg') {
-          // Parse SVG to extract paths
-          const parser = new DOMParser();
-          const doc = parser.parseFromString(content, 'image/svg+xml');
-          const svgEl = doc.querySelector('svg');
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      const result = await api.uploadEstimatorFile(formData);
 
-          if (svgEl) {
-            const viewBox = svgEl.getAttribute('viewBox')?.split(' ').map(Number);
-            const width = parseFloat(svgEl.getAttribute('width') || String(viewBox?.[2] || 100));
-            const height = parseFloat(svgEl.getAttribute('height') || String(viewBox?.[3] || 100));
-            dimensions = { width, height };
-
-            // Extract all paths
-            const pathElements = doc.querySelectorAll('path, line, rect, circle, ellipse, polygon, polyline');
-            pathElements.forEach((el, idx) => {
-              const d = el.getAttribute('d') || convertToPath(el);
-              if (d) {
-                paths.push({
-                  id: `path-${idx}`,
-                  d,
-                  length: estimatePathLength(d),
-                  selected: true,
-                });
-              }
-            });
-          }
-          preview = `data:image/svg+xml;base64,${btoa(unescape(encodeURIComponent(content)))}`;
-        } else if (type === 'image') {
-          preview = content;
-          // Get image dimensions
-          const img = new Image();
-          img.onload = () => {
-            dimensions = { width: img.width, height: img.height };
-          };
-          img.src = content;
-        } else if (type === 'dxf') {
-          // For DXF, we'll need backend processing
-          // For now, create a placeholder
-          preview = '';
-          setIsProcessing(true);
-          try {
-            const formData = new FormData();
-            formData.append('file', file);
-            const result = await api.uploadEstimatorFile(formData);
-            if (result.success) {
-              preview = result.preview || '';
-              paths = result.paths || [];
-              dimensions = result.dimensions || { width: 0, height: 0 };
-            }
-          } catch (err) {
-            console.error('DXF processing failed', err);
-            setError('Gagal memproses file DXF');
-          }
-          setIsProcessing(false);
-        }
-
-        resolve({
+      if (result.success) {
+        setIsProcessing(false);
+        return {
           file,
-          preview,
+          preview: result.preview || '',
           type,
-          dimensions,
-          paths,
-        });
-      };
-
-      if (type === 'image') {
-        reader.readAsDataURL(file);
+          dimensions: result.dimensions || { width: 100, height: 100 },
+          paths: result.paths || [],
+        };
       } else {
-        reader.readAsText(file);
+        setError(result.error || 'Gagal memproses file');
+        setIsProcessing(false);
+        return null;
       }
-    });
+    } catch (err) {
+      console.error('File processing failed', err);
+      setError('Gagal memproses file. Silakan coba lagi.');
+      setIsProcessing(false);
+      return null;
+    }
   };
 
   const handleDrop = useCallback(async (e: React.DragEvent) => {
@@ -259,6 +245,7 @@ export default function Estimator() {
         setFiles(prev => [...prev, processed]);
       }
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -281,168 +268,227 @@ export default function Estimator() {
     setFiles(prev => prev.filter((_, i) => i !== index));
   };
 
-  // Path length estimation (simple approximation)
-  const estimatePathLength = (d: string): number => {
-    // Simple estimation based on path commands
-    // For accurate calculation, we'd use svg-path-properties library
-    const commands = d.match(/[MLHVCSQTAZ][^MLHVCSQTAZ]*/gi) || [];
-    let length = 0;
-    let lastX = 0, lastY = 0;
-
-    commands.forEach(cmd => {
-      const type = cmd[0].toUpperCase();
-      const coords = cmd.slice(1).trim().split(/[\s,]+/).map(Number);
-
-      switch (type) {
-        case 'M':
-          lastX = coords[0];
-          lastY = coords[1];
-          break;
-        case 'L':
-          length += Math.sqrt(Math.pow(coords[0] - lastX, 2) + Math.pow(coords[1] - lastY, 2));
-          lastX = coords[0];
-          lastY = coords[1];
-          break;
-        case 'H':
-          length += Math.abs(coords[0] - lastX);
-          lastX = coords[0];
-          break;
-        case 'V':
-          length += Math.abs(coords[0] - lastY);
-          lastY = coords[0];
-          break;
-        case 'C':
-          // Bezier curve approximation
-          length += Math.sqrt(Math.pow(coords[4] - lastX, 2) + Math.pow(coords[5] - lastY, 2)) * 1.2;
-          lastX = coords[4];
-          lastY = coords[5];
-          break;
-        case 'Z':
-          break;
-      }
-    });
-
-    return length;
-  };
-
-  // Convert SVG elements to path data
-  const convertToPath = (el: Element): string => {
-    const tag = el.tagName.toLowerCase();
-
-    switch (tag) {
-      case 'rect': {
-        const x = parseFloat(el.getAttribute('x') || '0');
-        const y = parseFloat(el.getAttribute('y') || '0');
-        const w = parseFloat(el.getAttribute('width') || '0');
-        const h = parseFloat(el.getAttribute('height') || '0');
-        return `M${x},${y} L${x+w},${y} L${x+w},${y+h} L${x},${y+h} Z`;
-      }
-      case 'circle': {
-        const cx = parseFloat(el.getAttribute('cx') || '0');
-        const cy = parseFloat(el.getAttribute('cy') || '0');
-        const r = parseFloat(el.getAttribute('r') || '0');
-        return `M${cx-r},${cy} A${r},${r} 0 1,0 ${cx+r},${cy} A${r},${r} 0 1,0 ${cx-r},${cy}`;
-      }
-      case 'line': {
-        const x1 = el.getAttribute('x1') || '0';
-        const y1 = el.getAttribute('y1') || '0';
-        const x2 = el.getAttribute('x2') || '0';
-        const y2 = el.getAttribute('y2') || '0';
-        return `M${x1},${y1} L${x2},${y2}`;
-      }
-      case 'polygon':
-      case 'polyline': {
-        const points = el.getAttribute('points') || '';
-        const pairs = points.trim().split(/\s+/);
-        if (pairs.length === 0) return '';
-        let d = `M${pairs[0]}`;
-        for (let i = 1; i < pairs.length; i++) {
-          d += ` L${pairs[i]}`;
-        }
-        if (tag === 'polygon') d += ' Z';
-        return d;
-      }
-      default:
-        return '';
+  // Get cutting speed based on material and thickness
+  const getCuttingSpeed = (materialId: string, thickness: number): number => {
+    const speeds = CUTTING_SPEEDS[materialId];
+    if (speeds && speeds[thickness]) {
+      return speeds[thickness];
     }
+    // Fallback: estimate based on default speed with thickness factor
+    const material = settings.materials.find(m => m.id === materialId);
+    const baseSpeed = material?.cuttingSpeed || 3000;
+    return baseSpeed * (1 / Math.sqrt(thickness));
   };
 
-  // Calculate nesting (simple grid layout)
+  // Calculate nesting with improved algorithm
   const calculateNesting = () => {
     if (files.length === 0) return;
 
     const file = files[0];
     const dims = file.dimensions || { width: 100, height: 100 };
-    const scaledWidth = dims.width * scale.value * (scale.unit === 'cm' ? 10 : scale.unit === 'inch' ? 25.4 : 1);
-    const scaledHeight = dims.height * scale.value * (scale.unit === 'cm' ? 10 : scale.unit === 'inch' ? 25.4 : 1);
+    const unitMultiplier = scale.unit === 'cm' ? 10 : scale.unit === 'inch' ? 25.4 : 1;
+    const scaledWidth = dims.width * scale.value * unitMultiplier;
+    const scaledHeight = dims.height * scale.value * unitMultiplier;
 
     const sheetW = settings.defaultSheetWidth;
     const sheetH = settings.defaultSheetHeight;
     const gap = 5; // 5mm gap between parts
 
-    const cols = Math.floor(sheetW / (scaledWidth + gap));
-    const rows = Math.floor(sheetH / (scaledHeight + gap));
+    // Try both orientations
+    const cols1 = Math.floor(sheetW / (scaledWidth + gap));
+    const rows1 = Math.floor(sheetH / (scaledHeight + gap));
+    const perSheet1 = cols1 * rows1;
+
+    const cols2 = Math.floor(sheetW / (scaledHeight + gap));
+    const rows2 = Math.floor(sheetH / (scaledWidth + gap));
+    const perSheet2 = cols2 * rows2;
+
+    // Choose better orientation
+    const useRotated = perSheet2 > perSheet1;
+    const cols = useRotated ? cols2 : cols1;
+    const rows = useRotated ? rows2 : rows1;
+    const partsPerSheet = Math.max(perSheet1, perSheet2);
+    const partW = useRotated ? scaledHeight : scaledWidth;
+    const partH = useRotated ? scaledWidth : scaledHeight;
+
+    const totalSheets = Math.ceil(quantity / partsPerSheet);
 
     const positions = [];
-    for (let r = 0; r < Math.min(rows, Math.ceil(quantity / cols)); r++) {
-      for (let c = 0; c < Math.min(cols, quantity - r * cols); c++) {
+    const partsToPlace = Math.min(partsPerSheet, quantity);
+
+    for (let r = 0; r < rows && positions.length < partsToPlace; r++) {
+      for (let c = 0; c < cols && positions.length < partsToPlace; c++) {
         positions.push({
-          x: c * (scaledWidth + gap) + gap,
-          y: r * (scaledHeight + gap) + gap,
-          rotation: 0,
+          x: c * (partW + gap) + gap,
+          y: r * (partH + gap) + gap,
+          rotation: useRotated ? 90 : 0,
         });
       }
     }
 
     const usedArea = positions.length * scaledWidth * scaledHeight;
-    const utilization = (usedArea / (sheetW * sheetH)) * 100;
+    const sheetArea = sheetW * sheetH;
+    const utilization = (usedArea / sheetArea) * 100;
+    const wastePercent = 100 - utilization;
 
     setNestingResult({
       sheetWidth: sheetW,
       sheetHeight: sheetH,
       utilization,
+      wastePercent,
       positions,
-      quantity: positions.length,
+      partsPerSheet,
+      totalSheets,
     });
   };
 
-  // Calculate estimation
+  // Calculate estimation with gas and more details
   const calculateEstimation = () => {
     if (!selectedMaterial || !nestingResult) return;
 
     const material = settings.materials.find(m => m.id === selectedMaterial);
     if (!material) return;
 
-    // Calculate total cutting length
-    let totalLength = 0;
+    const unitMultiplier = scale.unit === 'cm' ? 10 : scale.unit === 'inch' ? 25.4 : 1;
+
+    // Calculate total cutting length from selected paths
+    let totalLengthPerPart = 0;
     files.forEach(f => {
       f.paths?.forEach(p => {
         if (p.selected) {
-          const scaleFactor = scale.value * (scale.unit === 'cm' ? 10 : scale.unit === 'inch' ? 25.4 : 1);
-          totalLength += p.length * scaleFactor;
+          totalLengthPerPart += p.length * scale.value * unitMultiplier;
         }
       });
     });
-    totalLength *= quantity; // Multiply by quantity
+    const totalCuttingLength = totalLengthPerPart * quantity;
 
-    // Calculate cutting time (in minutes)
-    const cuttingSpeed = material.cuttingSpeed * (1 - selectedThickness * 0.1); // Slower for thicker material
-    const cuttingTime = totalLength / cuttingSpeed;
+    // Calculate cutting time using accurate speeds
+    const cuttingSpeed = getCuttingSpeed(selectedMaterial, selectedThickness);
+    const cuttingTime = totalCuttingLength / cuttingSpeed;
 
-    // Calculate costs
-    const materialCost = (totalLength / 1000) * material.pricePerMeter; // Convert mm to m
-    const laborCost = (cuttingTime / 60) * settings.laborCostPerHour;
-    const totalCost = materialCost + laborCost;
+    // Calculate processed area
+    const dims = files[0]?.dimensions || { width: 100, height: 100 };
+    const partArea = dims.width * dims.height * scale.value * scale.value * unitMultiplier * unitMultiplier;
+    const processedArea = partArea * quantity;
+
+    // Calculate gas usage (L/min * time in min, converted to m³)
+    const gasUsage = (settings.gasFlowRate * cuttingTime) / 1000;
+    const gasCost = gasUsage * settings.gasPrice;
+
+    // Calculate material cost (sheet cost)
+    const sheetArea = (settings.defaultSheetWidth * settings.defaultSheetHeight) / 1000000; // m²
+    const sheetCost = sheetArea * settings.sheetPricePerM2;
+    const materialCost = sheetCost * nestingResult.totalSheets;
+
+    // Calculate labor cost
+    const laborCost = cuttingTime * settings.laborCostPerMinute;
+
+    // Total cost
+    const totalCost = materialCost + laborCost + gasCost;
     const pricePerPiece = totalCost / quantity;
 
     setEstimation({
-      totalCuttingLength: totalLength,
+      totalCuttingLength,
       cuttingTime,
       materialCost,
       laborCost,
+      gasCost,
       totalCost,
       pricePerPiece,
+      gasUsage,
+      processedArea,
+      totalSheets: nestingResult.totalSheets,
+      wastePercent: nestingResult.wastePercent,
     });
+  };
+
+  // Export nesting to DXF
+  const exportNestingToDXF = () => {
+    if (!nestingResult || !files[0]) return;
+
+    const dims = files[0].dimensions || { width: 100, height: 100 };
+    const unitMultiplier = scale.unit === 'cm' ? 10 : scale.unit === 'inch' ? 25.4 : 1;
+    const w = dims.width * scale.value * unitMultiplier;
+    const h = dims.height * scale.value * unitMultiplier;
+
+    let dxfContent = `0
+SECTION
+2
+ENTITIES
+`;
+
+    // Add sheet boundary
+    dxfContent += `0
+LWPOLYLINE
+8
+SHEET_BOUNDARY
+90
+4
+70
+1
+10
+0
+20
+0
+10
+${nestingResult.sheetWidth}
+20
+0
+10
+${nestingResult.sheetWidth}
+20
+${nestingResult.sheetHeight}
+10
+0
+20
+${nestingResult.sheetHeight}
+`;
+
+    // Add parts as rectangles
+    nestingResult.positions.forEach((pos, idx) => {
+      const isRotated = pos.rotation === 90;
+      const partW = isRotated ? h : w;
+      const partH = isRotated ? w : h;
+
+      dxfContent += `0
+LWPOLYLINE
+8
+PART_${idx + 1}
+90
+4
+70
+1
+10
+${pos.x}
+20
+${pos.y}
+10
+${pos.x + partW}
+20
+${pos.y}
+10
+${pos.x + partW}
+20
+${pos.y + partH}
+10
+${pos.x}
+20
+${pos.y + partH}
+`;
+    });
+
+    dxfContent += `0
+ENDSEC
+0
+EOF`;
+
+    const blob = new Blob([dxfContent], { type: 'application/dxf' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `nesting_${files[0].file.name.replace(/\.[^.]+$/, '')}.dxf`;
+    a.click();
+    URL.revokeObjectURL(url);
   };
 
   // Navigation
@@ -478,8 +524,8 @@ export default function Estimator() {
   const reset = () => {
     setCurrentStep(1);
     setFiles([]);
-    setSelectedPaths([]);
     setScale({ value: 1, unit: 'mm' });
+    setScaleBarLength(100);
     setSelectedMaterial('');
     setSelectedThickness(0);
     setQuantity(1);
@@ -487,6 +533,21 @@ export default function Estimator() {
     setEstimation(null);
     setError(null);
     setZoom(1);
+  };
+
+  // Get selected path count and total length
+  const getSelectionStats = () => {
+    let count = 0;
+    let totalLength = 0;
+    files.forEach(f => {
+      f.paths?.forEach(p => {
+        if (p.selected) {
+          count++;
+          totalLength += p.length;
+        }
+      });
+    });
+    return { count, totalLength };
   };
 
   // Render steps
@@ -533,7 +594,8 @@ export default function Estimator() {
                       <FileImage size={20} />
                       <span className="file-name">{f.file.name}</span>
                       <span className="file-type">{f.type.toUpperCase()}</span>
-                      <button className="file-remove" onClick={() => removeFile(idx)}>
+                      {f.paths && <span className="file-paths">{f.paths.length} paths</span>}
+                      <button className="file-remove" onClick={(e) => { e.stopPropagation(); removeFile(idx); }}>
                         <X size={16} />
                       </button>
                     </div>
@@ -551,11 +613,12 @@ export default function Estimator() {
           </div>
         );
 
-      case 2:
+      case 2: {
+        const stats = getSelectionStats();
         return (
           <div className="step-content">
             <h2 className="step-title">Preview & Seleksi</h2>
-            <p className="step-description">Tinjau dan pilih path yang akan di-cut</p>
+            <p className="step-description">Pilih path yang akan dipotong. Anda bisa skip seleksi untuk memotong semua.</p>
 
             <div className="preview-container">
               <div className="preview-toolbar">
@@ -571,29 +634,33 @@ export default function Estimator() {
                 </button>
               </div>
 
-              <div className="preview-canvas" style={{ transform: `scale(${zoom})` }}>
-                {files.map((f, idx) => (
-                  <div key={idx} className="preview-item">
-                    {f.type === 'svg' || f.type === 'image' ? (
-                      <img src={f.preview} alt={f.file.name} />
-                    ) : (
-                      <div className="dxf-preview">
-                        <p>Preview DXF</p>
-                        {f.dimensions && (
-                          <p>{f.dimensions.width} x {f.dimensions.height}</p>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                ))}
+              <div className="preview-canvas-wrapper">
+                <div className="preview-canvas" style={{ transform: `scale(${zoom})`, transformOrigin: 'top left' }}>
+                  {files.map((f, idx) => (
+                    <div key={idx} className="preview-item">
+                      {f.preview ? (
+                        <img src={f.preview} alt={f.file.name} />
+                      ) : (
+                        <div className="dxf-preview">
+                          <p>Memproses file...</p>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
               </div>
 
               {files[0]?.paths && files[0].paths.length > 0 && (
                 <div className="path-selection">
-                  <h4>Path yang terdeteksi: {files[0].paths.length}</h4>
+                  <div className="path-selection-header">
+                    <h4>Path yang terdeteksi: {files[0].paths.length}</h4>
+                    <span className="selection-stats">
+                      Terpilih: {stats.count} path ({stats.totalLength.toFixed(1)} unit)
+                    </span>
+                  </div>
                   <div className="path-list">
-                    {files[0].paths.map((path, idx) => (
-                      <label key={path.id} className="path-item">
+                    {files[0].paths.slice(0, 50).map((path, idx) => (
+                      <label key={path.id} className={`path-item ${path.selected ? 'selected' : ''}`}>
                         <input
                           type="checkbox"
                           checked={path.selected}
@@ -605,18 +672,21 @@ export default function Estimator() {
                             }
                           }}
                         />
-                        <span>Path {idx + 1}</span>
+                        <span className="path-name">Path {idx + 1}</span>
                         <span className="path-length">{path.length.toFixed(1)} unit</span>
                       </label>
                     ))}
+                    {files[0].paths.length > 50 && (
+                      <p className="path-overflow">...dan {files[0].paths.length - 50} path lainnya</p>
+                    )}
                   </div>
                   <div className="path-actions">
-                    <button onClick={() => {
+                    <button className="btn-sm" onClick={() => {
                       const newFiles = [...files];
                       newFiles[0].paths?.forEach(p => p.selected = true);
                       setFiles(newFiles);
                     }}>Pilih Semua</button>
-                    <button onClick={() => {
+                    <button className="btn-sm btn-outline" onClick={() => {
                       const newFiles = [...files];
                       newFiles[0].paths?.forEach(p => p.selected = false);
                       setFiles(newFiles);
@@ -627,6 +697,7 @@ export default function Estimator() {
             </div>
           </div>
         );
+      }
 
       case 3:
         return (
@@ -635,60 +706,94 @@ export default function Estimator() {
             <p className="step-description">Tentukan skala dan satuan ukuran desain Anda</p>
 
             <div className="scale-settings">
-              <div className="setting-group">
-                <label>Skala</label>
-                <div className="scale-input">
-                  <span>1 :</span>
+              <div className="scale-row">
+                <div className="setting-group">
+                  <label>Skala Gambar</label>
+                  <div className="scale-input">
+                    <span>1 :</span>
+                    <input
+                      type="number"
+                      min="0.01"
+                      step="0.01"
+                      value={scale.value}
+                      onChange={(e) => setScale(prev => ({ ...prev, value: parseFloat(e.target.value) || 1 }))}
+                    />
+                  </div>
+                </div>
+
+                <div className="setting-group">
+                  <label>Unit</label>
+                  <div className="unit-buttons">
+                    {(['mm', 'cm', 'inch'] as const).map(unit => (
+                      <button
+                        key={unit}
+                        className={`unit-btn ${scale.unit === unit ? 'active' : ''}`}
+                        onClick={() => setScale(prev => ({ ...prev, unit }))}
+                      >
+                        {unit}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="setting-group">
+                  <label>Jumlah Potong</label>
                   <input
                     type="number"
-                    min="0.01"
-                    step="0.01"
-                    value={scale.value}
-                    onChange={(e) => setScale(prev => ({ ...prev, value: parseFloat(e.target.value) || 1 }))}
+                    min="1"
+                    value={quantity}
+                    onChange={(e) => setQuantity(parseInt(e.target.value) || 1)}
+                    className="quantity-input"
                   />
                 </div>
               </div>
 
-              <div className="setting-group">
-                <label>Unit</label>
-                <div className="unit-buttons">
-                  {(['mm', 'cm', 'inch'] as const).map(unit => (
-                    <button
-                      key={unit}
-                      className={`unit-btn ${scale.unit === unit ? 'active' : ''}`}
-                      onClick={() => setScale(prev => ({ ...prev, unit }))}
-                    >
-                      {unit}
-                    </button>
-                  ))}
+              {/* Scale Bar Reference */}
+              <div className="scale-bar-section">
+                <h4>Skala Batang Referensi</h4>
+                <p className="hint">Gunakan sebagai referensi untuk memastikan skala sudah benar</p>
+                <div className="scale-bar-input">
+                  <label>Panjang Referensi:</label>
+                  <input
+                    type="number"
+                    min="1"
+                    value={scaleBarLength}
+                    onChange={(e) => setScaleBarLength(parseInt(e.target.value) || 100)}
+                  />
+                  <span>{scale.unit}</span>
                 </div>
-              </div>
-
-              <div className="setting-group">
-                <label>Jumlah Potongan</label>
-                <input
-                  type="number"
-                  min="1"
-                  value={quantity}
-                  onChange={(e) => setQuantity(parseInt(e.target.value) || 1)}
-                  className="quantity-input"
-                />
+                <div className="scale-bar-preview">
+                  <div
+                    className="scale-bar"
+                    style={{
+                      width: `${Math.min(300, scaleBarLength * (scale.unit === 'cm' ? 10 : scale.unit === 'inch' ? 25.4 : 1) * scale.value / 2)}px`
+                    }}
+                  >
+                    <span className="scale-bar-label">{scaleBarLength} {scale.unit}</span>
+                  </div>
+                </div>
               </div>
 
               {files[0]?.dimensions && (
                 <div className="dimension-preview">
-                  <h4>Dimensi Hasil</h4>
+                  <h4>Dimensi Hasil Akhir</h4>
                   <div className="dimension-values">
-                    <div>
+                    <div className="dim-item">
                       <span>Lebar:</span>
                       <strong>
                         {(files[0].dimensions.width * scale.value).toFixed(2)} {scale.unit}
                       </strong>
                     </div>
-                    <div>
+                    <div className="dim-item">
                       <span>Tinggi:</span>
                       <strong>
                         {(files[0].dimensions.height * scale.value).toFixed(2)} {scale.unit}
+                      </strong>
+                    </div>
+                    <div className="dim-item">
+                      <span>Area:</span>
+                      <strong>
+                        {(files[0].dimensions.width * files[0].dimensions.height * scale.value * scale.value).toFixed(2)} {scale.unit}²
                       </strong>
                     </div>
                   </div>
@@ -698,7 +803,8 @@ export default function Estimator() {
           </div>
         );
 
-      case 4:
+      case 4: {
+        const material = settings.materials.find(m => m.id === selectedMaterial);
         return (
           <div className="step-content">
             <h2 className="step-title">Pilih Material</h2>
@@ -706,21 +812,22 @@ export default function Estimator() {
 
             <div className="material-selection">
               <div className="material-grid">
-                {settings.materials.map(material => (
+                {settings.materials.map(mat => (
                   <div
-                    key={material.id}
-                    className={`material-card ${selectedMaterial === material.id ? 'selected' : ''}`}
+                    key={mat.id}
+                    className={`material-card ${selectedMaterial === mat.id ? 'selected' : ''}`}
                     onClick={() => {
-                      setSelectedMaterial(material.id);
+                      setSelectedMaterial(mat.id);
                       setSelectedThickness(0);
                     }}
                   >
                     <div className="material-icon">
                       <Layers size={24} />
                     </div>
-                    <h4>{material.name}</h4>
-                    <p className="material-price">Rp {material.pricePerMeter.toLocaleString()}/m</p>
-                    {selectedMaterial === material.id && (
+                    <h4>{mat.name}</h4>
+                    <p className="material-price">Rp {mat.pricePerMeter.toLocaleString()}/m cutting</p>
+                    <p className="material-gas">Gas: {GAS_NAMES[mat.gasType]}</p>
+                    {selectedMaterial === mat.id && (
                       <div className="material-check">
                         <Check size={16} />
                       </div>
@@ -745,11 +852,25 @@ export default function Estimator() {
                         </button>
                       ))}
                   </div>
+                  {selectedThickness > 0 && (
+                    <div className="cutting-speed-info">
+                      <span>Kecepatan potong: </span>
+                      <strong>{getCuttingSpeed(selectedMaterial, selectedThickness).toLocaleString()} mm/min</strong>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {material && selectedThickness > 0 && (
+                <div className="material-summary">
+                  <p><strong>{material.name}</strong> - {selectedThickness}mm</p>
+                  <p>Gas: {GAS_NAMES[material.gasType]}</p>
                 </div>
               )}
             </div>
           </div>
         );
+      }
 
       case 5:
         return (
@@ -759,20 +880,36 @@ export default function Estimator() {
 
             {nestingResult && (
               <div className="nesting-preview">
-                <div className="nesting-info">
-                  <div className="info-item">
-                    <span>Ukuran Sheet</span>
-                    <strong>{nestingResult.sheetWidth} x {nestingResult.sheetHeight} mm</strong>
+                <div className="nesting-info-grid">
+                  <div className="info-card">
+                    <Package size={20} />
+                    <div>
+                      <span>Ukuran Sheet</span>
+                      <strong>{nestingResult.sheetWidth} x {nestingResult.sheetHeight} mm</strong>
+                    </div>
                   </div>
-                  <div className="info-item">
-                    <span>Jumlah Part</span>
-                    <strong>{nestingResult.quantity} pcs</strong>
+                  <div className="info-card">
+                    <LayoutGrid size={20} />
+                    <div>
+                      <span>Part per Sheet</span>
+                      <strong>{nestingResult.partsPerSheet} pcs</strong>
+                    </div>
                   </div>
-                  <div className="info-item">
-                    <span>Utilisasi Material</span>
-                    <strong className={nestingResult.utilization > 70 ? 'good' : 'warning'}>
-                      {nestingResult.utilization.toFixed(1)}%
-                    </strong>
+                  <div className="info-card">
+                    <Layers size={20} />
+                    <div>
+                      <span>Total Sheet</span>
+                      <strong>{nestingResult.totalSheets} lembar</strong>
+                    </div>
+                  </div>
+                  <div className="info-card">
+                    <Percent size={20} />
+                    <div>
+                      <span>Utilisasi / Waste</span>
+                      <strong className={nestingResult.utilization > 70 ? 'text-green' : 'text-orange'}>
+                        {nestingResult.utilization.toFixed(1)}% / {nestingResult.wastePercent.toFixed(1)}%
+                      </strong>
+                    </div>
                   </div>
                 </div>
 
@@ -780,6 +917,7 @@ export default function Estimator() {
                   <svg
                     viewBox={`0 0 ${nestingResult.sheetWidth} ${nestingResult.sheetHeight}`}
                     className="nesting-svg"
+                    preserveAspectRatio="xMidYMid meet"
                   >
                     {/* Sheet background */}
                     <rect
@@ -787,8 +925,8 @@ export default function Estimator() {
                       y="0"
                       width={nestingResult.sheetWidth}
                       height={nestingResult.sheetHeight}
-                      fill="#f8fafc"
-                      stroke="#e2e8f0"
+                      fill="var(--bg-secondary)"
+                      stroke="var(--border-color)"
                       strokeWidth="2"
                     />
 
@@ -800,8 +938,9 @@ export default function Estimator() {
                         y1="0"
                         x2={(i + 1) * 100}
                         y2={nestingResult.sheetHeight}
-                        stroke="#e2e8f0"
+                        stroke="var(--border-color)"
                         strokeDasharray="4"
+                        opacity="0.5"
                       />
                     ))}
                     {Array.from({ length: Math.floor(nestingResult.sheetHeight / 100) }).map((_, i) => (
@@ -811,34 +950,42 @@ export default function Estimator() {
                         y1={(i + 1) * 100}
                         x2={nestingResult.sheetWidth}
                         y2={(i + 1) * 100}
-                        stroke="#e2e8f0"
+                        stroke="var(--border-color)"
                         strokeDasharray="4"
+                        opacity="0.5"
                       />
                     ))}
 
                     {/* Parts */}
                     {nestingResult.positions.map((pos, idx) => {
                       const dims = files[0]?.dimensions || { width: 100, height: 100 };
-                      const scaleFactor = scale.value * (scale.unit === 'cm' ? 10 : scale.unit === 'inch' ? 25.4 : 1);
-                      const w = dims.width * scaleFactor;
-                      const h = dims.height * scaleFactor;
+                      const unitMultiplier = scale.unit === 'cm' ? 10 : scale.unit === 'inch' ? 25.4 : 1;
+                      const baseW = dims.width * scale.value * unitMultiplier;
+                      const baseH = dims.height * scale.value * unitMultiplier;
+                      const isRotated = pos.rotation === 90;
+                      const w = isRotated ? baseH : baseW;
+                      const h = isRotated ? baseW : baseH;
+
                       return (
-                        <g key={idx} transform={`translate(${pos.x}, ${pos.y}) rotate(${pos.rotation})`}>
+                        <g key={idx}>
                           <rect
+                            x={pos.x}
+                            y={pos.y}
                             width={w}
                             height={h}
                             fill="#3b82f6"
                             fillOpacity="0.2"
                             stroke="#3b82f6"
-                            strokeWidth="1"
+                            strokeWidth="2"
                           />
                           <text
-                            x={w / 2}
-                            y={h / 2}
+                            x={pos.x + w / 2}
+                            y={pos.y + h / 2}
                             textAnchor="middle"
                             dominantBaseline="middle"
-                            fontSize="12"
+                            fontSize={Math.min(w, h) / 3}
                             fill="#3b82f6"
+                            fontWeight="bold"
                           >
                             {idx + 1}
                           </text>
@@ -848,12 +995,19 @@ export default function Estimator() {
                   </svg>
                 </div>
 
-                {quantity > nestingResult.quantity && (
-                  <div className="nesting-warning">
+                <div className="nesting-actions">
+                  <button className="btn-secondary" onClick={exportNestingToDXF}>
+                    <FileDown size={18} />
+                    Export DXF
+                  </button>
+                </div>
+
+                {quantity > nestingResult.partsPerSheet && (
+                  <div className="nesting-info-note">
                     <AlertCircle size={16} />
                     <span>
-                      Hanya {nestingResult.quantity} dari {quantity} part yang muat dalam 1 sheet.
-                      Dibutuhkan {Math.ceil(quantity / nestingResult.quantity)} sheet.
+                      {nestingResult.partsPerSheet} part muat per sheet.
+                      Total {nestingResult.totalSheets} sheet untuk {quantity} part.
                     </span>
                   </div>
                 )}
@@ -862,11 +1016,12 @@ export default function Estimator() {
           </div>
         );
 
-      case 6:
+      case 6: {
+        const material = settings.materials.find(m => m.id === selectedMaterial);
         return (
           <div className="step-content">
             <h2 className="step-title">Hasil Estimasi</h2>
-            <p className="step-description">Ringkasan biaya pemotongan laser</p>
+            <p className="step-description">Ringkasan lengkap biaya pemotongan laser</p>
 
             {estimation && (
               <div className="estimation-result">
@@ -882,23 +1037,73 @@ export default function Estimator() {
                 </div>
 
                 <div className="result-details">
-                  <h4>Detail Perhitungan</h4>
+                  <h4>Detail Pemotongan</h4>
                   <div className="detail-grid">
                     <div className="detail-item">
-                      <span>Total Panjang Cutting</span>
-                      <strong>{(estimation.totalCuttingLength / 1000).toFixed(2)} m</strong>
+                      <div className="detail-icon"><Ruler size={18} /></div>
+                      <div>
+                        <span>Total Panjang Cutting</span>
+                        <strong>{(estimation.totalCuttingLength / 1000).toFixed(2)} m</strong>
+                      </div>
                     </div>
                     <div className="detail-item">
-                      <span>Estimasi Waktu Cutting</span>
-                      <strong>{estimation.cuttingTime.toFixed(1)} menit</strong>
+                      <div className="detail-icon"><Clock size={18} /></div>
+                      <div>
+                        <span>Estimasi Waktu</span>
+                        <strong>{estimation.cuttingTime.toFixed(1)} menit</strong>
+                      </div>
                     </div>
                     <div className="detail-item">
-                      <span>Biaya Material</span>
+                      <div className="detail-icon"><Package size={18} /></div>
+                      <div>
+                        <span>Luas Area Proses</span>
+                        <strong>{(estimation.processedArea / 1000000).toFixed(4)} m²</strong>
+                      </div>
+                    </div>
+                    <div className="detail-item">
+                      <div className="detail-icon"><Layers size={18} /></div>
+                      <div>
+                        <span>Kebutuhan Plat</span>
+                        <strong>{estimation.totalSheets} lembar</strong>
+                      </div>
+                    </div>
+                    <div className="detail-item">
+                      <div className="detail-icon"><Percent size={18} /></div>
+                      <div>
+                        <span>Material Terbuang</span>
+                        <strong className={estimation.wastePercent < 30 ? 'text-green' : 'text-orange'}>
+                          {estimation.wastePercent.toFixed(1)}%
+                        </strong>
+                      </div>
+                    </div>
+                    <div className="detail-item">
+                      <div className="detail-icon"><Fuel size={18} /></div>
+                      <div>
+                        <span>Estimasi Gas ({material ? GAS_NAMES[material.gasType] : 'N/A'})</span>
+                        <strong>{estimation.gasUsage.toFixed(2)} m³ ({(estimation.gasUsage / settings.gasTankVolume).toFixed(1)} tabung)</strong>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="result-costs">
+                  <h4>Rincian Biaya</h4>
+                  <div className="cost-breakdown">
+                    <div className="cost-row">
+                      <span>Biaya Material ({estimation.totalSheets} sheet)</span>
                       <strong>Rp {estimation.materialCost.toLocaleString('id-ID', { maximumFractionDigits: 0 })}</strong>
                     </div>
-                    <div className="detail-item">
-                      <span>Biaya Jasa</span>
+                    <div className="cost-row">
+                      <span>Biaya Jasa ({estimation.cuttingTime.toFixed(1)} menit × Rp {settings.laborCostPerMinute.toLocaleString()})</span>
                       <strong>Rp {estimation.laborCost.toLocaleString('id-ID', { maximumFractionDigits: 0 })}</strong>
+                    </div>
+                    <div className="cost-row">
+                      <span>Biaya Gas ({estimation.gasUsage.toFixed(2)} m³ × Rp {settings.gasPrice.toLocaleString()})</span>
+                      <strong>Rp {estimation.gasCost.toLocaleString('id-ID', { maximumFractionDigits: 0 })}</strong>
+                    </div>
+                    <div className="cost-row total">
+                      <span>Total</span>
+                      <strong>Rp {estimation.totalCost.toLocaleString('id-ID', { maximumFractionDigits: 0 })}</strong>
                     </div>
                   </div>
                 </div>
@@ -909,15 +1114,23 @@ export default function Estimator() {
                     <tbody>
                       <tr>
                         <td>Material</td>
-                        <td>{settings.materials.find(m => m.id === selectedMaterial)?.name}</td>
+                        <td>{material?.name}</td>
                       </tr>
                       <tr>
                         <td>Ketebalan</td>
                         <td>{selectedThickness} mm</td>
                       </tr>
                       <tr>
+                        <td>Gas Potong</td>
+                        <td>{material ? GAS_NAMES[material.gasType] : '-'}</td>
+                      </tr>
+                      <tr>
                         <td>Jumlah</td>
                         <td>{quantity} pcs</td>
+                      </tr>
+                      <tr>
+                        <td>Sheet Size</td>
+                        <td>{settings.defaultSheetWidth} x {settings.defaultSheetHeight} mm</td>
                       </tr>
                       <tr>
                         <td>File</td>
@@ -941,6 +1154,7 @@ export default function Estimator() {
             )}
           </div>
         );
+      }
 
       default:
         return null;
@@ -1036,79 +1250,130 @@ export default function Estimator() {
       {/* Settings Modal */}
       {showSettings && (
         <div className="modal-overlay" onClick={() => setShowSettings(false)}>
-          <div className="modal-content" onClick={e => e.stopPropagation()}>
+          <div className="modal-content settings-modal" onClick={e => e.stopPropagation()}>
             <div className="modal-header">
-              <h2>Pengaturan</h2>
+              <h2>Pengaturan Estimator</h2>
               <button className="modal-close" onClick={() => setShowSettings(false)}>
                 <X size={20} />
               </button>
             </div>
             <div className="modal-body">
-              <div className="setting-section">
-                <h3>Mesin</h3>
-                <div className="setting-row">
-                  <label>Tipe Mesin</label>
-                  <input
-                    type="text"
-                    value={settings.machineType}
-                    onChange={(e) => saveSettings({ ...settings, machineType: e.target.value })}
-                  />
-                </div>
-              </div>
-
-              <div className="setting-section">
-                <h3>Biaya</h3>
-                <div className="setting-row">
-                  <label>Biaya Jasa per Jam (Rp)</label>
-                  <input
-                    type="number"
-                    value={settings.laborCostPerHour}
-                    onChange={(e) => saveSettings({ ...settings, laborCostPerHour: parseInt(e.target.value) || 0 })}
-                  />
-                </div>
-              </div>
-
-              <div className="setting-section">
-                <h3>Default Sheet</h3>
-                <div className="setting-row">
-                  <label>Lebar (mm)</label>
-                  <input
-                    type="number"
-                    value={settings.defaultSheetWidth}
-                    onChange={(e) => saveSettings({ ...settings, defaultSheetWidth: parseInt(e.target.value) || 1220 })}
-                  />
-                </div>
-                <div className="setting-row">
-                  <label>Tinggi (mm)</label>
-                  <input
-                    type="number"
-                    value={settings.defaultSheetHeight}
-                    onChange={(e) => saveSettings({ ...settings, defaultSheetHeight: parseInt(e.target.value) || 2440 })}
-                  />
-                </div>
-              </div>
-
-              <div className="setting-section">
-                <h3>Material</h3>
-                <p className="setting-hint">Klik material untuk edit harga per meter</p>
-                {settings.materials.map((mat, idx) => (
-                  <div key={mat.id} className="material-setting">
-                    <span>{mat.name}</span>
-                    <div className="material-price-input">
-                      <span>Rp</span>
-                      <input
-                        type="number"
-                        value={mat.pricePerMeter}
-                        onChange={(e) => {
-                          const newMaterials = [...settings.materials];
-                          newMaterials[idx].pricePerMeter = parseInt(e.target.value) || 0;
-                          saveSettings({ ...settings, materials: newMaterials });
-                        }}
-                      />
-                      <span>/m</span>
-                    </div>
+              <div className="settings-grid">
+                <div className="setting-section">
+                  <h3>Mesin</h3>
+                  <div className="setting-row">
+                    <label>Tipe Mesin</label>
+                    <input
+                      type="text"
+                      value={settings.machineType}
+                      onChange={(e) => saveSettings({ ...settings, machineType: e.target.value })}
+                    />
                   </div>
-                ))}
+                  <div className="setting-row">
+                    <label>Daya (Watt)</label>
+                    <input
+                      type="number"
+                      value={settings.machinePower}
+                      onChange={(e) => saveSettings({ ...settings, machinePower: parseInt(e.target.value) || 1500 })}
+                    />
+                  </div>
+                </div>
+
+                <div className="setting-section">
+                  <h3>Biaya Operasional</h3>
+                  <div className="setting-row">
+                    <label>Biaya Jasa per Menit (Rp)</label>
+                    <input
+                      type="number"
+                      value={settings.laborCostPerMinute}
+                      onChange={(e) => saveSettings({ ...settings, laborCostPerMinute: parseInt(e.target.value) || 0 })}
+                    />
+                  </div>
+                  <div className="setting-row">
+                    <label>Harga Sheet per m² (Rp)</label>
+                    <input
+                      type="number"
+                      value={settings.sheetPricePerM2}
+                      onChange={(e) => saveSettings({ ...settings, sheetPricePerM2: parseInt(e.target.value) || 0 })}
+                    />
+                  </div>
+                </div>
+
+                <div className="setting-section">
+                  <h3>Gas</h3>
+                  <div className="setting-row">
+                    <label>Harga Gas per m³ (Rp)</label>
+                    <input
+                      type="number"
+                      value={settings.gasPrice}
+                      onChange={(e) => saveSettings({ ...settings, gasPrice: parseInt(e.target.value) || 0 })}
+                    />
+                  </div>
+                  <div className="setting-row">
+                    <label>Volume Tabung (m³)</label>
+                    <input
+                      type="number"
+                      step="0.1"
+                      value={settings.gasTankVolume}
+                      onChange={(e) => saveSettings({ ...settings, gasTankVolume: parseFloat(e.target.value) || 6 })}
+                    />
+                  </div>
+                  <div className="setting-row">
+                    <label>Flow Rate (L/min)</label>
+                    <input
+                      type="number"
+                      value={settings.gasFlowRate}
+                      onChange={(e) => saveSettings({ ...settings, gasFlowRate: parseInt(e.target.value) || 20 })}
+                    />
+                  </div>
+                </div>
+
+                <div className="setting-section">
+                  <h3>Default Sheet</h3>
+                  <div className="setting-row">
+                    <label>Lebar (mm)</label>
+                    <input
+                      type="number"
+                      value={settings.defaultSheetWidth}
+                      onChange={(e) => saveSettings({ ...settings, defaultSheetWidth: parseInt(e.target.value) || 1220 })}
+                    />
+                  </div>
+                  <div className="setting-row">
+                    <label>Tinggi (mm)</label>
+                    <input
+                      type="number"
+                      value={settings.defaultSheetHeight}
+                      onChange={(e) => saveSettings({ ...settings, defaultSheetHeight: parseInt(e.target.value) || 2440 })}
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div className="setting-section full-width">
+                <h3>Material & Harga Cutting</h3>
+                <p className="setting-hint">Harga per meter panjang pemotongan</p>
+                <div className="material-settings-list">
+                  {settings.materials.map((mat, idx) => (
+                    <div key={mat.id} className="material-setting">
+                      <span className="mat-name">{mat.name}</span>
+                      <div className="mat-inputs">
+                        <div className="mat-input-group">
+                          <span>Rp</span>
+                          <input
+                            type="number"
+                            value={mat.pricePerMeter}
+                            onChange={(e) => {
+                              const newMaterials = [...settings.materials];
+                              newMaterials[idx].pricePerMeter = parseInt(e.target.value) || 0;
+                              saveSettings({ ...settings, materials: newMaterials });
+                            }}
+                          />
+                          <span>/m</span>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
               </div>
             </div>
           </div>
