@@ -16,7 +16,6 @@ import {
   Check,
   AlertCircle,
   Download,
-  Trash2,
   ZoomIn,
   ZoomOut,
   Move
@@ -102,7 +101,7 @@ export default function Estimator() {
   // State
   const [currentStep, setCurrentStep] = useState(1);
   const [files, setFiles] = useState<FileData[]>([]);
-  const [selectedPaths, setSelectedPaths] = useState<string[]>([]);
+  const [, setSelectedPaths] = useState<string[]>([]);
   const [scale, setScale] = useState({ value: 1, unit: 'mm' as 'mm' | 'cm' | 'inch' });
   const [selectedMaterial, setSelectedMaterial] = useState<string>('');
   const [selectedThickness, setSelectedThickness] = useState<number>(0);
@@ -383,7 +382,6 @@ export default function Estimator() {
 
     const cols = Math.floor(sheetW / (scaledWidth + gap));
     const rows = Math.floor(sheetH / (scaledHeight + gap));
-    const perSheet = cols * rows;
 
     const positions = [];
     for (let r = 0; r < Math.min(rows, Math.ceil(quantity / cols)); r++) {
@@ -976,7 +974,6 @@ export default function Estimator() {
       {/* Stepper */}
       <div className="stepper">
         {STEPS.map((step, idx) => {
-          const Icon = step.icon;
           const isActive = currentStep === step.id;
           const isCompleted = currentStep > step.id;
 

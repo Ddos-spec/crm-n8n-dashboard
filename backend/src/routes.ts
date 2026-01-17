@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import multer from 'multer';
 import DxfParser from 'dxf-parser';
+import potrace from 'potrace';
 import { pool } from './lib/db';
 import { config } from './config/env';
 
@@ -928,10 +929,51 @@ router.post('/api/estimator/upload', upload.single('file'), async (req, res) => 
         });
       }
     } else {
-      // For images, we return the base64 data URL
+      // For images, use potrace to trace and convert to SVG paths
       const mimeType = req.file.mimetype || 'image/png';
-      preview = `data:${mimeType};base64,${req.file.buffer.toString('base64')}`;
-      // For images, we can't extract paths - user would need to trace them
+
+      try {
+        // Use potrace to trace the image
+        const tracedSvg = await new Promise<string>((resolve, reject) => {
+          potrace.trace(req.file!.buffer, {
+            threshold: 128,
+            turdSize: 2,
+            optTolerance: 0.2,
+          }, (err: Error | null, svg: string) => {
+            if (err) reject(err);
+            else resolve(svg);
+          });
+        });
+
+        // Extract paths from the traced SVG
+        const pathMatches = tracedSvg.matchAll(/<path[^>]*d="([^"]+)"[^>]*\/?>/gi);
+        let idx = 0;
+        for (const match of pathMatches) {
+          paths.push({
+            id: `img-path-${idx++}`,
+            d: match[1],
+            length: estimatePathLength(match[1]),
+            selected: true,
+          });
+        }
+
+        // Extract dimensions from traced SVG
+        const widthMatch = tracedSvg.match(/width="([^"]+)"/);
+        const heightMatch = tracedSvg.match(/height="([^"]+)"/);
+        if (widthMatch && heightMatch) {
+          dimensions = {
+            width: parseFloat(widthMatch[1]) || 100,
+            height: parseFloat(heightMatch[1]) || 100,
+          };
+        }
+
+        // Use traced SVG as preview
+        preview = `data:image/svg+xml;base64,${Buffer.from(tracedSvg).toString('base64')}`;
+      } catch (traceError) {
+        console.error('Image tracing failed:', traceError);
+        // Fallback to original image if tracing fails
+        preview = `data:${mimeType};base64,${req.file.buffer.toString('base64')}`;
+      }
     }
 
     return res.json({
