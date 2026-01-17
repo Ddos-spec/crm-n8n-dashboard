@@ -6,7 +6,7 @@ import {
   MessageSquare,
   Target,
   CheckSquare,
-  Sparkles
+  Calculator
 } from 'lucide-react';
 
 export function Layout() {
@@ -55,8 +55,8 @@ export function Layout() {
             to="/ai"
             className={({ isActive }) => `mobile-nav-item ${isActive ? 'active' : ''}`}
           >
-            <Sparkles size={20} className="mobile-nav-icon" />
-            <span>AI</span>
+            <Calculator size={20} className="mobile-nav-icon" />
+            <span>Estimator</span>
           </NavLink>
         </div>
       </nav>
