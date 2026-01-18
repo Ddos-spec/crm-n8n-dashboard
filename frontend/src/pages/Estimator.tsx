@@ -769,11 +769,18 @@ EOF`;
 
     // Get the first selected area and generate cropped preview
     const selectedArea = selections.find(s => s.selected) || selections[0];
+    console.log('Selected area:', selectedArea);
+
     if (selectedArea) {
       const cropped = await generateCroppedPreview(selectedArea);
+      console.log('Cropped result:', cropped ? { width: cropped.width, height: cropped.height, hasData: !!cropped.dataUrl } : null);
+
       if (cropped) {
         setCroppedPreview(cropped.dataUrl);
         setCroppedDimensions({ width: cropped.width, height: cropped.height });
+      } else {
+        console.warn('Cropping failed, using full image');
+        // Fallback: don't set cropped preview, will use full image
       }
     }
 
@@ -1339,6 +1346,11 @@ EOF`;
                     ))}
 
                     {/* Parts */}
+                    {nestingResult.positions.length === 0 && (
+                      <text x="50%" y="50%" textAnchor="middle" fill="#999" fontSize="20">
+                        Tidak ada part yang bisa ditampilkan
+                      </text>
+                    )}
                     {nestingResult.positions.map((pos, idx) => {
                       // Use cropped dimensions if available
                       const dims = croppedDimensions || files[0]?.dimensions || { width: 100, height: 100 };
@@ -1350,6 +1362,11 @@ EOF`;
                       const h = isRotated ? baseW : baseH;
                       // Use cropped preview if available, otherwise fall back to full preview
                       const previewUrl = croppedPreview || files[0]?.preview;
+
+                      // Debug log first position only
+                      if (idx === 0) {
+                        console.log('Nesting render:', { dims, baseW, baseH, w, h, previewUrl: previewUrl ? 'exists' : 'missing', croppedDimensions, positions: nestingResult.positions.length });
+                      }
 
                       return (
                         <g key={idx}>
