@@ -1251,25 +1251,37 @@ EOF`;
                       const isRotated = pos.rotation === 90;
                       const w = isRotated ? baseH : baseW;
                       const h = isRotated ? baseW : baseH;
+                      const previewUrl = files[0]?.preview;
 
                       return (
                         <g key={idx}>
+                          {/* Part background */}
                           <rect
                             x={pos.x}
                             y={pos.y}
                             width={w}
                             height={h}
-                            fill="#3b82f6"
-                            fillOpacity="0.2"
+                            fill="white"
                             stroke="#3b82f6"
                             strokeWidth="2"
                           />
+                          {/* Part design image */}
+                          {previewUrl && (
+                            <image
+                              x={pos.x}
+                              y={pos.y}
+                              width={w}
+                              height={h}
+                              href={previewUrl}
+                              preserveAspectRatio="xMidYMid meet"
+                              transform={isRotated ? `rotate(90, ${pos.x + w / 2}, ${pos.y + h / 2})` : undefined}
+                            />
+                          )}
+                          {/* Part number label */}
                           <text
-                            x={pos.x + w / 2}
-                            y={pos.y + h / 2}
-                            textAnchor="middle"
-                            dominantBaseline="middle"
-                            fontSize={Math.min(w, h) / 3}
+                            x={pos.x + 15}
+                            y={pos.y + 20}
+                            fontSize="14"
                             fill="#3b82f6"
                             fontWeight="bold"
                           >
