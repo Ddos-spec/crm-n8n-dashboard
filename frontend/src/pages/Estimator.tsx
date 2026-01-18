@@ -316,6 +316,30 @@ export default function Estimator() {
     const sheetH = settings.defaultSheetHeight;
     const gap = 5; // 5mm gap between parts
 
+    // Check if part is too large for the sheet
+    const minPartDim = Math.min(scaledWidth, scaledHeight);
+    const maxPartDim = Math.max(scaledWidth, scaledHeight);
+    const minSheetDim = Math.min(sheetW, sheetH);
+    const maxSheetDim = Math.max(sheetW, sheetH);
+
+    if (minPartDim + gap > minSheetDim || maxPartDim + gap > maxSheetDim) {
+      // Part doesn't fit on sheet in any orientation
+      setError(`Part terlalu besar (${scaledWidth.toFixed(0)}x${scaledHeight.toFixed(0)} mm) untuk sheet (${sheetW}x${sheetH} mm). Kurangi skala atau gunakan sheet yang lebih besar.`);
+      setNestingResult({
+        sheetWidth: sheetW,
+        sheetHeight: sheetH,
+        utilization: 0,
+        wastePercent: 100,
+        positions: [],
+        partsPerSheet: 0,
+        totalSheets: 0,
+      });
+      return;
+    }
+
+    // Clear any previous error
+    setError(null);
+
     // Try both orientations
     const cols1 = Math.floor(sheetW / (scaledWidth + gap));
     const rows1 = Math.floor(sheetH / (scaledHeight + gap));
@@ -333,7 +357,9 @@ export default function Estimator() {
     const partW = useRotated ? scaledHeight : scaledWidth;
     const partH = useRotated ? scaledWidth : scaledHeight;
 
-    const totalSheets = Math.ceil(quantity / partsPerSheet);
+    // Safety check - ensure partsPerSheet is at least 1 to prevent division by zero
+    const safePartsPerSheet = Math.max(1, partsPerSheet);
+    const totalSheets = Math.ceil(quantity / safePartsPerSheet);
 
     const positions = [];
     const partsToPlace = Math.min(partsPerSheet, quantity);
@@ -367,6 +393,12 @@ export default function Estimator() {
   // Calculate estimation with gas and more details
   const calculateEstimation = () => {
     if (!selectedMaterial || !nestingResult) return;
+
+    // Don't calculate if parts don't fit on sheet
+    if (nestingResult.partsPerSheet === 0 || nestingResult.totalSheets === 0) {
+      setEstimation(null);
+      return;
+    }
 
     const material = settings.materials.find(m => m.id === selectedMaterial);
     if (!material) return;
@@ -1256,7 +1288,14 @@ EOF`;
                   </button>
                 </div>
 
-                {quantity > nestingResult.partsPerSheet && (
+                {nestingResult.partsPerSheet === 0 ? (
+                  <div className="nesting-info-note error">
+                    <AlertCircle size={16} />
+                    <span>
+                      Part terlalu besar untuk muat di sheet. Kurangi skala atau gunakan sheet yang lebih besar.
+                    </span>
+                  </div>
+                ) : quantity > nestingResult.partsPerSheet ? (
                   <div className="nesting-info-note">
                     <AlertCircle size={16} />
                     <span>
@@ -1264,7 +1303,7 @@ EOF`;
                       Total {nestingResult.totalSheets} sheet untuk {quantity} part.
                     </span>
                   </div>
-                )}
+                ) : null}
               </div>
             )}
           </div>
@@ -1276,6 +1315,18 @@ EOF`;
           <div className="step-content">
             <h2 className="step-title">Hasil Estimasi</h2>
             <p className="step-description">Ringkasan lengkap biaya pemotongan laser</p>
+
+            {!estimation && nestingResult?.partsPerSheet === 0 && (
+              <div className="estimation-error">
+                <AlertCircle size={48} />
+                <h3>Tidak dapat menghitung estimasi</h3>
+                <p>Part terlalu besar untuk muat di sheet material. Silakan kembali ke langkah sebelumnya dan:</p>
+                <ul>
+                  <li>Kurangi skala part</li>
+                  <li>Atau gunakan ukuran sheet yang lebih besar di pengaturan</li>
+                </ul>
+              </div>
+            )}
 
             {estimation && (
               <div className="estimation-result">
