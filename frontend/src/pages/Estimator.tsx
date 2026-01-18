@@ -694,6 +694,18 @@ EOF`;
         // Get the preview element to calculate scale ratio
         const previewElement = previewCanvasRef.current?.querySelector('.preview-item img') as HTMLImageElement;
 
+        console.log('Crop debug:', {
+          selection,
+          imgNaturalSize: { width: img.naturalWidth, height: img.naturalHeight },
+          previewElement: previewElement ? {
+            clientWidth: previewElement.clientWidth,
+            clientHeight: previewElement.clientHeight,
+            naturalWidth: previewElement.naturalWidth,
+            naturalHeight: previewElement.naturalHeight
+          } : 'not found',
+          fileDimensions: files[0].dimensions
+        });
+
         let scaleX = 1;
         let scaleY = 1;
 
@@ -702,30 +714,25 @@ EOF`;
           scaleX = img.naturalWidth / previewElement.clientWidth;
           scaleY = img.naturalHeight / previewElement.clientHeight;
         } else {
-          // Fallback: use file dimensions if available
-          const fileDims = files[0].dimensions;
-          if (fileDims && fileDims.width > 0 && fileDims.height > 0) {
-            // Estimate displayed size based on typical container width (adjust if needed)
-            const estimatedDisplayWidth = Math.min(fileDims.width, 800);
-            const aspectRatio = fileDims.height / fileDims.width;
-            const estimatedDisplayHeight = estimatedDisplayWidth * aspectRatio;
-            scaleX = fileDims.width / estimatedDisplayWidth;
-            scaleY = fileDims.height / estimatedDisplayHeight;
-          }
+          // Preview element not found - use 1:1 since selection was made on displayed image
+          console.log('Preview element not found, using 1:1 ratio');
         }
+
+        console.log('Scale factors:', { scaleX, scaleY });
 
         // Calculate crop area in original image coordinates
-        const cropX = Math.max(0, selection.x * scaleX);
-        const cropY = Math.max(0, selection.y * scaleY);
-        const cropWidth = Math.min(selection.width * scaleX, img.naturalWidth - cropX);
-        const cropHeight = Math.min(selection.height * scaleY, img.naturalHeight - cropY);
+        let cropX = selection.x * scaleX;
+        let cropY = selection.y * scaleY;
+        let cropWidth = selection.width * scaleX;
+        let cropHeight = selection.height * scaleY;
 
-        // Validate crop dimensions
-        if (cropWidth <= 0 || cropHeight <= 0) {
-          console.error('Invalid crop dimensions:', { cropX, cropY, cropWidth, cropHeight });
-          resolve(null);
-          return;
-        }
+        // Clamp values to image bounds
+        cropX = Math.max(0, Math.min(cropX, img.naturalWidth - 1));
+        cropY = Math.max(0, Math.min(cropY, img.naturalHeight - 1));
+        cropWidth = Math.max(1, Math.min(cropWidth, img.naturalWidth - cropX));
+        cropHeight = Math.max(1, Math.min(cropHeight, img.naturalHeight - cropY));
+
+        console.log('Final crop area:', { cropX, cropY, cropWidth, cropHeight });
 
         // Create canvas and draw cropped image
         const canvas = document.createElement('canvas');
