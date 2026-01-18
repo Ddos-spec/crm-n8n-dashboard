@@ -170,6 +170,8 @@ export default function Estimator() {
   const [drawStart, setDrawStart] = useState<{ x: number; y: number } | null>(null);
   const [currentSelection, setCurrentSelection] = useState<{ x: number; y: number; width: number; height: number } | null>(null);
   const [, setUseAreaSelection] = useState(false); // Track if user chose to use area selection
+  const [croppedPreview, setCroppedPreview] = useState<string | null>(null);
+  const [croppedDimensions, setCroppedDimensions] = useState<{ width: number; height: number } | null>(null);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const dropZoneRef = useRef<HTMLDivElement>(null);
@@ -307,7 +309,8 @@ export default function Estimator() {
     if (files.length === 0) return;
 
     const file = files[0];
-    const dims = file.dimensions || { width: 100, height: 100 };
+    // Use cropped dimensions if available, otherwise use full image dimensions
+    const dims = croppedDimensions || file.dimensions || { width: 100, height: 100 };
     const unitMultiplier = scale.unit === 'cm' ? 10 : scale.unit === 'inch' ? 25.4 : 1;
     const scaledWidth = dims.width * scale.value * unitMultiplier;
     const scaledHeight = dims.height * scale.value * unitMultiplier;
@@ -596,6 +599,8 @@ EOF`;
     setSelections([]);
     setUseAreaSelection(false);
     setSelectionMode('select');
+    setCroppedPreview(null);
+    setCroppedDimensions(null);
   };
 
   // Area selection mouse handlers
@@ -664,6 +669,9 @@ EOF`;
   // Skip selection and use all paths
   const skipSelection = () => {
     setUseAreaSelection(false);
+    // Clear cropped preview - use full image
+    setCroppedPreview(null);
+    setCroppedDimensions(null);
     // Select all paths
     const newFiles = [...files];
     newFiles.forEach(f => {
@@ -673,14 +681,81 @@ EOF`;
     nextStep();
   };
 
+  // Generate cropped preview from selection area
+  const generateCroppedPreview = async (selection: SelectionArea): Promise<{ dataUrl: string; width: number; height: number } | null> => {
+    if (!files[0]?.preview || !previewCanvasRef.current) return null;
+
+    const img = new Image();
+    img.src = files[0].preview;
+
+    return new Promise((resolve) => {
+      img.onload = () => {
+        // Get the preview element to calculate scale ratio
+        const previewElement = previewCanvasRef.current?.querySelector('img');
+        if (!previewElement) {
+          resolve(null);
+          return;
+        }
+
+        // Calculate ratio between displayed size and actual image size
+        const displayedWidth = previewElement.clientWidth;
+        const displayedHeight = previewElement.clientHeight;
+        const scaleX = img.naturalWidth / displayedWidth;
+        const scaleY = img.naturalHeight / displayedHeight;
+
+        // Calculate crop area in original image coordinates
+        const cropX = selection.x * scaleX;
+        const cropY = selection.y * scaleY;
+        const cropWidth = selection.width * scaleX;
+        const cropHeight = selection.height * scaleY;
+
+        // Create canvas and draw cropped image
+        const canvas = document.createElement('canvas');
+        canvas.width = cropWidth;
+        canvas.height = cropHeight;
+        const ctx = canvas.getContext('2d');
+
+        if (!ctx) {
+          resolve(null);
+          return;
+        }
+
+        ctx.drawImage(
+          img,
+          cropX, cropY, cropWidth, cropHeight,
+          0, 0, cropWidth, cropHeight
+        );
+
+        resolve({
+          dataUrl: canvas.toDataURL('image/png'),
+          width: cropWidth,
+          height: cropHeight
+        });
+      };
+
+      img.onerror = () => resolve(null);
+    });
+  };
+
   // Use area selections to filter paths
-  const applyAreaSelection = () => {
+  const applyAreaSelection = async () => {
     if (selections.length === 0) {
       skipSelection();
       return;
     }
 
     setUseAreaSelection(true);
+
+    // Get the first selected area and generate cropped preview
+    const selectedArea = selections.find(s => s.selected) || selections[0];
+    if (selectedArea) {
+      const cropped = await generateCroppedPreview(selectedArea);
+      if (cropped) {
+        setCroppedPreview(cropped.dataUrl);
+        setCroppedDimensions({ width: cropped.width, height: cropped.height });
+      }
+    }
+
     // For now, select all paths (in a real implementation, we'd filter paths by area)
     // The selection areas will be used for nesting dimensions
     const newFiles = [...files];
@@ -1244,14 +1319,16 @@ EOF`;
 
                     {/* Parts */}
                     {nestingResult.positions.map((pos, idx) => {
-                      const dims = files[0]?.dimensions || { width: 100, height: 100 };
+                      // Use cropped dimensions if available
+                      const dims = croppedDimensions || files[0]?.dimensions || { width: 100, height: 100 };
                       const unitMultiplier = scale.unit === 'cm' ? 10 : scale.unit === 'inch' ? 25.4 : 1;
                       const baseW = dims.width * scale.value * unitMultiplier;
                       const baseH = dims.height * scale.value * unitMultiplier;
                       const isRotated = pos.rotation === 90;
                       const w = isRotated ? baseH : baseW;
                       const h = isRotated ? baseW : baseH;
-                      const previewUrl = files[0]?.preview;
+                      // Use cropped preview if available, otherwise fall back to full preview
+                      const previewUrl = croppedPreview || files[0]?.preview;
 
                       return (
                         <g key={idx}>
