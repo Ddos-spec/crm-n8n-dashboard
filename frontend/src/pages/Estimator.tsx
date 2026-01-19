@@ -603,13 +603,47 @@ EOF`;
     setCroppedDimensions(null);
   };
 
+  // Get image bounds within the preview canvas
+  const getImageBounds = () => {
+    const imgElement = previewCanvasRef.current?.querySelector('.preview-item img') as HTMLImageElement;
+    if (!imgElement) return null;
+
+    const canvasRect = previewCanvasRef.current?.getBoundingClientRect();
+    const imgRect = imgElement.getBoundingClientRect();
+
+    if (!canvasRect) return null;
+
+    return {
+      x: (imgRect.left - canvasRect.left) / zoom,
+      y: (imgRect.top - canvasRect.top) / zoom,
+      width: imgRect.width / zoom,
+      height: imgRect.height / zoom,
+    };
+  };
+
+  // Constrain a point to image bounds
+  const constrainToImage = (x: number, y: number, bounds: { x: number; y: number; width: number; height: number }) => {
+    return {
+      x: Math.max(bounds.x, Math.min(x, bounds.x + bounds.width)),
+      y: Math.max(bounds.y, Math.min(y, bounds.y + bounds.height)),
+    };
+  };
+
   // Area selection mouse handlers
   const handlePreviewMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
     if (selectionMode !== 'select' || !previewCanvasRef.current) return;
 
     const rect = previewCanvasRef.current.getBoundingClientRect();
-    const x = (e.clientX - rect.left) / zoom;
-    const y = (e.clientY - rect.top) / zoom;
+    let x = (e.clientX - rect.left) / zoom;
+    let y = (e.clientY - rect.top) / zoom;
+
+    // Constrain to image bounds
+    const bounds = getImageBounds();
+    if (bounds) {
+      const constrained = constrainToImage(x, y, bounds);
+      x = constrained.x;
+      y = constrained.y;
+    }
 
     setIsDrawing(true);
     setDrawStart({ x, y });
@@ -620,8 +654,16 @@ EOF`;
     if (!isDrawing || !drawStart || !previewCanvasRef.current) return;
 
     const rect = previewCanvasRef.current.getBoundingClientRect();
-    const currentX = (e.clientX - rect.left) / zoom;
-    const currentY = (e.clientY - rect.top) / zoom;
+    let currentX = (e.clientX - rect.left) / zoom;
+    let currentY = (e.clientY - rect.top) / zoom;
+
+    // Constrain to image bounds
+    const bounds = getImageBounds();
+    if (bounds) {
+      const constrained = constrainToImage(currentX, currentY, bounds);
+      currentX = constrained.x;
+      currentY = constrained.y;
+    }
 
     const x = Math.min(drawStart.x, currentX);
     const y = Math.min(drawStart.y, currentY);
