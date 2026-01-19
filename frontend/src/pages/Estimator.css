@@ -423,6 +423,8 @@
   max-width: 100%;
   max-height: 400px;
   object-fit: contain;
+  /* Tingkatkan kontras dan saturasi untuk visibilitas lebih baik */
+  filter: contrast(1.8) saturate(1.5) brightness(0.95);
 }
 
 .dxf-preview {
@@ -817,6 +819,11 @@
 
 .nesting-svg line {
   stroke: var(--border);
+}
+
+/* Tingkatkan kontras gambar di nesting preview */
+.nesting-svg image {
+  filter: contrast(1.8) saturate(1.5) brightness(0.95);
 }
 
 .nesting-warning {
