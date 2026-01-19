@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback, useEffect } from 'react';
+import { useState, useRef, useCallback, useEffect, useMemo } from 'react';
 import {
   Upload,
   Eye,
@@ -15,6 +15,7 @@ import {
   FileImage,
   Check,
   AlertCircle,
+  AlertTriangle,
   Download,
   ZoomIn,
   ZoomOut,
@@ -26,10 +27,57 @@ import {
   Square,
   MousePointer,
   Trash2,
-  SkipForward
+  SkipForward,
+  CheckCircle,
+  Info
 } from 'lucide-react';
 import { api } from '../lib/api';
 import './Estimator.css';
+
+// ============================================
+// VALIDATION HELPERS
+// ============================================
+
+interface ValidationResult {
+  isValid: boolean;
+  errors: string[];
+  warnings: string[];
+}
+
+// Safe division - prevents Infinity and NaN
+const safeDivide = (numerator: number, denominator: number, fallback: number = 0): number => {
+  if (denominator === 0 || !isFinite(denominator) || !isFinite(numerator)) {
+    return fallback;
+  }
+  const result = numerator / denominator;
+  return isFinite(result) ? result : fallback;
+};
+
+// Clamp number between min and max
+const clamp = (value: number, min: number, max: number): number => {
+  return Math.max(min, Math.min(max, value));
+};
+
+// Check if number is valid (not NaN, not Infinity)
+const isValidNumber = (value: number): boolean => {
+  return typeof value === 'number' && isFinite(value) && !isNaN(value);
+};
+
+// Safe Math.ceil that returns fallback for invalid inputs
+const safeCeil = (value: number, fallback: number = 0): number => {
+  if (!isValidNumber(value)) return fallback;
+  return Math.ceil(value);
+};
+
+// Validate dimensions object
+const validateDimensions = (dims: { width: number; height: number } | undefined): { width: number; height: number } => {
+  const defaultDims = { width: 100, height: 100 };
+  if (!dims) return defaultDims;
+  return {
+    width: isValidNumber(dims.width) && dims.width > 0 ? dims.width : defaultDims.width,
+    height: isValidNumber(dims.height) && dims.height > 0 ? dims.height : defaultDims.height,
+  };
+};
 
 // Types
 interface FileData {
@@ -172,6 +220,7 @@ export default function Estimator() {
   const [, setUseAreaSelection] = useState(false); // Track if user chose to use area selection
   const [croppedPreview, setCroppedPreview] = useState<string | null>(null);
   const [croppedDimensions, setCroppedDimensions] = useState<{ width: number; height: number } | null>(null);
+  const [warnings, setWarnings] = useState<string[]>([]);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const dropZoneRef = useRef<HTMLDivElement>(null);
@@ -195,6 +244,104 @@ export default function Estimator() {
     setSettings(newSettings);
     localStorage.setItem('estimator-settings-v2', JSON.stringify(newSettings));
   };
+
+  // ============================================
+  // STEP VALIDATION
+  // ============================================
+
+  // Validate each step before allowing to proceed
+  const stepValidation = useMemo((): Record<number, ValidationResult> => {
+    const validations: Record<number, ValidationResult> = {};
+
+    // Step 1: File Upload
+    validations[1] = {
+      isValid: files.length > 0 && files[0]?.preview !== '',
+      errors: files.length === 0 ? ['Silakan upload file desain terlebih dahulu'] : [],
+      warnings: [],
+    };
+
+    // Step 2: Preview & Selection
+    const hasValidSelection = selections.length === 0 || selections.some(s => s.selected && s.width > 10 && s.height > 10);
+    validations[2] = {
+      isValid: files.length > 0,
+      errors: files.length === 0 ? ['File tidak ditemukan'] : [],
+      warnings: selections.length > 0 && !hasValidSelection
+        ? ['Tidak ada area yang dipilih. Klik "Skip" untuk memproses seluruh gambar.']
+        : [],
+    };
+
+    // Step 3: Scale & Quantity
+    const scaleErrors: string[] = [];
+    const scaleWarnings: string[] = [];
+    if (scale.value <= 0) scaleErrors.push('Skala harus lebih dari 0');
+    if (scale.value > 100) scaleWarnings.push('Skala sangat besar, pastikan nilai sudah benar');
+    if (quantity <= 0) scaleErrors.push('Jumlah potong harus minimal 1');
+    if (quantity > 10000) scaleWarnings.push('Jumlah potong sangat banyak, pastikan nilai sudah benar');
+
+    validations[3] = {
+      isValid: scale.value > 0 && quantity > 0,
+      errors: scaleErrors,
+      warnings: scaleWarnings,
+    };
+
+    // Step 4: Material Selection
+    validations[4] = {
+      isValid: selectedMaterial !== '' && selectedThickness > 0,
+      errors: [
+        ...(selectedMaterial === '' ? ['Silakan pilih material'] : []),
+        ...(selectedThickness === 0 ? ['Silakan pilih ketebalan'] : []),
+      ],
+      warnings: [],
+    };
+
+    // Step 5: Nesting
+    const nestingErrors: string[] = [];
+    const nestingWarnings: string[] = [];
+    if (nestingResult) {
+      if (nestingResult.partsPerSheet === 0) {
+        nestingErrors.push('Part terlalu besar untuk sheet. Kurangi skala atau gunakan sheet lebih besar.');
+      }
+      if (nestingResult.utilization < 20) {
+        nestingWarnings.push('Utilisasi material sangat rendah (<20%). Pertimbangkan untuk mengatur ulang.');
+      }
+      if (!isFinite(nestingResult.totalSheets) || nestingResult.totalSheets <= 0) {
+        nestingErrors.push('Perhitungan jumlah sheet tidak valid');
+      }
+    }
+
+    validations[5] = {
+      isValid: nestingResult !== null && nestingResult.partsPerSheet > 0 && isFinite(nestingResult.totalSheets),
+      errors: nestingErrors,
+      warnings: nestingWarnings,
+    };
+
+    // Step 6: Results
+    const estimationErrors: string[] = [];
+    if (estimation) {
+      if (!isFinite(estimation.totalCost) || estimation.totalCost < 0) {
+        estimationErrors.push('Perhitungan biaya tidak valid');
+      }
+    }
+
+    validations[6] = {
+      isValid: estimation !== null && isFinite(estimation.totalCost) && estimation.totalCost >= 0,
+      errors: estimationErrors,
+      warnings: [],
+    };
+
+    return validations;
+  }, [files, selections, scale, quantity, selectedMaterial, selectedThickness, nestingResult, estimation]);
+
+  // Check if can proceed to next step
+  const canProceedToNextStep = useMemo(() => {
+    const currentValidation = stepValidation[currentStep];
+    return currentValidation?.isValid ?? false;
+  }, [stepValidation, currentStep]);
+
+  // Get current step validation info
+  const currentStepValidation = useMemo(() => {
+    return stepValidation[currentStep] || { isValid: true, errors: [], warnings: [] };
+  }, [stepValidation, currentStep]);
 
   // File handling
   const handleDragOver = useCallback((e: React.DragEvent) => {
@@ -304,19 +451,39 @@ export default function Estimator() {
     return baseSpeed * (1 / Math.sqrt(thickness));
   };
 
-  // Calculate nesting with improved algorithm
+  // Calculate nesting with improved algorithm and robust error handling
   const calculateNesting = () => {
-    if (files.length === 0) return;
+    if (files.length === 0) {
+      setError('File tidak ditemukan. Silakan upload file terlebih dahulu.');
+      return;
+    }
 
     const file = files[0];
     // Use cropped dimensions if available, otherwise use full image dimensions
-    const dims = croppedDimensions || file.dimensions || { width: 100, height: 100 };
-    const unitMultiplier = scale.unit === 'cm' ? 10 : scale.unit === 'm' ? 1000 : 1;
-    const scaledWidth = dims.width * scale.value * unitMultiplier;
-    const scaledHeight = dims.height * scale.value * unitMultiplier;
+    // Validate dimensions using helper function
+    const rawDims = croppedDimensions || file.dimensions;
+    const dims = validateDimensions(rawDims);
 
-    const sheetW = settings.defaultSheetWidth;
-    const sheetH = settings.defaultSheetHeight;
+    // Validate scale value
+    const safeScale = isValidNumber(scale.value) && scale.value > 0 ? scale.value : 1;
+    const unitMultiplier = scale.unit === 'cm' ? 10 : scale.unit === 'm' ? 1000 : 1;
+
+    // Calculate scaled dimensions with validation
+    const scaledWidth = dims.width * safeScale * unitMultiplier;
+    const scaledHeight = dims.height * safeScale * unitMultiplier;
+
+    // Validate calculated dimensions
+    if (!isValidNumber(scaledWidth) || !isValidNumber(scaledHeight) || scaledWidth <= 0 || scaledHeight <= 0) {
+      setError('Dimensi part tidak valid. Periksa kembali nilai skala.');
+      setNestingResult(null);
+      return;
+    }
+
+    // Validate sheet dimensions
+    const sheetW = isValidNumber(settings.defaultSheetWidth) && settings.defaultSheetWidth > 0
+      ? settings.defaultSheetWidth : 1220;
+    const sheetH = isValidNumber(settings.defaultSheetHeight) && settings.defaultSheetHeight > 0
+      ? settings.defaultSheetHeight : 2440;
     const gap = 5; // 5mm gap between parts
 
     // Check if part is too large for the sheet
@@ -342,14 +509,15 @@ export default function Estimator() {
 
     // Clear any previous error
     setError(null);
+    setWarnings([]);
 
-    // Try both orientations
-    const cols1 = Math.floor(sheetW / (scaledWidth + gap));
-    const rows1 = Math.floor(sheetH / (scaledHeight + gap));
+    // Try both orientations with safe calculations
+    const cols1 = Math.max(0, Math.floor(safeDivide(sheetW, scaledWidth + gap, 0)));
+    const rows1 = Math.max(0, Math.floor(safeDivide(sheetH, scaledHeight + gap, 0)));
     const perSheet1 = cols1 * rows1;
 
-    const cols2 = Math.floor(sheetW / (scaledHeight + gap));
-    const rows2 = Math.floor(sheetH / (scaledWidth + gap));
+    const cols2 = Math.max(0, Math.floor(safeDivide(sheetW, scaledHeight + gap, 0)));
+    const rows2 = Math.max(0, Math.floor(safeDivide(sheetH, scaledWidth + gap, 0)));
     const perSheet2 = cols2 * rows2;
 
     // Choose better orientation
@@ -360,9 +528,24 @@ export default function Estimator() {
     const partW = useRotated ? scaledHeight : scaledWidth;
     const partH = useRotated ? scaledWidth : scaledHeight;
 
+    // Validate quantity
+    const safeQuantity = isValidNumber(quantity) && quantity > 0 ? quantity : 1;
+
     // Safety check - ensure partsPerSheet is at least 1 to prevent division by zero
     const safePartsPerSheet = Math.max(1, partsPerSheet);
-    const totalSheets = Math.ceil(quantity / safePartsPerSheet);
+    const totalSheets = safeCeil(safeDivide(safeQuantity, safePartsPerSheet, 1), 1);
+
+    // Add warnings for edge cases
+    const newWarnings: string[] = [];
+    if (partsPerSheet === 0) {
+      newWarnings.push('Tidak ada part yang muat di sheet dengan konfigurasi ini.');
+    }
+    if (partsPerSheet === 1 && safeQuantity > 1) {
+      newWarnings.push('Hanya 1 part per sheet. Pertimbangkan untuk memperkecil ukuran part.');
+    }
+    if (newWarnings.length > 0) {
+      setWarnings(newWarnings);
+    }
 
     const positions = [];
     const partsToPlace = Math.min(partsPerSheet, quantity);
@@ -393,9 +576,12 @@ export default function Estimator() {
     });
   };
 
-  // Calculate estimation with gas and more details
+  // Calculate estimation with gas and more details - with robust error handling
   const calculateEstimation = () => {
-    if (!selectedMaterial || !nestingResult) return;
+    if (!selectedMaterial || !nestingResult) {
+      setEstimation(null);
+      return;
+    }
 
     // Don't calculate if parts don't fit on sheet
     if (nestingResult.partsPerSheet === 0 || nestingResult.totalSheets === 0) {
@@ -403,46 +589,79 @@ export default function Estimator() {
       return;
     }
 
+    // Validate nesting result values
+    if (!isValidNumber(nestingResult.totalSheets) || nestingResult.totalSheets <= 0) {
+      setError('Hasil nesting tidak valid. Silakan coba lagi.');
+      setEstimation(null);
+      return;
+    }
+
     const material = settings.materials.find(m => m.id === selectedMaterial);
-    if (!material) return;
+    if (!material) {
+      setError('Material tidak ditemukan.');
+      setEstimation(null);
+      return;
+    }
 
+    const safeScale = isValidNumber(scale.value) && scale.value > 0 ? scale.value : 1;
     const unitMultiplier = scale.unit === 'cm' ? 10 : scale.unit === 'm' ? 1000 : 1;
+    const safeQuantity = isValidNumber(quantity) && quantity > 0 ? quantity : 1;
 
-    // Calculate total cutting length from selected paths
+    // Calculate total cutting length from selected paths with validation
     let totalLengthPerPart = 0;
     files.forEach(f => {
       f.paths?.forEach(p => {
-        if (p.selected) {
-          totalLengthPerPart += p.length * scale.value * unitMultiplier;
+        if (p.selected && isValidNumber(p.length)) {
+          totalLengthPerPart += p.length * safeScale * unitMultiplier;
         }
       });
     });
-    const totalCuttingLength = totalLengthPerPart * quantity;
 
-    // Calculate cutting time using accurate speeds
+    // Fallback: if no paths, estimate based on perimeter
+    if (totalLengthPerPart === 0) {
+      const dims = validateDimensions(files[0]?.dimensions);
+      // Estimate perimeter as cutting length
+      totalLengthPerPart = 2 * (dims.width + dims.height) * safeScale * unitMultiplier;
+    }
+
+    const totalCuttingLength = totalLengthPerPart * safeQuantity;
+
+    // Calculate cutting time using accurate speeds with safe division
     const cuttingSpeed = getCuttingSpeed(selectedMaterial, selectedThickness);
-    const cuttingTime = totalCuttingLength / cuttingSpeed;
+    const safeCuttingSpeed = isValidNumber(cuttingSpeed) && cuttingSpeed > 0 ? cuttingSpeed : 3000;
+    const cuttingTime = safeDivide(totalCuttingLength, safeCuttingSpeed, 0);
 
-    // Calculate processed area
-    const dims = files[0]?.dimensions || { width: 100, height: 100 };
-    const partArea = dims.width * dims.height * scale.value * scale.value * unitMultiplier * unitMultiplier;
-    const processedArea = partArea * quantity;
+    // Calculate processed area with validated dimensions
+    const dims = validateDimensions(files[0]?.dimensions);
+    const partArea = dims.width * dims.height * safeScale * safeScale * unitMultiplier * unitMultiplier;
+    const processedArea = partArea * safeQuantity;
 
     // Calculate gas usage (L/min * time in min, converted to m³)
-    const gasUsage = (settings.gasFlowRate * cuttingTime) / 1000;
-    const gasCost = gasUsage * settings.gasPrice;
+    const safeGasFlowRate = isValidNumber(settings.gasFlowRate) ? settings.gasFlowRate : 20;
+    const gasUsage = safeDivide(safeGasFlowRate * cuttingTime, 1000, 0);
+    const safeGasPrice = isValidNumber(settings.gasPrice) ? settings.gasPrice : 50000;
+    const gasCost = gasUsage * safeGasPrice;
 
-    // Calculate material cost (sheet cost)
-    const sheetArea = (settings.defaultSheetWidth * settings.defaultSheetHeight) / 1000000; // m²
-    const sheetCost = sheetArea * settings.sheetPricePerM2;
+    // Calculate material cost (sheet cost) with safe division
+    const sheetArea = safeDivide(settings.defaultSheetWidth * settings.defaultSheetHeight, 1000000, 1); // m²
+    const safeSheetPrice = isValidNumber(settings.sheetPricePerM2) ? settings.sheetPricePerM2 : 150000;
+    const sheetCost = sheetArea * safeSheetPrice;
     const materialCost = sheetCost * nestingResult.totalSheets;
 
     // Calculate labor cost
-    const laborCost = cuttingTime * settings.laborCostPerMinute;
+    const safeLaborCost = isValidNumber(settings.laborCostPerMinute) ? settings.laborCostPerMinute : 1500;
+    const laborCost = cuttingTime * safeLaborCost;
 
-    // Total cost
+    // Total cost with validation
     const totalCost = materialCost + laborCost + gasCost;
-    const pricePerPiece = totalCost / quantity;
+    const pricePerPiece = safeDivide(totalCost, safeQuantity, 0);
+
+    // Final validation - ensure all values are valid numbers
+    if (!isValidNumber(totalCost) || !isValidNumber(pricePerPiece)) {
+      setError('Perhitungan biaya gagal. Periksa kembali input.');
+      setEstimation(null);
+      return;
+    }
 
     setEstimation({
       totalCuttingLength,
@@ -679,14 +898,54 @@ EOF`;
       return;
     }
 
-    // Only add if selection has meaningful size (at least 10x10 pixels)
-    if (currentSelection.width > 10 && currentSelection.height > 10) {
-      const newSelection: SelectionArea = {
-        id: `sel-${Date.now()}`,
-        ...currentSelection,
-        selected: true,
-      };
-      setSelections(prev => [...prev, newSelection]);
+    // Validate selection dimensions
+    const minSize = 10;
+    const maxSelections = 10; // Prevent too many selections
+
+    // Check if we already have max selections
+    if (selections.length >= maxSelections) {
+      setWarnings([`Maksimal ${maxSelections} area seleksi. Hapus beberapa area untuk menambah yang baru.`]);
+      setIsDrawing(false);
+      setDrawStart(null);
+      setCurrentSelection(null);
+      return;
+    }
+
+    // Only add if selection has meaningful size
+    if (currentSelection.width > minSize && currentSelection.height > minSize) {
+      // Auto-fix: ensure selection is within valid bounds
+      const bounds = getImageBounds();
+      let finalSelection = { ...currentSelection };
+
+      if (bounds) {
+        // Clamp selection to image bounds
+        const x = clamp(currentSelection.x, bounds.x, bounds.x + bounds.width);
+        const y = clamp(currentSelection.y, bounds.y, bounds.y + bounds.height);
+        const maxWidth = bounds.x + bounds.width - x;
+        const maxHeight = bounds.y + bounds.height - y;
+
+        finalSelection = {
+          x,
+          y,
+          width: Math.min(currentSelection.width, maxWidth),
+          height: Math.min(currentSelection.height, maxHeight),
+        };
+      }
+
+      // Only add if final selection is still valid
+      if (finalSelection.width > minSize && finalSelection.height > minSize) {
+        const newSelection: SelectionArea = {
+          id: `sel-${Date.now()}`,
+          ...finalSelection,
+          selected: true,
+        };
+        setSelections(prev => [...prev, newSelection]);
+        setWarnings([]); // Clear warnings on successful selection
+      } else {
+        setWarnings(['Area seleksi terlalu kecil setelah disesuaikan ke batas gambar.']);
+      }
+    } else {
+      setWarnings(['Area seleksi terlalu kecil. Gambar area yang lebih besar (minimal 10x10 pixel).']);
     }
 
     setIsDrawing(false);
@@ -807,40 +1066,77 @@ EOF`;
     });
   };
 
-  // Use area selections to filter paths
+  // Use area selections to filter paths - with improved error handling
   const applyAreaSelection = async () => {
     if (selections.length === 0) {
       skipSelection();
       return;
     }
 
-    setUseAreaSelection(true);
+    // Show loading state
+    setIsProcessing(true);
+    setError(null);
+    setWarnings([]);
 
-    // Get the first selected area and generate cropped preview
-    const selectedArea = selections.find(s => s.selected) || selections[0];
-    console.log('Selected area:', selectedArea);
+    try {
+      setUseAreaSelection(true);
 
-    if (selectedArea) {
-      const cropped = await generateCroppedPreview(selectedArea);
-      console.log('Cropped result:', cropped ? { width: cropped.width, height: cropped.height, hasData: !!cropped.dataUrl } : null);
+      // Get the first selected area and generate cropped preview
+      const selectedArea = selections.find(s => s.selected) || selections[0];
 
-      if (cropped) {
-        setCroppedPreview(cropped.dataUrl);
-        setCroppedDimensions({ width: cropped.width, height: cropped.height });
-      } else {
-        console.warn('Cropping failed, using full image');
-        // Fallback: don't set cropped preview, will use full image
+      if (selectedArea) {
+        // Validate selection before processing
+        if (selectedArea.width <= 0 || selectedArea.height <= 0) {
+          setWarnings(['Area seleksi tidak valid. Menggunakan gambar penuh.']);
+        } else {
+          // Set timeout for cropping operation
+          const cropPromise = generateCroppedPreview(selectedArea);
+          const timeoutPromise = new Promise<null>((resolve) =>
+            setTimeout(() => resolve(null), 5000) // 5 second timeout
+          );
+
+          const cropped = await Promise.race([cropPromise, timeoutPromise]);
+
+          if (cropped && cropped.dataUrl && cropped.width > 0 && cropped.height > 0) {
+            setCroppedPreview(cropped.dataUrl);
+            setCroppedDimensions({ width: cropped.width, height: cropped.height });
+          } else {
+            // Fallback: use file dimensions but no cropped preview
+            console.warn('Cropping failed or timed out, using full image');
+            setWarnings(['Cropping gagal. Menggunakan dimensi area seleksi.']);
+
+            // Use selection dimensions as approximation
+            const bounds = getImageBounds();
+            if (bounds && files[0]?.dimensions) {
+              const scaleX = files[0].dimensions.width / bounds.width;
+              const scaleY = files[0].dimensions.height / bounds.height;
+              const estimatedWidth = selectedArea.width * scaleX;
+              const estimatedHeight = selectedArea.height * scaleY;
+
+              if (estimatedWidth > 0 && estimatedHeight > 0) {
+                setCroppedDimensions({
+                  width: Math.round(estimatedWidth),
+                  height: Math.round(estimatedHeight)
+                });
+              }
+            }
+          }
+        }
       }
-    }
 
-    // For now, select all paths (in a real implementation, we'd filter paths by area)
-    // The selection areas will be used for nesting dimensions
-    const newFiles = [...files];
-    newFiles.forEach(f => {
-      f.paths?.forEach(p => (p.selected = true));
-    });
-    setFiles(newFiles);
-    nextStep();
+      // For now, select all paths
+      const newFiles = [...files];
+      newFiles.forEach(f => {
+        f.paths?.forEach(p => (p.selected = true));
+      });
+      setFiles(newFiles);
+      nextStep();
+    } catch (err) {
+      console.error('Error applying selection:', err);
+      setError('Gagal memproses seleksi. Silakan coba lagi.');
+    } finally {
+      setIsProcessing(false);
+    }
   };
 
   // Get selected path count and total length
@@ -1723,23 +2019,43 @@ EOF`;
 
       {/* Navigation */}
       {currentStep < 6 && (
-        <div className="estimator-nav">
-          <button
-            className="btn-nav btn-prev"
-            onClick={prevStep}
-            disabled={currentStep === 1}
-          >
-            <ChevronLeft size={18} />
-            Sebelumnya
-          </button>
-          <button
-            className="btn-nav btn-next"
-            onClick={nextStep}
-            disabled={!canProceed()}
-          >
-            Selanjutnya
-            <ChevronRight size={18} />
-          </button>
+        <div className="estimator-nav-container">
+          {/* Validation Messages */}
+          {(currentStepValidation.errors.length > 0 || currentStepValidation.warnings.length > 0) && (
+            <div className="validation-messages">
+              {currentStepValidation.errors.map((error, idx) => (
+                <div key={`error-${idx}`} className="validation-message error">
+                  <AlertCircle size={16} />
+                  <span>{error}</span>
+                </div>
+              ))}
+              {currentStepValidation.warnings.map((warning, idx) => (
+                <div key={`warning-${idx}`} className="validation-message warning">
+                  <AlertCircle size={16} />
+                  <span>{warning}</span>
+                </div>
+              ))}
+            </div>
+          )}
+          <div className="estimator-nav">
+            <button
+              className="btn-nav btn-prev"
+              onClick={prevStep}
+              disabled={currentStep === 1}
+            >
+              <ChevronLeft size={18} />
+              Sebelumnya
+            </button>
+            <button
+              className="btn-nav btn-next"
+              onClick={nextStep}
+              disabled={!canProceedToNextStep}
+              title={!canProceedToNextStep ? currentStepValidation.errors.join(', ') : ''}
+            >
+              Selanjutnya
+              <ChevronRight size={18} />
+            </button>
+          </div>
         </div>
       )}
 
