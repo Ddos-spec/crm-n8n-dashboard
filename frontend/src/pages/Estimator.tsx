@@ -1375,6 +1375,11 @@ EOF`;
                         console.log('Nesting render:', { dims, baseW, baseH, w, h, previewUrl: previewUrl ? 'exists' : 'missing', croppedDimensions, positions: nestingResult.positions.length });
                       }
 
+                      // Log preview URL for debugging (first item only)
+                      if (idx === 0) {
+                        console.log('Preview URL type:', typeof previewUrl, 'starts with:', previewUrl?.substring(0, 50));
+                      }
+
                       return (
                         <g key={idx}>
                           {/* Part background */}
@@ -1383,52 +1388,39 @@ EOF`;
                             y={pos.y}
                             width={w}
                             height={h}
-                            fill="#e0f2fe"
+                            fill="white"
                             stroke="#3b82f6"
                             strokeWidth="2"
                           />
-                          {/* Part design using foreignObject for HTML content */}
+                          {/* Part design - use SVG image element */}
                           {previewUrl && (
-                            <foreignObject
-                              x={pos.x}
-                              y={pos.y}
-                              width={w}
-                              height={h}
-                            >
-                              <div
-                                style={{
-                                  width: '100%',
-                                  height: '100%',
-                                  overflow: 'hidden',
-                                  display: 'flex',
-                                  alignItems: 'center',
-                                  justifyContent: 'center',
-                                  transform: isRotated ? 'rotate(90deg)' : undefined
-                                }}
-                              >
-                                <img
-                                  src={previewUrl}
-                                  alt={`Part ${idx + 1}`}
-                                  style={{
-                                    maxWidth: '100%',
-                                    maxHeight: '100%',
-                                    objectFit: 'contain'
-                                  }}
-                                  onError={(e) => {
-                                    // Hide broken image
-                                    (e.target as HTMLImageElement).style.display = 'none';
-                                  }}
-                                />
-                              </div>
-                            </foreignObject>
+                            <image
+                              x={pos.x + 2}
+                              y={pos.y + 2}
+                              width={w - 4}
+                              height={h - 4}
+                              xlinkHref={previewUrl}
+                              href={previewUrl}
+                              preserveAspectRatio="xMidYMid meet"
+                              style={{ pointerEvents: 'none' }}
+                            />
                           )}
-                          {/* Part number label */}
+                          {/* Part number label with background */}
+                          <rect
+                            x={pos.x + 5}
+                            y={pos.y + 5}
+                            width={24}
+                            height={24}
+                            fill="rgba(59, 130, 246, 0.9)"
+                            rx="4"
+                          />
                           <text
-                            x={pos.x + 15}
-                            y={pos.y + 20}
+                            x={pos.x + 17}
+                            y={pos.y + 22}
                             fontSize="14"
-                            fill="#3b82f6"
+                            fill="white"
                             fontWeight="bold"
+                            textAnchor="middle"
                           >
                             {idx + 1}
                           </text>
