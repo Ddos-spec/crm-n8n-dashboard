@@ -150,7 +150,7 @@ export default function Estimator() {
   // State
   const [currentStep, setCurrentStep] = useState(1);
   const [files, setFiles] = useState<FileData[]>([]);
-  const [scale, setScale] = useState({ value: 1, unit: 'mm' as 'mm' | 'cm' | 'inch' });
+  const [scale, setScale] = useState({ value: 1, unit: 'mm' as 'mm' | 'cm' | 'm' });
   const [scaleBarLength, setScaleBarLength] = useState(100); // mm
   const [selectedMaterial, setSelectedMaterial] = useState<string>('');
   const [selectedThickness, setSelectedThickness] = useState<number>(0);
@@ -311,7 +311,7 @@ export default function Estimator() {
     const file = files[0];
     // Use cropped dimensions if available, otherwise use full image dimensions
     const dims = croppedDimensions || file.dimensions || { width: 100, height: 100 };
-    const unitMultiplier = scale.unit === 'cm' ? 10 : scale.unit === 'inch' ? 25.4 : 1;
+    const unitMultiplier = scale.unit === 'cm' ? 10 : scale.unit === 'm' ? 1000 : 1;
     const scaledWidth = dims.width * scale.value * unitMultiplier;
     const scaledHeight = dims.height * scale.value * unitMultiplier;
 
@@ -406,7 +406,7 @@ export default function Estimator() {
     const material = settings.materials.find(m => m.id === selectedMaterial);
     if (!material) return;
 
-    const unitMultiplier = scale.unit === 'cm' ? 10 : scale.unit === 'inch' ? 25.4 : 1;
+    const unitMultiplier = scale.unit === 'cm' ? 10 : scale.unit === 'm' ? 1000 : 1;
 
     // Calculate total cutting length from selected paths
     let totalLengthPerPart = 0;
@@ -464,7 +464,7 @@ export default function Estimator() {
     if (!nestingResult || !files[0]) return;
 
     const dims = files[0].dimensions || { width: 100, height: 100 };
-    const unitMultiplier = scale.unit === 'cm' ? 10 : scale.unit === 'inch' ? 25.4 : 1;
+    const unitMultiplier = scale.unit === 'cm' ? 10 : scale.unit === 'm' ? 1000 : 1;
     const w = dims.width * scale.value * unitMultiplier;
     const h = dims.height * scale.value * unitMultiplier;
 
@@ -1120,7 +1120,7 @@ EOF`;
                 <div className="setting-group">
                   <label>Unit</label>
                   <div className="unit-buttons">
-                    {(['mm', 'cm', 'inch'] as const).map(unit => (
+                    {(['mm', 'cm', 'm'] as const).map(unit => (
                       <button
                         key={unit}
                         className={`unit-btn ${scale.unit === unit ? 'active' : ''}`}
@@ -1162,7 +1162,7 @@ EOF`;
                   <div
                     className="scale-bar"
                     style={{
-                      width: `${Math.min(300, scaleBarLength * (scale.unit === 'cm' ? 10 : scale.unit === 'inch' ? 25.4 : 1) * scale.value / 2)}px`
+                      width: `${Math.min(300, scaleBarLength * (scale.unit === 'cm' ? 10 : scale.unit === 'm' ? 1000 : 1) * scale.value / 2)}px`
                     }}
                   >
                     <span className="scale-bar-label">{scaleBarLength} {scale.unit}</span>
@@ -1361,7 +1361,7 @@ EOF`;
                     {nestingResult.positions.map((pos, idx) => {
                       // Use cropped dimensions if available
                       const dims = croppedDimensions || files[0]?.dimensions || { width: 100, height: 100 };
-                      const unitMultiplier = scale.unit === 'cm' ? 10 : scale.unit === 'inch' ? 25.4 : 1;
+                      const unitMultiplier = scale.unit === 'cm' ? 10 : scale.unit === 'm' ? 1000 : 1;
                       const baseW = dims.width * scale.value * unitMultiplier;
                       const baseH = dims.height * scale.value * unitMultiplier;
                       const isRotated = pos.rotation === 90;
@@ -1383,21 +1383,44 @@ EOF`;
                             y={pos.y}
                             width={w}
                             height={h}
-                            fill="white"
+                            fill="#e0f2fe"
                             stroke="#3b82f6"
                             strokeWidth="2"
                           />
-                          {/* Part design image */}
+                          {/* Part design using foreignObject for HTML content */}
                           {previewUrl && (
-                            <image
+                            <foreignObject
                               x={pos.x}
                               y={pos.y}
                               width={w}
                               height={h}
-                              href={previewUrl}
-                              preserveAspectRatio="xMidYMid meet"
-                              transform={isRotated ? `rotate(90, ${pos.x + w / 2}, ${pos.y + h / 2})` : undefined}
-                            />
+                            >
+                              <div
+                                style={{
+                                  width: '100%',
+                                  height: '100%',
+                                  overflow: 'hidden',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  transform: isRotated ? 'rotate(90deg)' : undefined
+                                }}
+                              >
+                                <img
+                                  src={previewUrl}
+                                  alt={`Part ${idx + 1}`}
+                                  style={{
+                                    maxWidth: '100%',
+                                    maxHeight: '100%',
+                                    objectFit: 'contain'
+                                  }}
+                                  onError={(e) => {
+                                    // Hide broken image
+                                    (e.target as HTMLImageElement).style.display = 'none';
+                                  }}
+                                />
+                              </div>
+                            </foreignObject>
                           )}
                           {/* Part number label */}
                           <text
