@@ -423,8 +423,8 @@
   max-width: 100%;
   max-height: 400px;
   object-fit: contain;
-  /* Tingkatkan kontras lebih tinggi untuk garis tipis */
-  filter: contrast(4) saturate(3) brightness(0.85) invert(0);
+  /* Tingkatkan kontras maksimal untuk garis tipis */
+  filter: contrast(10) saturate(5) brightness(0.8);
 }
 
 .dxf-preview {
@@ -823,7 +823,7 @@
 
 /* Tingkatkan kontras gambar di nesting preview */
 .nesting-svg image {
-  filter: contrast(4) saturate(3) brightness(0.85);
+  filter: contrast(10) saturate(5) brightness(0.8);
 }
 
 .nesting-warning {
@@ -1842,24 +1842,26 @@
 /* Area Selection Feature */
 .mode-selector {
   display: flex;
-  gap: 4px;
+  gap: 6px;
   background: var(--bg-card);
-  border-radius: var(--radius-sm);
-  padding: 4px;
+  border-radius: var(--radius);
+  padding: 6px;
   border: 1px solid var(--border);
 }
 
 .mode-btn {
   display: flex;
   align-items: center;
-  gap: 6px;
-  padding: 8px 12px;
+  justify-content: center;
+  gap: 8px;
+  padding: 10px 24px;
+  min-width: 100px;
   border: none;
-  border-radius: 4px;
+  border-radius: 6px;
   background: transparent;
   color: var(--text-secondary);
-  font-size: 13px;
-  font-weight: 500;
+  font-size: 14px;
+  font-weight: 600;
   cursor: pointer;
   transition: all 0.2s;
 }
