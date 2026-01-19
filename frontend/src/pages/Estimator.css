@@ -411,7 +411,7 @@
   display: flex;
   justify-content: center;
   padding: 40px;
-  background: var(--bg-tertiary);
+  background: #1a1d24;
   border-radius: var(--radius);
   border: 1px solid var(--border);
   min-height: 300px;
@@ -423,8 +423,8 @@
   max-width: 100%;
   max-height: 400px;
   object-fit: contain;
-  /* Invert + saturate untuk buat garis terang jadi gelap */
-  filter: invert(1) contrast(3) saturate(10) hue-rotate(180deg) brightness(0.4);
+  /* Tampilkan garis terang di kanvas gelap */
+  filter: brightness(2) contrast(1.5);
 }
 
 .dxf-preview {
@@ -801,7 +801,7 @@
 
 .nesting-canvas {
   padding: 20px;
-  background: var(--bg-tertiary);
+  background: #1a1d24;
   border: 1px solid var(--border);
   border-radius: var(--radius);
 }
@@ -810,20 +810,21 @@
   width: 100%;
   height: auto;
   max-height: 400px;
+  background: #1a1d24;
 }
 
 .nesting-svg rect:first-child {
-  fill: var(--bg-card);
-  stroke: var(--border);
+  fill: #1a1d24;
+  stroke: #3a4050;
 }
 
 .nesting-svg line {
-  stroke: var(--border);
+  stroke: #3a4050;
 }
 
-/* Invert + saturate untuk buat garis terang jadi gelap di nesting */
+/* Tampilkan garis putih di kanvas gelap */
 .nesting-svg image {
-  filter: invert(1) contrast(3) saturate(10) hue-rotate(180deg) brightness(0.4);
+  filter: brightness(2) contrast(1.5);
 }
 
 .nesting-warning {
