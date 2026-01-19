@@ -423,8 +423,8 @@
   max-width: 100%;
   max-height: 400px;
   object-fit: contain;
-  /* Tingkatkan kontras maksimal untuk garis tipis */
-  filter: contrast(10) saturate(5) brightness(0.8);
+  /* Invert + saturate untuk buat garis terang jadi gelap */
+  filter: invert(1) contrast(3) saturate(10) hue-rotate(180deg) brightness(0.4);
 }
 
 .dxf-preview {
@@ -821,9 +821,9 @@
   stroke: var(--border);
 }
 
-/* Tingkatkan kontras gambar di nesting preview */
+/* Invert + saturate untuk buat garis terang jadi gelap di nesting */
 .nesting-svg image {
-  filter: contrast(10) saturate(5) brightness(0.8);
+  filter: invert(1) contrast(3) saturate(10) hue-rotate(180deg) brightness(0.4);
 }
 
 .nesting-warning {
