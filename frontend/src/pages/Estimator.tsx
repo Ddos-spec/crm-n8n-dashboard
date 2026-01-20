@@ -218,8 +218,9 @@ export default function Estimator() {
   const [drawStart, setDrawStart] = useState<{ x: number; y: number } | null>(null);
   const [currentSelection, setCurrentSelection] = useState<{ x: number; y: number; width: number; height: number } | null>(null);
   const [, setUseAreaSelection] = useState(false); // Track if user chose to use area selection
-  const [croppedPreview, setCroppedPreview] = useState<string | null>(null);
-  const [croppedDimensions, setCroppedDimensions] = useState<{ width: number; height: number } | null>(null);
+  // Support multiple cropped previews - one per selection
+  const [croppedPreviews, setCroppedPreviews] = useState<string[]>([]);
+  const [croppedDimensionsList, setCroppedDimensionsList] = useState<{ width: number; height: number }[]>([]);
   const [warnings, setWarnings] = useState<string[]>([]);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -459,9 +460,9 @@ export default function Estimator() {
     }
 
     const file = files[0];
-    // Use cropped dimensions if available, otherwise use full image dimensions
+    // Use first cropped dimensions if available, otherwise use full image dimensions
     // Validate dimensions using helper function
-    const rawDims = croppedDimensions || file.dimensions;
+    const rawDims = croppedDimensionsList[0] || file.dimensions;
     const dims = validateDimensions(rawDims);
 
     // Validate scale value
@@ -818,8 +819,8 @@ EOF`;
     setSelections([]);
     setUseAreaSelection(false);
     setSelectionMode('select');
-    setCroppedPreview(null);
-    setCroppedDimensions(null);
+    setCroppedPreviews([]);
+    setCroppedDimensionsList([]);
   };
 
   // Get image bounds within the preview canvas
@@ -971,8 +972,8 @@ EOF`;
   const skipSelection = () => {
     setUseAreaSelection(false);
     // Clear cropped preview - use full image
-    setCroppedPreview(null);
-    setCroppedDimensions(null);
+    setCroppedPreviews([]);
+    setCroppedDimensionsList([]);
     // Select all paths
     const newFiles = [...files];
     newFiles.forEach(f => {
@@ -1067,6 +1068,7 @@ EOF`;
   };
 
   // Use area selections to filter paths - with improved error handling
+  // Now processes ALL selections, not just the first one
   const applyAreaSelection = async () => {
     if (selections.length === 0) {
       skipSelection();
@@ -1081,48 +1083,58 @@ EOF`;
     try {
       setUseAreaSelection(true);
 
-      // Get the first selected area and generate cropped preview
-      const selectedArea = selections.find(s => s.selected) || selections[0];
+      // Process ALL selections and generate cropped previews for each
+      const previews: string[] = [];
+      const dimensionsList: { width: number; height: number }[] = [];
+      const newWarnings: string[] = [];
 
-      if (selectedArea) {
+      for (let i = 0; i < selections.length; i++) {
+        const selection = selections[i];
+
         // Validate selection before processing
-        if (selectedArea.width <= 0 || selectedArea.height <= 0) {
-          setWarnings(['Area seleksi tidak valid. Menggunakan gambar penuh.']);
+        if (selection.width <= 0 || selection.height <= 0) {
+          newWarnings.push(`Area ${i + 1} tidak valid.`);
+          continue;
+        }
+
+        // Set timeout for cropping operation
+        const cropPromise = generateCroppedPreview(selection);
+        const timeoutPromise = new Promise<null>((resolve) =>
+          setTimeout(() => resolve(null), 5000) // 5 second timeout per selection
+        );
+
+        const cropped = await Promise.race([cropPromise, timeoutPromise]);
+
+        if (cropped && cropped.dataUrl && cropped.width > 0 && cropped.height > 0) {
+          previews.push(cropped.dataUrl);
+          dimensionsList.push({ width: cropped.width, height: cropped.height });
         } else {
-          // Set timeout for cropping operation
-          const cropPromise = generateCroppedPreview(selectedArea);
-          const timeoutPromise = new Promise<null>((resolve) =>
-            setTimeout(() => resolve(null), 5000) // 5 second timeout
-          );
+          // Fallback: estimate dimensions from selection
+          console.warn(`Cropping failed for selection ${i + 1}, using estimated dimensions`);
 
-          const cropped = await Promise.race([cropPromise, timeoutPromise]);
+          const bounds = getImageBounds();
+          if (bounds && files[0]?.dimensions) {
+            const scaleX = files[0].dimensions.width / bounds.width;
+            const scaleY = files[0].dimensions.height / bounds.height;
+            const estimatedWidth = Math.round(selection.width * scaleX);
+            const estimatedHeight = Math.round(selection.height * scaleY);
 
-          if (cropped && cropped.dataUrl && cropped.width > 0 && cropped.height > 0) {
-            setCroppedPreview(cropped.dataUrl);
-            setCroppedDimensions({ width: cropped.width, height: cropped.height });
-          } else {
-            // Fallback: use file dimensions but no cropped preview
-            console.warn('Cropping failed or timed out, using full image');
-            setWarnings(['Cropping gagal. Menggunakan dimensi area seleksi.']);
-
-            // Use selection dimensions as approximation
-            const bounds = getImageBounds();
-            if (bounds && files[0]?.dimensions) {
-              const scaleX = files[0].dimensions.width / bounds.width;
-              const scaleY = files[0].dimensions.height / bounds.height;
-              const estimatedWidth = selectedArea.width * scaleX;
-              const estimatedHeight = selectedArea.height * scaleY;
-
-              if (estimatedWidth > 0 && estimatedHeight > 0) {
-                setCroppedDimensions({
-                  width: Math.round(estimatedWidth),
-                  height: Math.round(estimatedHeight)
-                });
-              }
+            if (estimatedWidth > 0 && estimatedHeight > 0) {
+              // Use file preview as fallback
+              previews.push(files[0]?.preview || '');
+              dimensionsList.push({ width: estimatedWidth, height: estimatedHeight });
             }
           }
         }
       }
+
+      if (newWarnings.length > 0) {
+        setWarnings(newWarnings);
+      }
+
+      // Store all cropped previews and dimensions
+      setCroppedPreviews(previews);
+      setCroppedDimensionsList(dimensionsList);
 
       // For now, select all paths
       const newFiles = [...files];
@@ -1697,26 +1709,17 @@ EOF`;
                       </text>
                     )}
                     {nestingResult.positions.map((pos, idx) => {
-                      // Use cropped dimensions if available
-                      const dims = croppedDimensions || files[0]?.dimensions || { width: 100, height: 100 };
+                      // Cycle through cropped dimensions if multiple selections
+                      const previewIndex = croppedPreviews.length > 0 ? idx % croppedPreviews.length : 0;
+                      const dims = croppedDimensionsList[previewIndex] || files[0]?.dimensions || { width: 100, height: 100 };
                       const unitMultiplier = scale.unit === 'cm' ? 10 : scale.unit === 'm' ? 1000 : 1;
                       const baseW = dims.width * scale.value * unitMultiplier;
                       const baseH = dims.height * scale.value * unitMultiplier;
                       const isRotated = pos.rotation === 90;
                       const w = isRotated ? baseH : baseW;
                       const h = isRotated ? baseW : baseH;
-                      // Use cropped preview if available, otherwise fall back to full preview
-                      const previewUrl = croppedPreview || files[0]?.preview;
-
-                      // Debug log first position only
-                      if (idx === 0) {
-                        console.log('Nesting render:', { dims, baseW, baseH, w, h, previewUrl: previewUrl ? 'exists' : 'missing', croppedDimensions, positions: nestingResult.positions.length });
-                      }
-
-                      // Log preview URL for debugging (first item only)
-                      if (idx === 0) {
-                        console.log('Preview URL type:', typeof previewUrl, 'starts with:', previewUrl?.substring(0, 50));
-                      }
+                      // Use cropped preview if available (cycle through if multiple)
+                      const previewUrl = croppedPreviews[previewIndex] || files[0]?.preview;
 
                       return (
                         <g key={idx}>

@@ -423,8 +423,8 @@
   max-width: 100%;
   max-height: 400px;
   object-fit: contain;
-  /* Tampilkan garis terang di kanvas gelap */
-  filter: brightness(2) contrast(1.5);
+  /* Tampilkan garis terang dan jelas di kanvas gelap */
+  filter: brightness(3) contrast(2) saturate(1.2);
 }
 
 .dxf-preview {
@@ -822,9 +822,9 @@
   stroke: #3a4050;
 }
 
-/* Tampilkan garis putih di kanvas gelap */
+/* Tampilkan garis terang dan jelas di nesting */
 .nesting-svg image {
-  filter: brightness(2) contrast(1.5);
+  filter: brightness(3) contrast(2) saturate(1.2);
 }
 
 .nesting-warning {
