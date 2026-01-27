@@ -6,7 +6,8 @@ import {
   MessageSquare,
   Target,
   CheckSquare,
-  Calculator
+  Calculator,
+  MessageCircle
 } from 'lucide-react';
 
 export function Layout() {
@@ -57,6 +58,13 @@ export function Layout() {
           >
             <Calculator size={20} className="mobile-nav-icon" />
             <span>Estimator</span>
+          </NavLink>
+          <NavLink
+            to="/embedded-chat"
+            className={({ isActive }) => `mobile-nav-item ${isActive ? 'active' : ''}`}
+          >
+            <MessageCircle size={20} className="mobile-nav-icon" />
+            <span>Chatbot</span>
           </NavLink>
         </div>
       </nav>

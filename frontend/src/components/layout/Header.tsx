@@ -149,6 +149,13 @@ export function Header() {
             <Calculator size={16} />
             Estimator
           </NavLink>
+          <NavLink
+            to="/embedded-chat"
+            className={({ isActive }) => `nav-tab ${isActive ? 'active' : ''}`}
+          >
+            <MessageCircle size={16} />
+            Embedded Chat
+          </NavLink>
         </nav>
 
         <div className="header-right">
