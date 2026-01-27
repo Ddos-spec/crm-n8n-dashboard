@@ -22,6 +22,69 @@ const getWebhookUrl = () =>
   import.meta.env.VITE_N8N_CHAT_WEBHOOK ||
   'https://projek-n8n-n8n.qk6yxt.easypanel.host/webhook/4d637604-a1c4-4774-9d1e-c453fb46b85a/chat';
 
+const parseJsonChunks = (rawText: string) => {
+  const chunks: unknown[] = [];
+  let i = 0;
+
+  while (i < rawText.length) {
+    const char = rawText[i];
+    if (char !== '{' && char !== '[') {
+      i += 1;
+      continue;
+    }
+
+    const start = i;
+    const stack = [char];
+    let inString = false;
+    let escaped = false;
+    i += 1;
+
+    for (; i < rawText.length; i += 1) {
+      const current = rawText[i];
+      if (inString) {
+        if (escaped) {
+          escaped = false;
+          continue;
+        }
+        if (current === '\\') {
+          escaped = true;
+          continue;
+        }
+        if (current === '"') {
+          inString = false;
+        }
+        continue;
+      }
+
+      if (current === '"') {
+        inString = true;
+        continue;
+      }
+
+      if (current === '{' || current === '[') {
+        stack.push(current);
+        continue;
+      }
+
+      if (current === '}' || current === ']') {
+        stack.pop();
+        if (stack.length === 0) {
+          const chunk = rawText.slice(start, i + 1);
+          try {
+            chunks.push(JSON.parse(chunk));
+          } catch {
+            // Ignore malformed JSON chunks
+          }
+          i += 1;
+          break;
+        }
+      }
+    }
+  }
+
+  return chunks;
+};
+
 const extractReply = (data: unknown) => {
   if (typeof data === 'string') return data;
   if (Array.isArray(data)) {
@@ -33,12 +96,14 @@ const extractReply = (data: unknown) => {
     if (typeof payload.reply === 'string') return payload.reply;
     if (typeof payload.message === 'string') return payload.message;
     if (typeof payload.text === 'string') return payload.text;
+    if (typeof payload.content === 'string') return payload.content;
     if (typeof payload.output === 'string') return payload.output;
     if (payload.data && typeof payload.data === 'object') {
       const nested = payload.data as Record<string, unknown>;
       if (typeof nested.reply === 'string') return nested.reply;
       if (typeof nested.message === 'string') return nested.message;
       if (typeof nested.text === 'string') return nested.text;
+      if (typeof nested.content === 'string') return nested.content;
       if (typeof nested.output === 'string') return nested.output;
     }
   }
@@ -58,10 +123,40 @@ const safeJsonParse = (rawText: string) => {
         console.error('Failed to parse trimmed JSON response', innerError);
       }
     }
+    const chunks = parseJsonChunks(rawText);
+    if (chunks.length > 0) {
+      return chunks;
+    }
     console.error('Failed to parse JSON response', error);
   }
 
-  return rawText.trim();
+  return null;
+};
+
+const extractStreamText = (payload: unknown) => {
+  if (!payload) return null;
+  const items = Array.isArray(payload) ? payload.flatMap((item) => (Array.isArray(item) ? item : [item])) : [payload];
+  const parts: string[] = [];
+
+  for (const item of items) {
+    if (!item || typeof item !== 'object') continue;
+    const record = item as Record<string, unknown>;
+    const type = typeof record.type === 'string' ? record.type : '';
+    if (type === 'begin') continue;
+
+    const content = typeof record.content === 'string' ? record.content : null;
+    const delta = typeof record.delta === 'string' ? record.delta : null;
+    const text = typeof record.text === 'string' ? record.text : null;
+    const output = typeof record.output === 'string' ? record.output : null;
+
+    if (content) parts.push(content);
+    else if (delta) parts.push(delta);
+    else if (text) parts.push(text);
+    else if (output) parts.push(output);
+  }
+
+  const joined = parts.join('');
+  return joined.trim() ? joined : null;
 };
 
 export default function EmbeddedChat() {
@@ -118,13 +213,16 @@ export default function EmbeddedChat() {
 
       const rawText = await response.text();
       const payload = safeJsonParse(rawText);
+      const extracted =
+        extractReply(payload) ||
+        extractStreamText(payload) ||
+        (rawText.trim() ? rawText.trim() : null);
 
       if (!response.ok) {
-        const errorText = extractReply(payload) || 'Webhook error';
-        throw new Error(errorText);
+        throw new Error(extracted || 'Webhook error');
       }
 
-      const replyText = extractReply(payload) || 'Pesan diterima. Balasan belum tersedia.';
+      const replyText = extracted || 'Pesan diterima. Balasan belum tersedia.';
       const assistantMessage: ChatMessage = {
         id: `assistant-${Date.now()}`,
         role: 'assistant',
