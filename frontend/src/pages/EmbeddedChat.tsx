@@ -24,19 +24,44 @@ const getWebhookUrl = () =>
 
 const extractReply = (data: unknown) => {
   if (typeof data === 'string') return data;
+  if (Array.isArray(data)) {
+    const first = data[0] as Record<string, unknown> | undefined;
+    if (first && typeof first.output === 'string') return first.output;
+  }
   if (data && typeof data === 'object') {
     const payload = data as Record<string, unknown>;
     if (typeof payload.reply === 'string') return payload.reply;
     if (typeof payload.message === 'string') return payload.message;
     if (typeof payload.text === 'string') return payload.text;
+    if (typeof payload.output === 'string') return payload.output;
     if (payload.data && typeof payload.data === 'object') {
       const nested = payload.data as Record<string, unknown>;
       if (typeof nested.reply === 'string') return nested.reply;
       if (typeof nested.message === 'string') return nested.message;
       if (typeof nested.text === 'string') return nested.text;
+      if (typeof nested.output === 'string') return nested.output;
     }
   }
   return null;
+};
+
+const safeJsonParse = (rawText: string) => {
+  try {
+    return JSON.parse(rawText) as unknown;
+  } catch (error) {
+    const start = rawText.indexOf('[');
+    const end = rawText.lastIndexOf(']');
+    if (start !== -1 && end !== -1 && end > start) {
+      try {
+        return JSON.parse(rawText.slice(start, end + 1)) as unknown;
+      } catch (innerError) {
+        console.error('Failed to parse trimmed JSON response', innerError);
+      }
+    }
+    console.error('Failed to parse JSON response', error);
+  }
+
+  return rawText.trim();
 };
 
 export default function EmbeddedChat() {
@@ -91,10 +116,8 @@ export default function EmbeddedChat() {
         }),
       });
 
-      const contentType = response.headers.get('content-type');
-      const payload = contentType && contentType.includes('application/json')
-        ? await response.json()
-        : await response.text();
+      const rawText = await response.text();
+      const payload = safeJsonParse(rawText);
 
       if (!response.ok) {
         const errorText = extractReply(payload) || 'Webhook error';
