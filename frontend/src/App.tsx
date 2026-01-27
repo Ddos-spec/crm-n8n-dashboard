@@ -11,6 +11,7 @@ const Marketing = lazy(() => import('./pages/Marketing'));
 const Tugas = lazy(() => import('./pages/Tugas'));
 const Penugasan = lazy(() => import('./pages/Penugasan'));
 const Estimator = lazy(() => import('./pages/Estimator'));
+const EmbeddedChat = lazy(() => import('./pages/EmbeddedChat'));
 
 // Simple Loading Spinner for Suspense fallback
 const PageLoader = () => (
@@ -61,6 +62,11 @@ export default function App() {
               <Route path="/ai" element={
                 <Suspense fallback={<PageLoader />}>
                   <Estimator />
+                </Suspense>
+              } />
+              <Route path="/embedded-chat" element={
+                <Suspense fallback={<PageLoader />}>
+                  <EmbeddedChat />
                 </Suspense>
               } />
               <Route path="*" element={
