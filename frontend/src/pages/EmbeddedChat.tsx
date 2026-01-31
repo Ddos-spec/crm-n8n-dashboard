@@ -1,5 +1,8 @@
 import React, { useCallback, useMemo, useRef, useState } from 'react';
 import { MessageCircle, Send, Loader2, AlertTriangle, Copy } from 'lucide-react';
+import ReactMarkdown from 'react-markdown';
+import remarkBreaks from 'remark-breaks';
+import remarkGfm from 'remark-gfm';
 
 const createSessionId = () => {
   if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) {
@@ -341,6 +344,81 @@ export default function EmbeddedChat() {
           gap: 6px;
         }
 
+        .embedded-chat-text {
+          display: flex;
+          flex-direction: column;
+          gap: 8px;
+        }
+
+        .embedded-chat-text p {
+          margin: 0;
+        }
+
+        .embedded-chat-text h1,
+        .embedded-chat-text h2,
+        .embedded-chat-text h3,
+        .embedded-chat-text h4 {
+          margin: 8px 0 4px;
+          font-weight: 600;
+        }
+
+        .embedded-chat-text h1 { font-size: 16px; }
+        .embedded-chat-text h2 { font-size: 15px; }
+        .embedded-chat-text h3 { font-size: 14px; }
+        .embedded-chat-text h4 { font-size: 13px; }
+
+        .embedded-chat-text ul,
+        .embedded-chat-text ol {
+          margin: 0;
+          padding-left: 18px;
+          display: flex;
+          flex-direction: column;
+          gap: 4px;
+        }
+
+        .embedded-chat-text table {
+          width: 100%;
+          border-collapse: collapse;
+          display: block;
+          overflow-x: auto;
+        }
+
+        .embedded-chat-text th,
+        .embedded-chat-text td {
+          border: 1px solid var(--border);
+          padding: 6px 8px;
+          font-size: 12px;
+          white-space: nowrap;
+        }
+
+        .embedded-chat-text th {
+          text-align: left;
+          background: var(--bg-tertiary);
+          font-weight: 600;
+        }
+
+        .embedded-chat-text pre {
+          margin: 0;
+          padding: 10px 12px;
+          background: var(--bg-tertiary);
+          border-radius: 10px;
+          overflow-x: auto;
+          font-size: 12px;
+        }
+
+        .embedded-chat-text code {
+          background: var(--bg-tertiary);
+          padding: 2px 4px;
+          border-radius: 6px;
+          font-size: 12px;
+        }
+
+        .embedded-chat-text hr {
+          border: none;
+          border-top: 1px dashed var(--border);
+          margin: 6px 0;
+        }
+
         .embedded-chat-message.user {
           align-self: flex-end;
           background: linear-gradient(135deg, var(--accent), var(--cyan));
@@ -485,7 +563,11 @@ export default function EmbeddedChat() {
         <div className="embedded-chat-messages">
           {messages.map((message) => (
             <div key={message.id} className={`embedded-chat-message ${message.role}`}>
-              <div>{message.text}</div>
+              <div className="embedded-chat-text">
+                <ReactMarkdown remarkPlugins={[remarkGfm, remarkBreaks]}>
+                  {message.text}
+                </ReactMarkdown>
+              </div>
               <div className="embedded-chat-meta">
                 {new Date(message.timestamp).toLocaleTimeString('id-ID', {
                   hour: '2-digit',
