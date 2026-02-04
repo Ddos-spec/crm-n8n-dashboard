@@ -2,7 +2,8 @@ import { Router } from 'express';
 import multer from 'multer';
 import DxfParser from 'dxf-parser';
 import potrace from 'potrace';
-import * as pdfjsLib from 'pdfjs-dist/legacy/build/pdf';
+// eslint-disable-next-line @typescript-eslint/no-var-requires
+const pdfjsLib = require('pdfjs-dist/legacy/build/pdf');
 import { createCanvas } from 'canvas';
 import { pool } from './lib/db';
 import { config } from './config/env';
