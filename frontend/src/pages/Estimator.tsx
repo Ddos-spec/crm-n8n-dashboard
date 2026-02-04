@@ -2140,15 +2140,27 @@ EOF`;
 
       {/* Content */}
       <div className="estimator-content">
-        <div className="content-card">
-          {isProcessing ? (
-            <div className="processing-state">
+        <div className="content-card" style={{ position: 'relative', overflow: 'hidden' }}>
+          {isProcessing && (
+            <div className="processing-overlay" style={{
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              backgroundColor: 'rgba(255, 255, 255, 0.9)',
+              zIndex: 50,
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              justifyContent: 'center',
+              backdropFilter: 'blur(2px)'
+            }}>
               <div className="spinner" />
-              <p>Memproses file...</p>
+              <p style={{ marginTop: '16px', color: 'var(--text-secondary)', fontWeight: 500 }}>Memproses data...</p>
             </div>
-          ) : (
-            renderStep()
           )}
+          {renderStep()}
         </div>
       </div>
 
