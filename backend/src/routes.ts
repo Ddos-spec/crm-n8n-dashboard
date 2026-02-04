@@ -962,8 +962,6 @@ router.post('/api/estimator/upload', upload.single('file'), async (req, res) => 
           data: new Uint8Array(req.file.buffer),
           // Disable font face to prevent font loading errors in Node environment
           disableFontFace: true,
-          // Use standard fonts from the package if possible, or ignore
-          standardFontDataUrl: './node_modules/pdfjs-dist/standard_fonts/', 
         });
 
         const doc = await loadingTask.promise;
