@@ -1071,11 +1071,13 @@ EOF`;
     return new Promise((resolve) => {
       img.onload = () => {
         // Get the preview element to calculate scale ratio
-        const previewElement = previewCanvasRef.current?.querySelector('.preview-item img') as HTMLImageElement;
-        const canvasElement = previewCanvasRef.current;
+        // Use ID selector for robustness - targeting the first image as base
+        const previewElement = document.getElementById('preview-img-0') as HTMLImageElement;
+        
+        const canvasElement = previewCanvasRef.current || document.querySelector('.preview-canvas');
 
         if (!previewElement || !canvasElement) {
-          console.error('Preview element not found');
+          console.error('Preview element not found by ID (preview-img-0)');
           resolve(null);
           return;
         }
@@ -1364,7 +1366,12 @@ EOF`;
                   {files.map((f, idx) => (
                     <div key={idx} className="preview-item">
                       {f.preview ? (
-                        <img src={f.preview} alt={f.file.name} draggable={false} />
+                        <img 
+                          id={`preview-img-${idx}`}
+                          src={f.preview} 
+                          alt={f.file.name} 
+                          draggable={false} 
+                        />
                       ) : (
                         <div className="dxf-preview">
                           <p>Memproses file...</p>
