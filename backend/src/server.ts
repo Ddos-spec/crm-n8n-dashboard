@@ -21,6 +21,9 @@ process.on('uncaughtException', (error) => {
 
 const app = express();
 
+// Trust proxy is required when running behind a reverse proxy (like Easypanel/Docker)
+app.set('trust proxy', 1);
+
 const allowedOrigins = config.corsOrigins;
 
 app.use(

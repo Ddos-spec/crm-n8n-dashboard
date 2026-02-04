@@ -27,6 +27,30 @@ const upload = multer({
   },
 });
 
+// Canvas Factory for PDF.js in Node environment
+class NodeCanvasFactory {
+  create(width: number, height: number) {
+    const canvas = createCanvas(width, height);
+    const context = canvas.getContext('2d');
+    return {
+      canvas,
+      context,
+    };
+  }
+
+  reset(canvasAndContext: any, width: number, height: number) {
+    canvasAndContext.canvas.width = width;
+    canvasAndContext.canvas.height = height;
+  }
+
+  destroy(canvasAndContext: any) {
+    canvasAndContext.canvas.width = 0;
+    canvasAndContext.canvas.height = 0;
+    canvasAndContext.canvas = null;
+    canvasAndContext.context = null;
+  }
+}
+
 const router = Router();
 
 // Input validation helpers
@@ -933,22 +957,30 @@ router.post('/api/estimator/upload', upload.single('file'), async (req, res) => 
       }
     } else if (ext === '.pdf') {
       try {
+        // Load the PDF document
         const loadingTask = pdfjsLib.getDocument({
           data: new Uint8Array(req.file.buffer),
+          // Disable font face to prevent font loading errors in Node environment
           disableFontFace: true,
+          // Use standard fonts from the package if possible, or ignore
+          standardFontDataUrl: './node_modules/pdfjs-dist/standard_fonts/', 
         });
+
         const doc = await loadingTask.promise;
         const page = await doc.getPage(1);
         const viewport = page.getViewport({ scale: 2.0 });
-        const canvas = createCanvas(viewport.width, viewport.height);
-        const context = canvas.getContext('2d');
+        
+        // Use factory to create canvas
+        const factory = new NodeCanvasFactory();
+        const canvasAndContext = factory.create(viewport.width, viewport.height);
 
         await page.render({
-          canvasContext: context as any,
+          canvasContext: canvasAndContext.context,
           viewport: viewport,
+          canvasFactory: factory,
         }).promise;
 
-        const pngBuffer = canvas.toBuffer('image/png');
+        const pngBuffer = canvasAndContext.canvas.toBuffer('image/png');
         
         // Trace the rendered PDF page
         const tracedSvg = await new Promise<string>((resolve, reject) => {
