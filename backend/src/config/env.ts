@@ -20,7 +20,7 @@ export const config = {
   jwtSecret: getEnv('JWT_SECRET') as string,
   corsOrigins: corsOrigin
     ? corsOrigin.split(',').map((origin) => origin.trim()).filter(Boolean)
-    : ['http://localhost:5173'],
+    : ['http://localhost:5173', 'https://crm-n8n-dashboard.vercel.app'],
   whatsappUrl: getEnv('WHATSAPP_URL') || '',
   whatsappApiKey: getEnv('API_WHATSAPP') || '',
 };
