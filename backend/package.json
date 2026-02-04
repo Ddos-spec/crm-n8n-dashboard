@@ -24,7 +24,7 @@
     "express-rate-limit": "^7.4.0",
     "helmet": "^7.1.0",
     "multer": "^2.0.2",
-    "pdfjs-dist": "3.11.174",
+    "pdfjs-dist": "5.4.624",
     "pg": "^8.13.1",
     "potrace": "^2.1.8"
   },
