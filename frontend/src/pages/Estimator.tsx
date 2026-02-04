@@ -388,8 +388,8 @@ export default function Estimator() {
   const processFile = async (file: File): Promise<FileData | null> => {
     const ext = file.name.split('.').pop()?.toLowerCase();
 
-    if (!ext || !['svg', 'dxf', 'png', 'jpg', 'jpeg', 'webp'].includes(ext)) {
-      setError('Format file tidak didukung. Gunakan SVG, DXF, atau gambar (PNG, JPG).');
+    if (!ext || !['svg', 'dxf', 'png', 'jpg', 'jpeg', 'webp', 'pdf'].includes(ext)) {
+      setError('Format file tidak didukung. Gunakan SVG, DXF, PDF, atau gambar (PNG, JPG).');
       return null;
     }
 
@@ -474,6 +474,262 @@ export default function Estimator() {
     const material = settings.materials.find(m => m.id === materialId);
     const baseSpeed = material?.cuttingSpeed || 3000;
     return baseSpeed * (1 / Math.sqrt(thickness));
+  };
+
+  // Calculate nesting with improved algorithm and robust error handling
+  const calculateNesting = () => {
+    // 1. Identify parts to process
+    let partsToProcess: ProcessedPart[] = [];
+
+    if (selections.length > 0 && croppedPreviews.length > 0) {
+      // Priority 1: Use selections (Cropped Areas)
+      partsToProcess = selections.map((sel, idx) => {
+        const preview = croppedPreviews[idx] || '';
+        const dims = croppedDimensionsList[idx] || { width: 100, height: 100 };
+        return {
+          id: sel.id,
+          name: `Area ${idx + 1}`,
+          width: dims.width,
+          height: dims.height,
+          preview,
+          // Estimate path length for images (perimeter based)
+          pathLength: 2 * (dims.width + dims.height)
+        };
+      });
+    } else if (files.length > 0) {
+      // Priority 2: Use uploaded files
+      partsToProcess = files.map((f, idx) => {
+        const dims = validateDimensions(f.dimensions);
+        // Calculate real path length if available
+        let length = 0;
+        if (f.paths) {
+           f.paths.forEach(p => { if(p.selected) length += p.length; });
+        }
+        if (length === 0) length = 2 * (dims.width + dims.height);
+
+        return {
+          id: `file-${idx}`,
+          name: f.file.name,
+          width: dims.width,
+          height: dims.height,
+          preview: f.preview,
+          pathLength: length
+        };
+      });
+    }
+
+    if (partsToProcess.length === 0) {
+      setError('Tidak ada data untuk diproses. Silakan upload file atau seleksi area.');
+      return;
+    }
+
+    // Settings & Validation
+    const safeScale = isValidNumber(scale.value) && scale.value > 0 ? scale.value : 1;
+    const unitMultiplier = scale.unit === 'cm' ? 10 : scale.unit === 'm' ? 1000 : 1;
+    const sheetW = isValidNumber(settings.defaultSheetWidth) && settings.defaultSheetWidth > 0
+      ? settings.defaultSheetWidth : 1220;
+    const sheetH = isValidNumber(settings.defaultSheetHeight) && settings.defaultSheetHeight > 0
+      ? settings.defaultSheetHeight : 2440;
+    const gap = 5;
+    const safeQuantity = isValidNumber(quantity) && quantity > 0 ? quantity : 1;
+
+    const layouts: SheetLayout[] = [];
+    const errors: string[] = [];
+
+    // 2. Process each part independently
+    partsToProcess.forEach(part => {
+      // Apply scale
+      const scaledWidth = part.width * safeScale * unitMultiplier;
+      const scaledHeight = part.height * safeScale * unitMultiplier;
+
+      // Validate dimensions
+      if (scaledWidth <= 0 || scaledHeight <= 0) {
+        errors.push(`Part ${part.name}: Dimensi tidak valid.`);
+        return;
+      }
+
+      // Check fit
+      const minPart = Math.min(scaledWidth, scaledHeight);
+      const maxPart = Math.max(scaledWidth, scaledHeight);
+      const minSheet = Math.min(sheetW, sheetH);
+      const maxSheet = Math.max(sheetW, sheetH);
+
+      if (minPart + gap > minSheet || maxPart + gap > maxSheet) {
+        errors.push(`Part ${part.name} terlalu besar (${scaledWidth.toFixed(0)}x${scaledHeight.toFixed(0)}) untuk sheet.`);
+        // Add failed layout
+        layouts.push({
+          partId: part.id,
+          partName: part.name,
+          sheetWidth: sheetW,
+          sheetHeight: sheetH,
+          utilization: 0,
+          wastePercent: 100,
+          positions: [],
+          partsPerSheet: 0,
+          totalSheets: 0,
+          partWidth: scaledWidth,
+          partHeight: scaledHeight
+        });
+        return;
+      }
+
+      // Calculate Orientation 1
+      const cols1 = Math.max(0, Math.floor(safeDivide(sheetW, scaledWidth + gap, 0)));
+      const rows1 = Math.max(0, Math.floor(safeDivide(sheetH, scaledHeight + gap, 0)));
+      const perSheet1 = cols1 * rows1;
+
+      // Calculate Orientation 2 (Rotated)
+      const cols2 = Math.max(0, Math.floor(safeDivide(sheetW, scaledHeight + gap, 0)));
+      const rows2 = Math.max(0, Math.floor(safeDivide(sheetH, scaledWidth + gap, 0)));
+      const perSheet2 = cols2 * rows2;
+
+      // Best orientation
+      const useRotated = perSheet2 > perSheet1;
+      const cols = useRotated ? cols2 : cols1;
+      const rows = useRotated ? rows2 : rows1;
+      const partsPerSheet = Math.max(perSheet1, perSheet2);
+      const layoutPartW = useRotated ? scaledHeight : scaledWidth;
+      const layoutPartH = useRotated ? scaledWidth : scaledHeight;
+
+      const totalSheets = safeCeil(safeDivide(safeQuantity, partsPerSheet, 1), 0);
+
+      // Generate positions
+      const positions = [];
+      // Just show one sheet sample
+      const partsToShow = Math.min(partsPerSheet, 100); // Limit for performance
+
+      for (let r = 0; r < rows && positions.length < partsToShow; r++) {
+        for (let c = 0; c < cols && positions.length < partsToShow; c++) {
+          positions.push({
+            x: c * (layoutPartW + gap) + gap,
+            y: r * (layoutPartH + gap) + gap,
+            rotation: useRotated ? 90 : 0,
+          });
+        }
+      }
+
+      const usedAreaPerSheet = partsPerSheet * scaledWidth * scaledHeight;
+      const sheetArea = sheetW * sheetH;
+      const utilization = safeDivide(usedAreaPerSheet, sheetArea, 0) * 100;
+
+      layouts.push({
+        partId: part.id,
+        partName: part.name,
+        sheetWidth: sheetW,
+        sheetHeight: sheetH,
+        utilization,
+        wastePercent: 100 - utilization,
+        positions,
+        partsPerSheet,
+        totalSheets,
+        partWidth: scaledWidth,
+        partHeight: scaledHeight
+      });
+    });
+
+    if (errors.length > 0) {
+      setError(errors[0]); // Show first error
+    } else {
+      setError(null);
+    }
+
+    // 3. Aggregate results
+    const totalGlobalSheets = layouts.reduce((sum, l) => sum + l.totalSheets, 0);
+    // Simple average utilization (weighted by sheets would be better but this is estimation)
+    const avgUtil = safeDivide(layouts.reduce((sum, l) => sum + l.utilization, 0), layouts.length, 0);
+
+    setNestingResult({
+      layouts,
+      totalSheets: totalGlobalSheets,
+      globalUtilization: avgUtil,
+      totalParts: partsToProcess.length
+    });
+  };
+
+  // Calculate estimation with gas and more details - with robust error handling
+  const calculateEstimation = () => {
+    if (!selectedMaterial || !nestingResult || nestingResult.layouts.length === 0) {
+      setEstimation(null);
+      return;
+    }
+
+    const material = settings.materials.find(m => m.id === selectedMaterial);
+    if (!material) {
+      setError('Material tidak ditemukan.');
+      setEstimation(null);
+      return;
+    }
+
+    const safeScale = isValidNumber(scale.value) && scale.value > 0 ? scale.value : 1;
+    const unitMultiplier = scale.unit === 'cm' ? 10 : scale.unit === 'm' ? 1000 : 1;
+    const safeQuantity = isValidNumber(quantity) && quantity > 0 ? quantity : 1;
+    
+    // Cutting params
+    const cuttingSpeed = getCuttingSpeed(selectedMaterial, selectedThickness);
+    const safeCuttingSpeed = isValidNumber(cuttingSpeed) && cuttingSpeed > 0 ? cuttingSpeed : 3000;
+    const safeLaborCost = isValidNumber(settings.laborCostPerMinute) ? settings.laborCostPerMinute : 1500;
+    const safeGasFlowRate = isValidNumber(settings.gasFlowRate) ? settings.gasFlowRate : 20;
+    const safeGasPrice = isValidNumber(settings.gasPrice) ? settings.gasPrice : 50000;
+    const safeSheetPrice = isValidNumber(settings.sheetPricePerM2) ? settings.sheetPricePerM2 : 150000;
+    const sheetAreaM2 = safeDivide(settings.defaultSheetWidth * settings.defaultSheetHeight, 1000000, 1);
+
+    // Calculate totals across all layouts (parts)
+    let totalCuttingLength = 0;
+    let totalProcessedArea = 0;
+    let totalSheets = 0;
+
+    nestingResult.layouts.forEach(layout => {
+        // Perimeter = 2 * (w + h)
+        const perimeter = 2 * (layout.partWidth + layout.partHeight);
+        
+        // Total length for this part type = perimeter * quantity
+        totalCuttingLength += perimeter * safeQuantity;
+        
+        // Processed area
+        totalProcessedArea += (layout.partWidth * layout.partHeight) * safeQuantity;
+        
+        totalSheets += layout.totalSheets;
+    });
+
+    // Recalculate cutting length more accurately if we have files/paths and NO cropping
+    if (files.length > 0 && selections.length === 0) {
+       let realTotalLength = 0;
+       files.forEach(f => {
+         f.paths?.forEach(p => {
+            if (p.selected) realTotalLength += p.length;
+         });
+       });
+       if (realTotalLength > 0) {
+           // Replace the perimeter estimation
+           totalCuttingLength = realTotalLength * safeScale * unitMultiplier * safeQuantity;
+       }
+    }
+
+    const cuttingTime = safeDivide(totalCuttingLength, safeCuttingSpeed, 0); // minutes
+    const gasUsage = safeDivide(safeGasFlowRate * cuttingTime, 1000, 0); // m3
+    
+    const laborCost = cuttingTime * safeLaborCost;
+    const gasCost = gasUsage * safeGasPrice;
+    
+    const sheetCostPerSheet = sheetAreaM2 * safeSheetPrice;
+    const materialCost = sheetCostPerSheet * totalSheets;
+
+    const totalCost = materialCost + laborCost + gasCost;
+    const pricePerPiece = safeDivide(totalCost, safeQuantity * nestingResult.totalParts, 0);
+
+    setEstimation({
+      totalCuttingLength,
+      cuttingTime,
+      materialCost,
+      laborCost,
+      gasCost,
+      totalCost,
+      pricePerPiece,
+      gasUsage,
+      processedArea: totalProcessedArea,
+      totalSheets,
+      wastePercent: 100 - nestingResult.globalUtilization,
+    });
   };
   
   // (Nesting and Estimation functions are here - skipped for brevity in replacement context matching)
@@ -1007,7 +1263,7 @@ EOF`;
               <input
                 ref={fileInputRef}
                 type="file"
-                accept=".svg,.dxf,.png,.jpg,.jpeg,.webp"
+                accept=".svg,.dxf,.png,.jpg,.jpeg,.webp,.pdf"
                 multiple
                 onChange={handleFileSelect}
                 style={{ display: 'none' }}
@@ -1018,7 +1274,7 @@ EOF`;
                 </div>
                 <p className="drop-zone-text">Drag & drop file di sini</p>
                 <p className="drop-zone-subtext">atau klik untuk memilih file</p>
-                <p className="drop-zone-formats">Format: SVG, DXF, PNG, JPG</p>
+                <p className="drop-zone-formats">Format: SVG, DXF, PDF, PNG, JPG</p>
               </div>
             </div>
 

@@ -423,8 +423,9 @@
   max-width: 100%;
   max-height: 400px;
   object-fit: contain;
-  /* Tampilkan garis terang dan jelas di kanvas gelap */
-  filter: brightness(3) contrast(2) saturate(1.2);
+  /* Blueprint style: White lines on black background */
+  filter: grayscale(1) invert(1) brightness(1.5) contrast(1.2);
+  mix-blend-mode: screen; /* Helps blend if there are multiple images */
 }
 
 .dxf-preview {

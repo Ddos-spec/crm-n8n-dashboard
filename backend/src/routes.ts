@@ -2,6 +2,8 @@ import { Router } from 'express';
 import multer from 'multer';
 import DxfParser from 'dxf-parser';
 import potrace from 'potrace';
+import * as pdfjsLib from 'pdfjs-dist/legacy/build/pdf';
+import { createCanvas } from 'canvas';
 import { pool } from './lib/db';
 import { config } from './config/env';
 
@@ -12,14 +14,14 @@ const upload = multer({
     fileSize: 10 * 1024 * 1024, // 10MB limit
   },
   fileFilter: (_req, file, cb) => {
-    const allowedMimes = ['image/svg+xml', 'application/dxf', 'image/png', 'image/jpeg', 'image/webp'];
-    const allowedExts = ['.svg', '.dxf', '.png', '.jpg', '.jpeg', '.webp'];
+    const allowedMimes = ['image/svg+xml', 'application/dxf', 'image/png', 'image/jpeg', 'image/webp', 'application/pdf'];
+    const allowedExts = ['.svg', '.dxf', '.png', '.jpg', '.jpeg', '.webp', '.pdf'];
     const ext = file.originalname.toLowerCase().slice(file.originalname.lastIndexOf('.'));
 
     if (allowedExts.includes(ext) || allowedMimes.includes(file.mimetype)) {
       cb(null, true);
     } else {
-      cb(new Error('Invalid file type. Allowed: SVG, DXF, PNG, JPG, WEBP'));
+      cb(new Error('Invalid file type. Allowed: SVG, DXF, PNG, JPG, WEBP, PDF'));
     }
   },
 });
@@ -926,6 +928,68 @@ router.post('/api/estimator/upload', upload.single('file'), async (req, res) => 
           d: match[1],
           length: estimatePathLength(match[1]),
           selected: true,
+        });
+      }
+    } else if (ext === '.pdf') {
+      try {
+        const loadingTask = pdfjsLib.getDocument({
+          data: new Uint8Array(req.file.buffer),
+          disableFontFace: true,
+        });
+        const doc = await loadingTask.promise;
+        const page = await doc.getPage(1);
+        const viewport = page.getViewport({ scale: 2.0 });
+        const canvas = createCanvas(viewport.width, viewport.height);
+        const context = canvas.getContext('2d');
+
+        await page.render({
+          canvasContext: context as any,
+          viewport: viewport,
+        }).promise;
+
+        const pngBuffer = canvas.toBuffer('image/png');
+        
+        // Trace the rendered PDF page
+        const tracedSvg = await new Promise<string>((resolve, reject) => {
+          potrace.trace(pngBuffer, {
+            threshold: 128,
+            turdSize: 2,
+            optTolerance: 0.2,
+          }, (err, svg) => {
+            if (err) reject(err);
+            else resolve(svg);
+          });
+        });
+
+        // Extract paths
+        const pathMatches = tracedSvg.matchAll(/<path[^>]*d="([^"]+)"[^>]*\/?>/gi);
+        let idx = 0;
+        for (const match of pathMatches) {
+          paths.push({
+            id: `pdf-path-${idx++}`,
+            d: match[1],
+            length: estimatePathLength(match[1]),
+            selected: true,
+          });
+        }
+
+        // Extract dimensions
+        const widthMatch = tracedSvg.match(/width="([^"]+)"/);
+        const heightMatch = tracedSvg.match(/height="([^"]+)"/);
+        if (widthMatch && heightMatch) {
+          dimensions = {
+            width: parseFloat(widthMatch[1]) || 100,
+            height: parseFloat(heightMatch[1]) || 100,
+          };
+        }
+
+        preview = `data:image/svg+xml;base64,${Buffer.from(tracedSvg).toString('base64')}`;
+      } catch (pdfError) {
+        console.error('PDF processing failed:', pdfError);
+        return res.status(400).json({
+          success: false,
+          error: 'Failed to process PDF file. Ensure it is a valid PDF document.',
+          meta: buildMeta(res.locals.requestId),
         });
       }
     } else {
