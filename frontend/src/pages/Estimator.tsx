@@ -1072,46 +1072,48 @@ EOF`;
       img.onload = () => {
         // Get the preview element to calculate scale ratio
         const previewElement = previewCanvasRef.current?.querySelector('.preview-item img') as HTMLImageElement;
+        const canvasElement = previewCanvasRef.current;
 
-        console.log('Crop debug:', {
-          selection,
-          imgNaturalSize: { width: img.naturalWidth, height: img.naturalHeight },
-          previewElement: previewElement ? {
-            clientWidth: previewElement.clientWidth,
-            clientHeight: previewElement.clientHeight,
-            naturalWidth: previewElement.naturalWidth,
-            naturalHeight: previewElement.naturalHeight
-          } : 'not found',
-          fileDimensions: files[0].dimensions
-        });
+        if (!previewElement || !canvasElement) {
+          console.error('Preview element not found');
+          resolve(null);
+          return;
+        }
+
+        // Calculate Image Bounds manually (similar to getImageBounds but ensuring fresh values)
+        const canvasRect = canvasElement.getBoundingClientRect();
+        const imgRect = previewElement.getBoundingClientRect();
+        
+        // Calculate offset of image within the canvas (accounting for zoom)
+        // We use the current zoom state which should be stable during this sync operation
+        const bounds = {
+          x: (imgRect.left - canvasRect.left) / zoom,
+          y: (imgRect.top - canvasRect.top) / zoom,
+          width: imgRect.width / zoom,
+          height: imgRect.height / zoom
+        };
 
         let scaleX = 1;
         let scaleY = 1;
 
-        if (previewElement && previewElement.clientWidth > 0 && previewElement.clientHeight > 0) {
-          // Calculate ratio between actual image size and displayed size
+        if (previewElement.clientWidth > 0 && previewElement.clientHeight > 0) {
+          // Calculate ratio between actual image size and displayed size (natural vs rendered)
           scaleX = img.naturalWidth / previewElement.clientWidth;
           scaleY = img.naturalHeight / previewElement.clientHeight;
-        } else {
-          // Preview element not found - use 1:1 since selection was made on displayed image
-          console.log('Preview element not found, using 1:1 ratio');
         }
 
-        console.log('Scale factors:', { scaleX, scaleY });
-
         // Calculate crop area in original image coordinates
-        let cropX = selection.x * scaleX;
-        let cropY = selection.y * scaleY;
+        // CRITICAL FIX: Subtract image offset (bounds.x/y) from selection coordinates
+        let cropX = (selection.x - bounds.x) * scaleX;
+        let cropY = (selection.y - bounds.y) * scaleY;
         let cropWidth = selection.width * scaleX;
         let cropHeight = selection.height * scaleY;
 
-        // Clamp values to image bounds
+        // Clamp values to image bounds to prevent empty crops
         cropX = Math.max(0, Math.min(cropX, img.naturalWidth - 1));
         cropY = Math.max(0, Math.min(cropY, img.naturalHeight - 1));
         cropWidth = Math.max(1, Math.min(cropWidth, img.naturalWidth - cropX));
         cropHeight = Math.max(1, Math.min(cropHeight, img.naturalHeight - cropY));
-
-        console.log('Final crop area:', { cropX, cropY, cropWidth, cropHeight });
 
         // Create canvas and draw cropped image
         const canvas = document.createElement('canvas');
