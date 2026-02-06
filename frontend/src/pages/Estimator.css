@@ -423,9 +423,10 @@
   max-width: 100%;
   max-height: 400px;
   object-fit: contain;
-  /* Force extracted geometry to look darker on white canvas */
-  filter: grayscale(1) contrast(2.2);
+  /* Hard threshold to push extracted geometry to black on white */
+  filter: grayscale(1) contrast(25) brightness(1.1);
   mix-blend-mode: multiply;
+  image-rendering: crisp-edges;
 }
 
 .dxf-preview {
@@ -825,8 +826,9 @@
 
 /* Keep extracted geometry dark on white nesting canvas */
 .nesting-svg image {
-  filter: grayscale(1) contrast(2.2);
+  filter: grayscale(1) contrast(25) brightness(1.1);
   mix-blend-mode: multiply;
+  image-rendering: crisp-edges;
 }
 
 .nesting-warning {
