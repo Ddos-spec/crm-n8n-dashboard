@@ -11,9 +11,6 @@ import { config } from './config/env';
 // Configure multer for file uploads
 const upload = multer({
   storage: multer.memoryStorage(),
-  limits: {
-    fileSize: 10 * 1024 * 1024, // 10MB limit
-  },
   fileFilter: (_req, file, cb) => {
     const allowedMimes = ['image/svg+xml', 'application/dxf', 'image/png', 'image/jpeg', 'image/webp', 'application/pdf'];
     const allowedExts = ['.svg', '.dxf', '.png', '.jpg', '.jpeg', '.webp', '.pdf'];
@@ -50,6 +47,34 @@ class NodeCanvasFactory {
     canvasAndContext.context = null;
   }
 }
+
+const parseSvgDimension = (rawValue: string | undefined): number | null => {
+  if (!rawValue) return null;
+
+  const value = rawValue.trim();
+  const match = value.match(/^([+-]?\d*\.?\d+(?:e[+-]?\d+)?)(px|mm|cm|in|pt|pc)?$/i);
+  if (!match) return null;
+
+  const numericValue = Number(match[1]);
+  if (!isFinite(numericValue) || numericValue <= 0) return null;
+
+  const unit = (match[2] || 'px').toLowerCase();
+  switch (unit) {
+    case 'mm':
+      return numericValue;
+    case 'cm':
+      return numericValue * 10;
+    case 'in':
+      return numericValue * 25.4;
+    case 'pt':
+      return numericValue * (25.4 / 72);
+    case 'pc':
+      return numericValue * (25.4 / 6);
+    case 'px':
+    default:
+      return numericValue;
+  }
+};
 
 const router = Router();
 
@@ -764,7 +789,6 @@ router.post('/api/estimator/upload', upload.single('file'), async (req, res) => 
       });
     }
 
-    const fileContent = req.file.buffer.toString('utf-8');
     const ext = req.file.originalname.toLowerCase().slice(req.file.originalname.lastIndexOf('.'));
 
     interface PathData {
@@ -781,6 +805,7 @@ router.post('/api/estimator/upload', upload.single('file'), async (req, res) => 
     if (ext === '.dxf') {
       // Parse DXF file
       try {
+        const fileContent = req.file.buffer.toString('utf-8');
         const parser = new DxfParser();
         const dxf = parser.parseSync(fileContent);
 
@@ -909,7 +934,7 @@ router.post('/api/estimator/upload', upload.single('file'), async (req, res) => 
 
             let svgPaths = paths.map(p => {
               // Translate path to start from padding
-              return `<path d="${p.d}" fill="none" stroke="#3b82f6" stroke-width="1" transform="translate(${-minX + padding}, ${-minY + padding})"/>`;
+              return `<path d="${p.d}" fill="none" stroke="#000000" stroke-width="1.2" transform="translate(${-minX + padding}, ${-minY + padding})"/>`;
             }).join('\n');
 
             preview = `data:image/svg+xml;base64,${Buffer.from(
@@ -927,6 +952,7 @@ router.post('/api/estimator/upload', upload.single('file'), async (req, res) => 
       }
     } else if (ext === '.svg') {
       // For SVG, we just return the content as base64
+      const fileContent = req.file.buffer.toString('utf-8');
       preview = `data:image/svg+xml;base64,${Buffer.from(fileContent).toString('base64')}`;
 
       // Parse SVG to extract dimensions and paths (basic extraction)
@@ -935,12 +961,24 @@ router.post('/api/estimator/upload', upload.single('file'), async (req, res) => 
       const heightMatch = fileContent.match(/height="([^"]+)"/);
 
       if (viewBoxMatch) {
-        const [, , , w, h] = viewBoxMatch[1].split(/\s+/).map(Number);
-        dimensions = { width: w || 100, height: h || 100 };
-      } else if (widthMatch && heightMatch) {
+        const viewBoxParts = viewBoxMatch[1]
+          .trim()
+          .split(/[\s,]+/)
+          .map(Number)
+          .filter(v => isFinite(v));
+        const viewBoxWidth = viewBoxParts[2];
+        const viewBoxHeight = viewBoxParts[3];
+
         dimensions = {
-          width: parseFloat(widthMatch[1]) || 100,
-          height: parseFloat(heightMatch[1]) || 100,
+          width: isFinite(viewBoxWidth) && viewBoxWidth > 0 ? viewBoxWidth : 100,
+          height: isFinite(viewBoxHeight) && viewBoxHeight > 0 ? viewBoxHeight : 100,
+        };
+      } else if (widthMatch && heightMatch) {
+        const parsedWidth = parseSvgDimension(widthMatch[1]);
+        const parsedHeight = parseSvgDimension(heightMatch[1]);
+        dimensions = {
+          width: parsedWidth || 100,
+          height: parsedHeight || 100,
         };
       }
 
@@ -1008,9 +1046,11 @@ router.post('/api/estimator/upload', upload.single('file'), async (req, res) => 
         const widthMatch = tracedSvg.match(/width="([^"]+)"/);
         const heightMatch = tracedSvg.match(/height="([^"]+)"/);
         if (widthMatch && heightMatch) {
+          const parsedWidth = parseSvgDimension(widthMatch[1]);
+          const parsedHeight = parseSvgDimension(heightMatch[1]);
           dimensions = {
-            width: parseFloat(widthMatch[1]) || 100,
-            height: parseFloat(heightMatch[1]) || 100,
+            width: parsedWidth || 100,
+            height: parsedHeight || 100,
           };
         }
 
@@ -1056,9 +1096,11 @@ router.post('/api/estimator/upload', upload.single('file'), async (req, res) => 
         const widthMatch = tracedSvg.match(/width="([^"]+)"/);
         const heightMatch = tracedSvg.match(/height="([^"]+)"/);
         if (widthMatch && heightMatch) {
+          const parsedWidth = parseSvgDimension(widthMatch[1]);
+          const parsedHeight = parseSvgDimension(heightMatch[1]);
           dimensions = {
-            width: parseFloat(widthMatch[1]) || 100,
-            height: parseFloat(heightMatch[1]) || 100,
+            width: parsedWidth || 100,
+            height: parsedHeight || 100,
           };
         }
 
@@ -1090,76 +1132,215 @@ router.post('/api/estimator/upload', upload.single('file'), async (req, res) => 
 
 // Helper function to estimate path length from SVG path data
 function estimatePathLength(d: string): number {
-  const commands = d.match(/[MLHVCSQTAZ][^MLHVCSQTAZ]*/gi) || [];
+  const commands = d.match(/[a-zA-Z][^a-zA-Z]*/g) || [];
   let length = 0;
-  let lastX = 0, lastY = 0;
-  let startX = 0, startY = 0;
+  let lastX = 0;
+  let lastY = 0;
+  let startX = 0;
+  let startY = 0;
 
-  commands.forEach(cmd => {
-    const type = cmd[0].toUpperCase();
-    const coords = cmd.slice(1).trim().split(/[\s,]+/).filter(Boolean).map(Number);
+  const pointDistance = (x1: number, y1: number, x2: number, y2: number) =>
+    Math.hypot(x2 - x1, y2 - y1);
+
+  const cubicBezierLength = (
+    x0: number,
+    y0: number,
+    x1: number,
+    y1: number,
+    x2: number,
+    y2: number,
+    x3: number,
+    y3: number,
+  ) => {
+    const steps = 12;
+    let total = 0;
+    let prevX = x0;
+    let prevY = y0;
+
+    for (let i = 1; i <= steps; i++) {
+      const t = i / steps;
+      const mt = 1 - t;
+      const x =
+        mt * mt * mt * x0 +
+        3 * mt * mt * t * x1 +
+        3 * mt * t * t * x2 +
+        t * t * t * x3;
+      const y =
+        mt * mt * mt * y0 +
+        3 * mt * mt * t * y1 +
+        3 * mt * t * t * y2 +
+        t * t * t * y3;
+      total += pointDistance(prevX, prevY, x, y);
+      prevX = x;
+      prevY = y;
+    }
+
+    return total;
+  };
+
+  const quadraticBezierLength = (
+    x0: number,
+    y0: number,
+    x1: number,
+    y1: number,
+    x2: number,
+    y2: number,
+  ) => {
+    const steps = 12;
+    let total = 0;
+    let prevX = x0;
+    let prevY = y0;
+
+    for (let i = 1; i <= steps; i++) {
+      const t = i / steps;
+      const mt = 1 - t;
+      const x = mt * mt * x0 + 2 * mt * t * x1 + t * t * x2;
+      const y = mt * mt * y0 + 2 * mt * t * y1 + t * t * y2;
+      total += pointDistance(prevX, prevY, x, y);
+      prevX = x;
+      prevY = y;
+    }
+
+    return total;
+  };
+
+  commands.forEach(command => {
+    const rawType = command[0];
+    const type = rawType.toUpperCase();
+    const isRelative = rawType !== type;
+    const coords = (command.slice(1).match(/[+-]?\d*\.?\d+(?:e[+-]?\d+)?/gi) || [])
+      .map(Number)
+      .filter(v => isFinite(v));
+
+    if (type === 'Z') {
+      length += pointDistance(lastX, lastY, startX, startY);
+      lastX = startX;
+      lastY = startY;
+      return;
+    }
 
     switch (type) {
-      case 'M':
-        if (coords.length >= 2) {
-          lastX = coords[0];
-          lastY = coords[1];
-          startX = lastX;
-          startY = lastY;
+      case 'M': {
+        for (let i = 0; i + 1 < coords.length; i += 2) {
+          const x = isRelative ? lastX + coords[i] : coords[i];
+          const y = isRelative ? lastY + coords[i + 1] : coords[i + 1];
+
+          if (i === 0) {
+            startX = x;
+            startY = y;
+          } else {
+            length += pointDistance(lastX, lastY, x, y);
+          }
+
+          lastX = x;
+          lastY = y;
         }
         break;
-      case 'L':
-        if (coords.length >= 2) {
-          length += Math.sqrt(Math.pow(coords[0] - lastX, 2) + Math.pow(coords[1] - lastY, 2));
-          lastX = coords[0];
-          lastY = coords[1];
+      }
+      case 'L': {
+        for (let i = 0; i + 1 < coords.length; i += 2) {
+          const x = isRelative ? lastX + coords[i] : coords[i];
+          const y = isRelative ? lastY + coords[i + 1] : coords[i + 1];
+          length += pointDistance(lastX, lastY, x, y);
+          lastX = x;
+          lastY = y;
         }
         break;
-      case 'H':
-        if (coords.length >= 1) {
-          length += Math.abs(coords[0] - lastX);
-          lastX = coords[0];
+      }
+      case 'H': {
+        coords.forEach(coord => {
+          const x = isRelative ? lastX + coord : coord;
+          length += Math.abs(x - lastX);
+          lastX = x;
+        });
+        break;
+      }
+      case 'V': {
+        coords.forEach(coord => {
+          const y = isRelative ? lastY + coord : coord;
+          length += Math.abs(y - lastY);
+          lastY = y;
+        });
+        break;
+      }
+      case 'C': {
+        for (let i = 0; i + 5 < coords.length; i += 6) {
+          const originX = lastX;
+          const originY = lastY;
+          const x1 = isRelative ? originX + coords[i] : coords[i];
+          const y1 = isRelative ? originY + coords[i + 1] : coords[i + 1];
+          const x2 = isRelative ? originX + coords[i + 2] : coords[i + 2];
+          const y2 = isRelative ? originY + coords[i + 3] : coords[i + 3];
+          const x = isRelative ? originX + coords[i + 4] : coords[i + 4];
+          const y = isRelative ? originY + coords[i + 5] : coords[i + 5];
+
+          length += cubicBezierLength(originX, originY, x1, y1, x2, y2, x, y);
+          lastX = x;
+          lastY = y;
         }
         break;
-      case 'V':
-        if (coords.length >= 1) {
-          length += Math.abs(coords[0] - lastY);
-          lastY = coords[0];
+      }
+      case 'S': {
+        for (let i = 0; i + 3 < coords.length; i += 4) {
+          const originX = lastX;
+          const originY = lastY;
+          const x2 = isRelative ? originX + coords[i] : coords[i];
+          const y2 = isRelative ? originY + coords[i + 1] : coords[i + 1];
+          const x = isRelative ? originX + coords[i + 2] : coords[i + 2];
+          const y = isRelative ? originY + coords[i + 3] : coords[i + 3];
+
+          // Fallback approximation: mirror control point data is unavailable here.
+          length += pointDistance(originX, originY, x2, y2) + pointDistance(x2, y2, x, y);
+          lastX = x;
+          lastY = y;
         }
         break;
-      case 'C':
-        if (coords.length >= 6) {
-          // Cubic bezier - approximate with chord length * factor
-          length += Math.sqrt(Math.pow(coords[4] - lastX, 2) + Math.pow(coords[5] - lastY, 2)) * 1.3;
-          lastX = coords[4];
-          lastY = coords[5];
+      }
+      case 'Q': {
+        for (let i = 0; i + 3 < coords.length; i += 4) {
+          const originX = lastX;
+          const originY = lastY;
+          const x1 = isRelative ? originX + coords[i] : coords[i];
+          const y1 = isRelative ? originY + coords[i + 1] : coords[i + 1];
+          const x = isRelative ? originX + coords[i + 2] : coords[i + 2];
+          const y = isRelative ? originY + coords[i + 3] : coords[i + 3];
+
+          length += quadraticBezierLength(originX, originY, x1, y1, x, y);
+          lastX = x;
+          lastY = y;
         }
         break;
-      case 'Q':
-        if (coords.length >= 4) {
-          // Quadratic bezier - approximate
-          length += Math.sqrt(Math.pow(coords[2] - lastX, 2) + Math.pow(coords[3] - lastY, 2)) * 1.2;
-          lastX = coords[2];
-          lastY = coords[3];
+      }
+      case 'T': {
+        for (let i = 0; i + 1 < coords.length; i += 2) {
+          const x = isRelative ? lastX + coords[i] : coords[i];
+          const y = isRelative ? lastY + coords[i + 1] : coords[i + 1];
+          length += pointDistance(lastX, lastY, x, y);
+          lastX = x;
+          lastY = y;
         }
         break;
-      case 'A':
-        if (coords.length >= 7) {
-          // Arc - approximate with distance * pi/2
-          const endX = coords[5];
-          const endY = coords[6];
-          const rx = coords[0];
-          const ry = coords[1];
-          const avgR = (rx + ry) / 2;
-          length += avgR * Math.PI; // Rough approximation
+      }
+      case 'A': {
+        for (let i = 0; i + 6 < coords.length; i += 7) {
+          const originX = lastX;
+          const originY = lastY;
+          const rx = Math.abs(coords[i]);
+          const ry = Math.abs(coords[i + 1]);
+          const endX = isRelative ? originX + coords[i + 5] : coords[i + 5];
+          const endY = isRelative ? originY + coords[i + 6] : coords[i + 6];
+
+          const chord = pointDistance(originX, originY, endX, endY);
+          const avgRadius = (rx + ry) / 2;
+          const arcEstimate = avgRadius > 0 ? Math.max(chord, avgRadius * Math.PI * 0.5) : chord;
+
+          length += arcEstimate;
           lastX = endX;
           lastY = endY;
         }
         break;
-      case 'Z':
-        length += Math.sqrt(Math.pow(startX - lastX, 2) + Math.pow(startY - lastY, 2));
-        lastX = startX;
-        lastY = startY;
+      }
+      default:
         break;
     }
   });

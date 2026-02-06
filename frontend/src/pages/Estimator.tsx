@@ -146,6 +146,7 @@ interface NestingResult {
 interface EstimationResult {
   totalCuttingLength: number;
   cuttingTime: number;
+  cuttingCost: number;
   materialCost: number;
   laborCost: number;
   gasCost: number;
@@ -323,19 +324,33 @@ export default function Estimator() {
       if (nestingResult.layouts.length === 0) {
         nestingErrors.push('Tidak ada layout yang berhasil dibuat.');
       }
-      
+
+      const invalidLayouts = nestingResult.layouts.filter(
+        l => !isFinite(l.partsPerSheet) || l.partsPerSheet <= 0 || !isFinite(l.totalSheets) || l.totalSheets <= 0,
+      );
+      if (invalidLayouts.length > 0) {
+        nestingErrors.push(`${invalidLayouts.length} part tidak muat di sheet. Sesuaikan skala atau ukuran sheet.`);
+      }
+
       const lowUtil = nestingResult.layouts.filter(l => l.utilization < 20);
       if (lowUtil.length > 0) {
         nestingWarnings.push(`${lowUtil.length} part memiliki utilisasi rendah (<20%).`);
       }
-      
+
       if (!isFinite(nestingResult.totalSheets) || nestingResult.totalSheets <= 0) {
         nestingErrors.push('Perhitungan jumlah sheet tidak valid');
       }
     }
 
     validations[5] = {
-      isValid: nestingResult !== null && nestingResult.layouts.length > 0 && isFinite(nestingResult.totalSheets),
+      isValid:
+        nestingResult !== null &&
+        nestingResult.layouts.length > 0 &&
+        isFinite(nestingResult.totalSheets) &&
+        nestingResult.totalSheets > 0 &&
+        nestingResult.layouts.every(
+          l => isFinite(l.partsPerSheet) && l.partsPerSheet > 0 && isFinite(l.totalSheets) && l.totalSheets > 0,
+        ),
       errors: nestingErrors,
       warnings: nestingWarnings,
     };
@@ -433,26 +448,48 @@ export default function Estimator() {
     }
 
     const droppedFiles = Array.from(e.dataTransfer.files);
-    setError(null);
+    if (droppedFiles.length === 0) return;
 
-    for (const file of droppedFiles) {
-      const processed = await processFile(file);
-      if (processed) {
-        setFiles(prev => [...prev, processed]);
-      }
+    setError(null);
+    setWarnings([]);
+
+    if (droppedFiles.length > 1) {
+      setWarnings(['Estimator saat ini hanya memproses 1 file per estimasi. File pertama yang digunakan.']);
+    }
+
+    const processed = await processFile(droppedFiles[0]);
+    if (processed) {
+      setFiles([processed]);
+      setSelections([]);
+      setCroppedPreviews([]);
+      setCroppedDimensionsList([]);
+      setNestingResult(null);
+      setEstimation(null);
+      setCurrentLayoutIndex(0);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFiles = Array.from(e.target.files || []);
-    setError(null);
+    if (selectedFiles.length === 0) return;
 
-    for (const file of selectedFiles) {
-      const processed = await processFile(file);
-      if (processed) {
-        setFiles(prev => [...prev, processed]);
-      }
+    setError(null);
+    setWarnings([]);
+
+    if (selectedFiles.length > 1) {
+      setWarnings(['Estimator saat ini hanya memproses 1 file per estimasi. File pertama yang digunakan.']);
+    }
+
+    const processed = await processFile(selectedFiles[0]);
+    if (processed) {
+      setFiles([processed]);
+      setSelections([]);
+      setCroppedPreviews([]);
+      setCroppedDimensionsList([]);
+      setNestingResult(null);
+      setEstimation(null);
+      setCurrentLayoutIndex(0);
     }
 
     if (fileInputRef.current) {
@@ -635,13 +672,13 @@ export default function Estimator() {
 
     // 3. Aggregate results
     const totalGlobalSheets = layouts.reduce((sum, l) => sum + l.totalSheets, 0);
-    // Simple average utilization (weighted by sheets would be better but this is estimation)
-    const avgUtil = safeDivide(layouts.reduce((sum, l) => sum + l.utilization, 0), layouts.length, 0);
+    const weightedUtilNumerator = layouts.reduce((sum, l) => sum + (l.utilization * l.totalSheets), 0);
+    const globalUtil = safeDivide(weightedUtilNumerator, totalGlobalSheets, 0);
 
     setNestingResult({
       layouts,
       totalSheets: totalGlobalSheets,
-      globalUtilization: avgUtil,
+      globalUtilization: globalUtil,
       totalParts: partsToProcess.length
     });
   };
@@ -660,6 +697,15 @@ export default function Estimator() {
       return;
     }
 
+    const invalidLayouts = nestingResult.layouts.filter(
+      l => !isFinite(l.partsPerSheet) || l.partsPerSheet <= 0 || !isFinite(l.totalSheets) || l.totalSheets <= 0,
+    );
+    if (invalidLayouts.length > 0) {
+      setError('Sebagian part tidak muat di sheet. Perbaiki nesting sebelum hitung biaya.');
+      setEstimation(null);
+      return;
+    }
+
     const safeScale = isValidNumber(scale.value) && scale.value > 0 ? scale.value : 1;
     const unitMultiplier = scale.unit === 'cm' ? 10 : scale.unit === 'm' ? 1000 : 1;
     const safeQuantity = isValidNumber(quantity) && quantity > 0 ? quantity : 1;
@@ -671,6 +717,7 @@ export default function Estimator() {
     const safeGasFlowRate = isValidNumber(settings.gasFlowRate) ? settings.gasFlowRate : 20;
     const safeGasPrice = isValidNumber(settings.gasPrice) ? settings.gasPrice : 50000;
     const safeSheetPrice = isValidNumber(settings.sheetPricePerM2) ? settings.sheetPricePerM2 : 150000;
+    const safeCuttingPricePerMeter = isValidNumber(material.pricePerMeter) ? material.pricePerMeter : 0;
     const sheetAreaM2 = safeDivide(settings.defaultSheetWidth * settings.defaultSheetHeight, 1000000, 1);
 
     // Calculate totals across all layouts (parts)
@@ -707,19 +754,21 @@ export default function Estimator() {
 
     const cuttingTime = safeDivide(totalCuttingLength, safeCuttingSpeed, 0); // minutes
     const gasUsage = safeDivide(safeGasFlowRate * cuttingTime, 1000, 0); // m3
-    
+
+    const cuttingCost = (totalCuttingLength / 1000) * safeCuttingPricePerMeter;
     const laborCost = cuttingTime * safeLaborCost;
     const gasCost = gasUsage * safeGasPrice;
-    
+
     const sheetCostPerSheet = sheetAreaM2 * safeSheetPrice;
     const materialCost = sheetCostPerSheet * totalSheets;
 
-    const totalCost = materialCost + laborCost + gasCost;
+    const totalCost = materialCost + cuttingCost + laborCost + gasCost;
     const pricePerPiece = safeDivide(totalCost, safeQuantity * nestingResult.totalParts, 0);
 
     setEstimation({
       totalCuttingLength,
       cuttingTime,
+      cuttingCost,
       materialCost,
       laborCost,
       gasCost,
@@ -845,24 +894,6 @@ EOF`;
     URL.revokeObjectURL(url);
   };
 
-  // Navigation
-  const canProceed = (): boolean => {
-    switch (currentStep) {
-      case 1: return files.length > 0;
-      case 2: {
-        // Step 2 now uses action buttons (skip/apply), not the main nav
-        // But we still allow proceeding if there are any paths or selections
-        const hasSelectedPaths = files.some(f => f.paths && f.paths.some(p => p.selected));
-        const hasSelectedAreas = selections.some(s => s.selected);
-        return hasSelectedPaths || hasSelectedAreas || files.length > 0;
-      }
-      case 3: return scale.value > 0;
-      case 4: return selectedMaterial !== '' && selectedThickness > 0;
-      case 5: return nestingResult !== null;
-      default: return true;
-    }
-  };
-
   const nextStep = () => {
     if (currentStep === 4) {
       calculateNesting();
@@ -898,6 +929,7 @@ EOF`;
     setSelectionMode('select');
     setCroppedPreviews([]);
     setCroppedDimensionsList([]);
+    setWarnings([]);
   };
 
   // Get image bounds within the preview canvas
@@ -1048,6 +1080,7 @@ EOF`;
   // Skip selection and use all paths
   const skipSelection = () => {
     setUseAreaSelection(false);
+    setWarnings([]);
     // Clear cropped preview - use full image
     setCroppedPreviews([]);
     setCroppedDimensionsList([]);
@@ -1156,6 +1189,12 @@ EOF`;
       return;
     }
 
+    const selectedSelections = selections.filter(s => s.selected);
+    if (selectedSelections.length === 0) {
+      setWarnings(['Pilih minimal 1 area atau klik "Skip - Gunakan Semua".']);
+      return;
+    }
+
     // Show loading state
     setIsProcessing(true);
     setError(null);
@@ -1169,12 +1208,12 @@ EOF`;
       const dimensionsList: { width: number; height: number }[] = [];
       const newWarnings: string[] = [];
 
-      for (let i = 0; i < selections.length; i++) {
-        const selection = selections[i];
+      for (let i = 0; i < selectedSelections.length; i++) {
+        const selection = selectedSelections[i];
 
         // Validate selection before processing
         if (selection.width <= 0 || selection.height <= 0) {
-          newWarnings.push(`Area ${i + 1} tidak valid.`);
+          newWarnings.push(`Area terpilih ${i + 1} tidak valid.`);
           continue;
         }
 
@@ -1268,7 +1307,6 @@ EOF`;
                 ref={fileInputRef}
                 type="file"
                 accept=".svg,.dxf,.png,.jpg,.jpeg,.webp,.pdf"
-                multiple
                 onChange={handleFileSelect}
                 style={{ display: 'none' }}
               />
@@ -1510,12 +1548,23 @@ EOF`;
                   Skip - Gunakan Semua
                 </button>
                 {selections.length > 0 && (
-                  <button className="btn-primary" onClick={applyAreaSelection}>
+                  <button className="btn-primary" onClick={applyAreaSelection} disabled={selectedAreas.length === 0}>
                     <Check size={18} />
                     Gunakan {selectedAreas.length} Area Terpilih
                   </button>
                 )}
               </div>
+
+              {warnings.length > 0 && (
+                <div className="validation-messages">
+                  {warnings.map((warning, idx) => (
+                    <div key={`selection-warning-${idx}`} className="validation-message warning">
+                      <AlertTriangle size={16} />
+                      <span>{warning}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
 
               {/* Instructions */}
               <div className="selection-help">
@@ -1933,12 +1982,15 @@ EOF`;
 
       case 6: {
         const material = settings.materials.find(m => m.id === selectedMaterial);
+        const hasUnnestableLayouts = nestingResult
+          ? nestingResult.layouts.some(layout => layout.partsPerSheet <= 0 || layout.totalSheets <= 0)
+          : false;
         return (
           <div className="step-content">
             <h2 className="step-title">Hasil Estimasi</h2>
             <p className="step-description">Ringkasan lengkap biaya pemotongan laser</p>
 
-            {!estimation && nestingResult?.partsPerSheet === 0 && (
+            {!estimation && hasUnnestableLayouts && (
               <div className="estimation-error">
                 <AlertCircle size={48} />
                 <h3>Tidak dapat menghitung estimasi</h3>
@@ -2016,6 +2068,10 @@ EOF`;
                 <div className="result-costs">
                   <h4>Rincian Biaya</h4>
                   <div className="cost-breakdown">
+                    <div className="cost-row">
+                      <span>Biaya Cutting ({(estimation.totalCuttingLength / 1000).toFixed(2)} m × Rp {material?.pricePerMeter.toLocaleString() || 0})</span>
+                      <strong>Rp {estimation.cuttingCost.toLocaleString('id-ID', { maximumFractionDigits: 0 })}</strong>
+                    </div>
                     <div className="cost-row">
                       <span>Biaya Material ({estimation.totalSheets} sheet)</span>
                       <strong>Rp {estimation.materialCost.toLocaleString('id-ID', { maximumFractionDigits: 0 })}</strong>

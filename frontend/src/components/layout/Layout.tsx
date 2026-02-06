@@ -10,6 +10,8 @@ import {
   MessageCircle
 } from 'lucide-react';
 
+const EMBEDDED_CHAT_ENABLED = false;
+
 export function Layout() {
   return (
     <>
@@ -59,13 +61,15 @@ export function Layout() {
             <Calculator size={20} className="mobile-nav-icon" />
             <span>Estimator</span>
           </NavLink>
-          <NavLink
-            to="/embedded-chat"
-            className={({ isActive }) => `mobile-nav-item ${isActive ? 'active' : ''}`}
-          >
-            <MessageCircle size={20} className="mobile-nav-icon" />
-            <span>Chatbot</span>
-          </NavLink>
+          {EMBEDDED_CHAT_ENABLED && (
+            <NavLink
+              to="/embedded-chat"
+              className={({ isActive }) => `mobile-nav-item ${isActive ? 'active' : ''}`}
+            >
+              <MessageCircle size={20} className="mobile-nav-icon" />
+              <span>Chatbot</span>
+            </NavLink>
+          )}
         </div>
       </nav>
     </>

@@ -17,6 +17,8 @@ import {
   Calculator
 } from 'lucide-react';
 
+const EMBEDDED_CHAT_ENABLED = false;
+
 // Helper to format time ago
 const formatTimeAgo = (dateStr: string) => {
   const date = new Date(dateStr);
@@ -149,13 +151,15 @@ export function Header() {
             <Calculator size={16} />
             Estimator
           </NavLink>
-          <NavLink
-            to="/embedded-chat"
-            className={({ isActive }) => `nav-tab ${isActive ? 'active' : ''}`}
-          >
-            <MessageCircle size={16} />
-            Embedded Chat
-          </NavLink>
+          {EMBEDDED_CHAT_ENABLED && (
+            <NavLink
+              to="/embedded-chat"
+              className={({ isActive }) => `nav-tab ${isActive ? 'active' : ''}`}
+            >
+              <MessageCircle size={16} />
+              Embedded Chat
+            </NavLink>
+          )}
         </nav>
 
         <div className="header-right">

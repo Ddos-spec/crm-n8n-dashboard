@@ -1,5 +1,5 @@
 import { Suspense, lazy } from 'react';
-import { HashRouter, Route, Routes } from 'react-router-dom';
+import { HashRouter, Navigate, Route, Routes } from 'react-router-dom';
 import { CustomerContextProvider } from './context/customer';
 import { ThemeProvider } from './context/ThemeContext';
 import { Layout } from './components/layout/Layout';
@@ -12,6 +12,7 @@ const Tugas = lazy(() => import('./pages/Tugas'));
 const Penugasan = lazy(() => import('./pages/Penugasan'));
 const Estimator = lazy(() => import('./pages/Estimator'));
 const EmbeddedChat = lazy(() => import('./pages/EmbeddedChat'));
+const EMBEDDED_CHAT_ENABLED = false;
 
 // Simple Loading Spinner for Suspense fallback
 const PageLoader = () => (
@@ -64,11 +65,15 @@ export default function App() {
                   <Estimator />
                 </Suspense>
               } />
-              <Route path="/embedded-chat" element={
-                <Suspense fallback={<PageLoader />}>
-                  <EmbeddedChat />
-                </Suspense>
-              } />
+              {EMBEDDED_CHAT_ENABLED ? (
+                <Route path="/embedded-chat" element={
+                  <Suspense fallback={<PageLoader />}>
+                    <EmbeddedChat />
+                  </Suspense>
+                } />
+              ) : (
+                <Route path="/embedded-chat" element={<Navigate to="/" replace />} />
+              )}
               <Route path="*" element={
                 <Suspense fallback={<PageLoader />}>
                   <Dashboard />
